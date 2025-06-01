@@ -13,9 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.skatehive.app",
@@ -65,9 +63,6 @@
     "extra": {
       "router": {
         "origin": false
-      },
-      "eas": {
-        "projectId": "fe8abcbe-2128-4543-9398-248fdc04bd3d"
       }
     },
     "owner": "r4topunk"
