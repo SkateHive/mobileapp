@@ -1,16 +1,15 @@
+
 import { router } from 'expo-router';
 import React from 'react';
 import { Dimensions, LayoutAnimation, Platform, UIManager, View } from 'react-native';
 import { AuthError, useAuth } from '~/lib/auth-provider';
-import {
-  AccountNotFoundError,
-  HiveError,
-  InvalidKeyError,
-  InvalidKeyFormatError
-} from '~/lib/hive-utils';
+import { AccountNotFoundError, HiveError, InvalidKeyError, InvalidKeyFormatError } from '~/lib/hive-utils';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { MatrixRain } from '../ui/loading-effects/MatrixRain';
 import { LoginForm } from './LoginForm';
+import { deleteEncryptedKey } from '~/lib/secure-key';
+import { STORED_USERS_KEY } from '~/lib/constants';
+import * as SecureStore from 'expo-secure-store';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android') {
@@ -23,7 +22,19 @@ const { height } = Dimensions.get('window');
 
 export function AuthScreen() {
   const { isDarkColorScheme } = useColorScheme();
-  const { storedUsers, login, loginStoredUser, enterSpectatorMode } = useAuth();
+  const { storedUsers, login, loginStoredUser, enterSpectatorMode, deleteStoredUser } = useAuth();
+  const [deletingUser, setDeletingUser] = React.useState<string | null>(null);
+  // Delete a user from stored users and SecureStore
+  const handleDeleteUser = async (username: string) => {
+    setDeletingUser(username);
+    try {
+      await deleteStoredUser(username);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    } finally {
+      setDeletingUser(null);
+    }
+  };
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [message, setMessage] = React.useState('');
@@ -58,7 +69,7 @@ export function AuthScreen() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (method: 'biometric' | 'pin', pin?: string) => {
     try {
       if (!username || !password) {
         setMessage('Please enter both username and posting key');
@@ -66,7 +77,7 @@ export function AuthScreen() {
         return;
       }
 
-      await login(username, password);
+      await login(username, password, method, pin);
 
       LayoutAnimation.configureNext(
         LayoutAnimation.create(
@@ -96,10 +107,10 @@ export function AuthScreen() {
     }
   };
 
-  const handleQuickLogin = async (selectedUsername: string) => {
+  // Accept username, method, and optional pin for quick login
+  const handleQuickLogin = async (selectedUsername: string, method: 'biometric' | 'pin', pin?: string) => {
     try {
-      await loginStoredUser(selectedUsername);
-      
+      await loginStoredUser(selectedUsername, pin);
       LayoutAnimation.configureNext(
         LayoutAnimation.create(
           500,
@@ -108,12 +119,10 @@ export function AuthScreen() {
         )
       );
       setIsVisible(false);
-      
       setTimeout(() => {
         router.push('/(tabs)/feed');
       }, 500);
     } catch (error) {
-      // Handle specific error types
       if (error instanceof InvalidKeyFormatError ||
           error instanceof AccountNotFoundError ||
           error instanceof InvalidKeyError ||
@@ -123,7 +132,6 @@ export function AuthScreen() {
       } else {
         setMessage('Error with quick login');
       }
-      
       setMessageType('error');
     }
   };
@@ -149,6 +157,8 @@ export function AuthScreen() {
           storedUsers={storedUsers}
           onQuickLogin={handleQuickLogin}
           isDarkColorScheme={isDarkColorScheme}
+          onDeleteUser={handleDeleteUser}
+          deletingUser={deletingUser}
         />
       </View>
     </View>

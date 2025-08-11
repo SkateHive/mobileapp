@@ -1,11 +1,14 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { FontAwesome } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
-import * as SecureStore from 'expo-secure-store';
+// import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Image, Pressable, View, Linking, ActivityIndicator } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
-import { API_BASE_URL } from '~/lib/constants';
+// import { API_BASE_URL } from '~/lib/constants';
+import { vote as hiveVote } from '~/lib/hive-utils';
+import { useAuth } from '~/lib/auth-provider';
 import { Text } from '../ui/text';
 import { MediaPreview } from './MediaPreview';
 import { useToast } from '~/lib/toast-provider';
@@ -18,9 +21,12 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, currentUsername }: PostCardProps) {
+  const { session } = useAuth();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [isVoting, setIsVoting] = useState(false);
+  const [showSlider, setShowSlider] = useState(false);
+  const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
   const [voteCount, setVoteCount] = useState(post.votes.filter(vote => vote.weight > 0).length);
   const { showToast } = useToast();
@@ -38,23 +44,17 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
     setIsModalVisible(true);
   }, []);
 
-  const handleVote = async () => {
+  const handleVote = async (customWeight?: number) => {
     try {
       setIsVoting(true);
 
-      if (!currentUsername) {
+      if (!session || !session.username || !session.decryptedKey) {
         showToast('Please login first', 'error');
         return;
       }
 
-      if (currentUsername === "SPECTATOR") {
+      if (session.username === "SPECTATOR") {
         showToast('Please login first', 'error');
-        return;
-      }
-
-      const password = await SecureStore.getItemAsync(currentUsername);
-      if (!password) {
-        showToast('Invalid credentials', 'error');
         return;
       }
 
@@ -66,47 +66,29 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
       setIsLiked(!isLiked);
       setVoteCount(prevCount => previousLikedState ? prevCount - 1 : prevCount + 1);
 
-      const response = await fetch(`${API_BASE_URL}/vote`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          voter: currentUsername,
-          author: post.author,
-          permlink: post.permlink,
-          posting_key: password,
-          weight: previousLikedState ? 0 : 10000 // Use previous state to determine weight
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
+      try {
+        await hiveVote(
+          session.decryptedKey,
+          session.username,
+          post.author,
+          post.permlink,
+          previousLikedState ? 0 : Math.round((customWeight ?? voteWeight) * 100)
+        );
+      } catch (err) {
         // Revert the optimistic update if the request failed
         setIsLiked(previousLikedState);
         setVoteCount(prevCount => previousLikedState ? prevCount + 1 : prevCount - 1);
-        throw new Error(error);
+        throw err;
       }
     } catch (error) {
-      // console.error('Vote error:', error);
-      
       let errorMessage = 'Failed to vote';
       if (error instanceof Error) {
-        try {
-          // Parse the JSON string from error.message
-          const errorData = JSON.parse(error.message);
-          if (errorData && errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (parseError) {
-          // If parsing fails, use the original error message
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
-      
       showToast(errorMessage, 'error');
     } finally {
       setIsVoting(false);
+      setShowSlider(false);
     }
   };
 
@@ -205,7 +187,13 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
           </View>
         </View>
         <Text className="text-gray-500">
-          {formatDistanceToNow(new Date(post.created), { addSuffix: true })}
+          {(() => {
+            const dateStr = post.created;
+            if (!dateStr) return '';
+            const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+            if (isNaN(date.getTime())) return '';
+            return formatDistanceToNow(date, { addSuffix: true });
+          })()}
         </Text>
       </Pressable>
 
@@ -230,31 +218,68 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
           ${calculateTotalValue(post)}
         </Text>
         <View>
-          <Pressable
-            onPress={handleVote}
-            className={`flex-row items-center gap-1 ${isVoting ? 'opacity-70' : ''}`}
-            disabled={isVoting}
-          >
-            {isVoting ? (
-              <ActivityIndicator 
-                size="small" 
-                color={isLiked ? "#32CD32" : "#666666"}
-                style={{ marginRight: 4, marginLeft: 4 }}
+          {showSlider ? (
+            <View className="flex-col items-center bg-background rounded-xl p-3 shadow-lg w-48">
+              <Text className="mb-2 text-center text-base font-semibold">Vote Weight: {voteWeight}%</Text>
+              <Slider
+                style={{ width: 150, height: 40 }}
+                minimumValue={1}
+                maximumValue={100}
+                step={1}
+                value={voteWeight}
+                onValueChange={setVoteWeight}
+                minimumTrackTintColor="#32CD32"
+                maximumTrackTintColor="#d1d5db"
+                thumbTintColor="#32CD32"
               />
-            ) : (
-              <>
-                <Text className={`text-xl font-bold ${isLiked ? 'text-green-500' : 'text-gray-600'}`}>
-                  {voteCount}
-                </Text>
-                <FontAwesome
-                  name={"arrow-up"}
-                  size={20}
+              <View className="flex-row gap-2 mt-2">
+                <Pressable
+                  className="bg-gray-200 px-3 py-1 rounded"
+                  onPress={() => setShowSlider(false)}
+                  disabled={isVoting}
+                >
+                  <Text className="text-gray-700">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  className={`bg-green-500 px-3 py-1 rounded ${isVoting ? 'opacity-70' : ''}`}
+                  onPress={() => handleVote(voteWeight)}
+                  disabled={isVoting}
+                >
+                  {isVoting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text className="text-white font-bold">Confirm</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setShowSlider(true)}
+              className={`flex-row items-center gap-1 ${isVoting ? 'opacity-70' : ''}`}
+              disabled={isVoting}
+            >
+              {isVoting ? (
+                <ActivityIndicator 
+                  size="small" 
                   color={isLiked ? "#32CD32" : "#666666"}
-                  style={{ marginRight: 4 }}
+                  style={{ marginRight: 4, marginLeft: 4 }}
                 />
-              </>
-            )}
-          </Pressable>
+              ) : (
+                <>
+                  <Text className={`text-xl font-bold ${isLiked ? 'text-green-500' : 'text-gray-600'}`}>
+                    {voteCount}
+                  </Text>
+                  <FontAwesome
+                    name={"arrow-up"}
+                    size={20}
+                    color={isLiked ? "#32CD32" : "#666666"}
+                    style={{ marginRight: 4 }}
+                  />
+                </>
+              )}
+            </Pressable>
+          )}
         </View>
       </View>
     </View>

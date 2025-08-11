@@ -9,27 +9,23 @@ interface ApiResponse<T> {
 /**
  * Fetches the main feed, filtering duplicate votes to keep only the latest vote per user
  */
-export async function getFeed(): Promise<Post[]> {
+
+// Paginated feed fetcher
+export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/feed`);
+    const response = await fetch(`${API_BASE_URL}/feed?page=${page}&limit=${limit}`);
     const data: ApiResponse<Post[]> = await response.json();
-    
     if (data.success && Array.isArray(data.data)) {
       // Process each post to filter duplicate votes
       return data.data.map((post: Post) => {
         if (post.votes && Array.isArray(post.votes)) {
-          // Create a map to store the latest vote for each voter
           const latestVotesMap = new Map();
-          
-          // Iterate through votes to find the latest one for each voter
           post.votes.forEach(vote => {
             const existingVote = latestVotesMap.get(vote.voter);
             if (!existingVote || new Date(vote.timestamp) > new Date(existingVote.timestamp)) {
               latestVotesMap.set(vote.voter, vote);
             }
           });
-          
-          // Convert the map values back to an array
           post.votes = Array.from(latestVotesMap.values());
         }
         return post;

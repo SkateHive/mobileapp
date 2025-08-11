@@ -1,3 +1,6 @@
+// React 19 workaround: If you see "useInsertionEffect must not schedule updates",
+// we defer state updates in animation callbacks using setTimeout.
+// If more compatibility issues arise, consider downgrading to React 18.
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, View } from 'react-native';
 import { useColorScheme } from '~/lib/useColorScheme';
@@ -105,18 +108,14 @@ export function MatrixRain({
     // Start animations for all drops immediately
     const animations = rainDrops.current.map(drop => {
       const cycleTime = (12000 / drop.speed) / speed;
-      
       return Animated.loop(
         Animated.sequence([
-          // Minimal initial delay
           Animated.delay(drop.startDelay),
-          // Falling animation
           Animated.timing(drop.y, {
             toValue: height + drop.fontSize * drop.length,
             duration: cycleTime,
             useNativeDriver: true,
           }),
-          // Reset position
           Animated.timing(drop.y, {
             toValue: -drop.fontSize * drop.length,
             duration: 0,
@@ -126,9 +125,11 @@ export function MatrixRain({
       );
     });
 
-    // Start all animations at once
+    // React 19 workaround: defer state update to avoid useInsertionEffect error
     const animation = Animated.parallel(animations);
-    animation.start(() => setAnimationReady(true));
+    animation.start(() => {
+      setTimeout(() => setAnimationReady(true), 0);
+    });
 
     return () => {
       animation.stop();

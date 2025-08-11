@@ -78,3 +78,28 @@ export interface PreloadedData {
   feed: Post[];
   trending: Post[];
 }
+
+// --- Secure Key & Auth Types ---
+
+export type EncryptionMethod = 'biometric' | 'pin';
+
+export interface EncryptedKey {
+  username: string;
+  encrypted: string;
+  method: EncryptionMethod;
+  salt: string;
+  iv: string;
+  createdAt: number;
+}
+
+export interface StoredUser {
+  username: string;
+  method: EncryptionMethod;
+  createdAt: number;
+}
+
+export interface AuthSession {
+  username: string;
+  decryptedKey: string;
+  loginTime: number;
+}

@@ -1,49 +1,77 @@
+
+
+
 import React from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, Pressable } from 'react-native';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Ionicons } from '@expo/vector-icons';
+import type { StoredUser } from '../../lib/types';
 
 interface StoredUsersViewProps {
-  users: string[];
-  onQuickLogin: (username: string) => Promise<void>;
+  users: StoredUser[];
+  onQuickLogin: (user: StoredUser) => void;
   isDarkColorScheme: boolean;
+  onDeleteUser?: (username: string) => void;
 }
 
-export function StoredUsersView({ users, onQuickLogin, isDarkColorScheme }: StoredUsersViewProps) {
+
+
+export function StoredUsersView({ users, onQuickLogin, isDarkColorScheme, onDeleteUser }: StoredUsersViewProps) {
   return (
     <View className="w-full max-w-sm">
-      <ScrollView 
+      <ScrollView
         className="max-h-[200px]"
         showsVerticalScrollIndicator={true}
         bounces={false}
       >
         {users
-          .filter(user => user !== "SPECTATOR")
+          .filter(user => user.username !== "SPECTATOR")
           .map((user) => (
-            <Button
-              key={user}
-              onPress={() => onQuickLogin(user)}
-              variant="ghost"
-              className="px-6 py-3 mb-2 flex-row items-center justify-between"
+            <View
+              key={user.username}
+              className="flex-row items-center justify-between px-2 mb-2"
             >
-              <View className="flex-row items-center">
-                <Ionicons 
-                  name="person-circle-outline" 
-                  size={24} 
-                  color={isDarkColorScheme ? '#ffffff' : '#000000'} 
+              <Button
+                onPress={() => onQuickLogin(user)}
+                variant="ghost"
+                className="flex-1 flex-row items-center justify-between px-4 py-3"
+              >
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={24}
+                    color={isDarkColorScheme ? '#ffffff' : '#000000'}
+                  />
+                  <Text className="text-lg font-medium text-foreground ml-2">
+                    {'@' + user.username}
+                  </Text>
+                  <Text className="ml-2 text-xs text-foreground/60">
+                    {user.method === 'pin' ? 'PIN' : 'Biometric'}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="arrow-forward-outline"
+                  size={20}
+                  color={isDarkColorScheme ? '#ffffff80' : '#00000080'}
                 />
-                <Text className="text-lg font-medium text-foreground ml-2">
-                  {'@' + user}
-                </Text>
-              </View>
-              <Ionicons 
-                name="arrow-forward-outline" 
-                size={20} 
-                color={isDarkColorScheme ? '#ffffff80' : '#00000080'} 
-              />
-            </Button>
-        ))}
+              </Button>
+              {onDeleteUser && (
+                <Pressable
+                  onPress={() => onDeleteUser(user.username)}
+                  className="ml-2 p-2 rounded-full active:bg-destructive/20"
+                  accessibilityLabel={`Delete @${user.username}`}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={22}
+                    color={isDarkColorScheme ? '#ef4444' : '#dc2626'}
+                  />
+                </Pressable>
+              )}
+            </View>
+          ))}
       </ScrollView>
     </View>
   );

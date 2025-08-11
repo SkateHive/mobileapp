@@ -1,3 +1,36 @@
+import React, { useState } from 'react';
+// Paginated feed hook for infinite scroll
+export function useFeedPaginated(page: number, limit: number) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const fetchPage = async () => {
+      setIsLoading(true);
+      try {
+        const newPosts = await getFeed(page, limit);
+        if (!cancelled) {
+          setPosts(prev => {
+            // Deduplicate by permlink
+            const permlinks = new Set(prev.map(p => p.permlink));
+            const unique = newPosts.filter(p => !permlinks.has(p.permlink));
+            if (unique.length === 0) setHasMore(false);
+            return [...prev, ...unique];
+          });
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    fetchPage();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  return { posts, isLoading, hasMore };
+}
 import { useQuery } from '@tanstack/react-query';
 import { 
   getFeed, 
@@ -53,13 +86,7 @@ const SPECTATOR_PROFILE: ProfileData = {
   }
 };
 
-export function useFeed() {
-  return useQuery({
-    queryKey: ['feed'],
-    queryFn: getFeed,
-    refetchInterval: 60000,
-  });
-}
+// Deprecated: useFeed is not compatible with paginated API. Use useFeedPaginated instead for infinite scroll.
 
 export function useTrending() {
   return useQuery({

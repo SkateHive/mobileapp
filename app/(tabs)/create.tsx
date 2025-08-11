@@ -13,21 +13,22 @@ import {
   Alert,
 } from "react-native";
 import { router } from "expo-router";
-import * as FileSystem from "expo-file-system";
-import * as SecureStore from "expo-secure-store";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Text } from "~/components/ui/text";
 import { useColorScheme } from "~/lib/useColorScheme";
 import { useAuth } from "~/lib/auth-provider";
-import { API_BASE_URL } from "~/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateSpectatorInfo } from "~/components/SpectatorMode/CreateSpectatorInfo";
+import { uploadVideoToPinata, createVideoIframe } from "~/lib/upload/video-upload";
+import { uploadImageToHive, createImageMarkdown } from "~/lib/upload/image-upload";
+import { createHiveComment } from "~/lib/upload/post-utils";
+import { SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG, getLastSnapsContainer } from "~/lib/hive-utils";
 
 export default function CreatePost() {
   const { isDarkColorScheme } = useColorScheme();
-  const { username } = useAuth();
+  const { username, session } = useAuth();
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
   const [media, setMedia] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export default function CreatePost() {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [hasVideoInteraction, setHasVideoInteraction] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
 
   const pickMedia = async () => {
     try {
@@ -56,13 +58,11 @@ export default function CreatePost() {
 
         // Get the actual MIME type from the asset
         if (asset.mimeType) {
-          // Use the MIME type directly from the asset if available
           setMediaMimeType(asset.mimeType);
         } else {
           // Fallback to detection based on file extension
           const fileExtension = asset.uri.split(".").pop()?.toLowerCase();
           if (asset.type === "image") {
-            // Map common image extensions to MIME types
             const imageMimeTypes: Record<string, string> = {
               jpg: "image/jpeg",
               jpeg: "image/jpeg",
@@ -75,7 +75,6 @@ export default function CreatePost() {
               imageMimeTypes[fileExtension || ""] || "image/jpeg"
             );
           } else {
-            // Map common video extensions to MIME types
             const videoMimeTypes: Record<string, string> = {
               mp4: "video/mp4",
               mov: "video/quicktime",
@@ -94,6 +93,7 @@ export default function CreatePost() {
       }
     } catch (error) {
       console.error("Error selecting media:", error);
+      Alert.alert("Error", "Failed to select media. Please try again.");
     } finally {
       setIsSelectingMedia(false);
     }
@@ -115,105 +115,153 @@ export default function CreatePost() {
   };
 
   const handlePost = async () => {
-    if (!content.trim() && !media) return;
+    if (!content.trim() && !media) {
+      Alert.alert("Validation Error", "Please add some content or media to your post");
+      return;
+    }
 
     // Check if user is authenticated
-    if (!username || username === "SPECTATOR") {
+    if (!username || username === "SPECTATOR" || !session?.decryptedKey) {
       Alert.alert("Authentication Required", "Please log in to create a post");
       return;
     }
 
     setIsUploading(true);
     setErrorMessage(null);
+    setUploadProgress("");
 
     try {
-      // Get user's posting key from secure storage
-      const postingKey = await SecureStore.getItemAsync(username);
-      if (!postingKey) {
-        throw new Error("Authentication error: Posting key not found");
-      }
+      let postBody = content;
+      let imageUrls: string[] = [];
+      let videoUrls: string[] = [];
 
-      // Prepare post data as JSON
-      const postData: {
-        author: string;
-        body: string;
-        media?: {
-          data: string;
-          type: string;
-          name: string;
-        };
-      } = {
-        author: username,
-        body: content,
-      };
+      // Handle media upload
+      if (media && mediaType && mediaMimeType) {
+        const fileName = media.split("/").pop() || `${Date.now()}.${mediaType === "image" ? "jpg" : "mp4"}`;
 
-      // Handle media if it exists
-      if (media) {
-        try {
-          // Convert media file to base64
-          const base64Data = await FileSystem.readAsStringAsync(media, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          const fileName =
-            media.split("/").pop() ||
-            `${Date.now()}.${mediaType === "image" ? "jpg" : "mp4"}`;
-          const fileType =
-            mediaMimeType || (mediaType === "image" ? "image/jpeg" : "video/mp4");
-
-          // Add media to post data
-          postData.media = {
-            data: base64Data,
-            type: fileType,
-            name: fileName,
-          };
-        } catch (fileError) {
-          console.error("Error encoding media:", fileError);
-          throw new Error("Failed to process media file");
+        if (mediaType === "image") {
+          setUploadProgress("Uploading image...");
+          
+          try {
+            const imageResult = await uploadImageToHive(
+              media,
+              fileName,
+              mediaMimeType,
+              {
+                username,
+                privateKey: session.decryptedKey,
+              }
+            );
+            
+            imageUrls.push(imageResult.url);
+            
+            // Add image to post body
+            const imageMarkdown = createImageMarkdown(imageResult.url, "Uploaded image");
+            postBody += postBody ? `\n\n${imageMarkdown}` : imageMarkdown;
+            
+          } catch (imageError) {
+            console.error("Image upload failed:", imageError);
+            throw new Error("Failed to upload image. Please try again.");
+          }
+          
+        } else if (mediaType === "video") {
+          setUploadProgress("Uploading video to IPFS...");
+          
+          try {
+            const videoResult = await uploadVideoToPinata(
+              media,
+              fileName,
+              mediaMimeType,
+              {
+                creator: username,
+              }
+            );
+            
+            videoUrls.push(videoResult.IpfsHash);
+            
+            // Add video iframe to post body
+            const videoIframe = createVideoIframe(videoResult.IpfsHash, "Video");
+            postBody += postBody ? `\n\n${videoIframe}` : videoIframe;
+            
+          } catch (videoError) {
+            console.error("Video upload failed:", videoError);
+            throw new Error("Failed to upload video. Please try again.");
+          }
         }
       }
 
-      // Send the post data as JSON
-      const response = await fetch(`${API_BASE_URL}/createpost`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${postingKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(postData),
-      });
+      setUploadProgress("Preparing post for blockchain...");
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create post");
+      // Get the latest snaps container for microblog posting
+      let parentAuthor = "";
+      let parentPermlink = COMMUNITY_TAG; // Default fallback
+      
+      try {
+        setUploadProgress("Fetching snaps container...");
+        const snapsContainer = await getLastSnapsContainer();
+        parentAuthor = snapsContainer.author;
+        parentPermlink = snapsContainer.permlink;
+        console.log("📦 Using snaps container:", { parentAuthor, parentPermlink });
+      } catch (error) {
+        console.warn("Failed to get snaps container, using community fallback:", error);
+        // Keep default values
       }
 
-      // Success - show confirmation and navigate to feed
-      Alert.alert("Success", "Your post has been published!");
+      // Prepare comment data for console logging
+      const commentData = {
+        body: postBody,
+        parentAuthor,
+        parentPermlink,
+        username,
+        images: imageUrls,
+        videos: videoUrls,
+        isSnapsPost: parentAuthor === SNAPS_CONTAINER_AUTHOR,
+        metadata: {
+          app: 'mycommunity-mobile',
+          tags: [COMMUNITY_TAG, '...extracted hashtags'],
+        }
+      };
 
-      // Clear form after successful post
+      console.log("📝 Post data prepared for blockchain:", commentData);
+
+      // Post to blockchain
+      await createHiveComment(
+        postBody,
+        parentAuthor, // Parent author for snaps container
+        parentPermlink, // Parent permlink for snaps container
+        {
+          username,
+          privateKey: session.decryptedKey,
+          communityTag: COMMUNITY_TAG, // Include community tag in metadata
+        }
+      );
+
+      // Success
+      Alert.alert("Success", "Your post data is ready! Check console for details.");
+
+      // Clear form
       setContent("");
       setMedia(null);
       setMediaType(null);
       setMediaMimeType(null);
 
-      // Invalidate queries to refresh feed data when navigating back to feed
+      // Invalidate queries to refresh feed data
       queryClient.invalidateQueries({ queryKey: ["feed"] });
       queryClient.invalidateQueries({ queryKey: ["trending"] });
       queryClient.invalidateQueries({ queryKey: ["following"] });
       queryClient.invalidateQueries({ queryKey: ["userFeed", username] });
 
-      // Navigate to feed to see the new post
+      // Navigate to feed
       router.push("/(tabs)/feed");
+      
     } catch (error) {
-      const errorMsg =
-        error instanceof Error ? error.message : "An unknown error occurred";
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
       setErrorMessage(errorMsg);
       Alert.alert("Error", errorMsg);
       console.error("Post error:", error);
     } finally {
       setIsUploading(false);
+      setUploadProgress("");
     }
   };
 
@@ -230,6 +278,7 @@ export default function CreatePost() {
           <Text className="text-3xl font-bold ml-4 mt-4">Create</Text>
 
           <Card className="m-4 mt-2 p-4 bg-card border border-border rounded-lg">
+            {/* Content Input */}
             <TextInput
               multiline
               placeholder="What's on your mind?"
@@ -242,6 +291,14 @@ export default function CreatePost() {
             />
           </Card>
 
+          {/* Upload Progress */}
+          {uploadProgress ? (
+            <Card className="mx-4 mb-2 p-3 bg-card border border-border rounded-lg">
+              <Text className="text-sm text-foreground/70">{uploadProgress}</Text>
+            </Card>
+          ) : null}
+
+          {/* Action Bar */}
           <View className="flex-row items-center justify-between p-4 border-t border-border">
             <Pressable
               onPress={pickMedia}
@@ -270,41 +327,52 @@ export default function CreatePost() {
               disabled={(!content.trim() && !media) || isUploading}
             >
               <Text className="font-medium">
-                {isUploading ? "Posting..." : "Post"}
+                {isUploading ? "Publishing..." : "Share"}
               </Text>
             </Button>
           </View>
 
+          {/* Media Preview */}
           {media && (
-            <View className="relative border border-muted rounded-lg overflow-hidden w-full aspect-square mt-4">
-              {mediaType === "image" ? (
-                <Image
-                  source={{ uri: media }}
-                  style={{ resizeMode: "cover", width: "100%", height: "100%" }}
-                />
-              ) : mediaType === "video" ? (
-                hasVideoInteraction ? (
-                  <VideoPlayer url={media} playing={isVideoPlaying} />
-                ) : (
-                  <Pressable className="w-full h-full" onPress={handleVideoPress}>
-                    <VideoPlayer url={media} playing={false} />
-                    <View className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <FontAwesome name="play-circle" size={50} color="white" />
-                    </View>
-                  </Pressable>
-                )
-              ) : null}
-              <Pressable
-                onPress={removeMedia}
-                className="absolute top-2 right-2 bg-black/50 rounded-full p-1"
-              >
-                <Ionicons name="close" size={20} color="white" />
-              </Pressable>
+            <View className="mx-4 mb-4">
+              <Card className="relative border border-muted rounded-lg overflow-hidden w-full aspect-square">
+                {mediaType === "image" ? (
+                  <Image
+                    source={{ uri: media }}
+                    style={{ resizeMode: "cover", width: "100%", height: "100%" }}
+                  />
+                ) : mediaType === "video" ? (
+                  hasVideoInteraction ? (
+                    <VideoPlayer url={media} playing={isVideoPlaying} />
+                  ) : (
+                    <Pressable className="w-full h-full" onPress={handleVideoPress}>
+                      <VideoPlayer url={media} playing={false} />
+                      <View className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <FontAwesome name="play-circle" size={50} color="white" />
+                      </View>
+                    </Pressable>
+                  )
+                ) : null}
+                <Pressable
+                  onPress={removeMedia}
+                  className="absolute top-2 right-2 bg-black/50 rounded-full p-1"
+                  disabled={isUploading}
+                >
+                  <Ionicons name="close" size={20} color="white" />
+                </Pressable>
+              </Card>
             </View>
+          )}
+
+          {/* Error Message */}
+          {errorMessage && (
+            <Card className="mx-4 mb-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+              <Text className="text-red-800 text-sm">{errorMessage}</Text>
+            </Card>
           )}
         </ScrollView>
       </TouchableWithoutFeedback>
     )}
     </>
   );
-}  
+}
