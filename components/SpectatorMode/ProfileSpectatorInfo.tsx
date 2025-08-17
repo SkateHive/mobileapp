@@ -1,6 +1,6 @@
 import { FontAwesome } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { View, TouchableOpacity, Linking, StyleSheet } from "react-native";
+import { View, TouchableOpacity, Linking, StyleSheet, Image } from "react-native";
 import { Text } from "~/components/ui/text";
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
 import { IconName, SpectatorInfoBase } from "./SpectatorInfoBase";
@@ -9,28 +9,31 @@ import { theme } from "~/lib/theme";
 
 interface SocialLink {
   name: string;
-  icon: string;
+  icon?: string;
+  imageUrl?: string;
   color: string;
   url: string;
 }
 
 export function ProfileSpectatorInfo() {
-  const handleJoinCommunity = () => {
-    router.push("/(onboarding)/home");
-  };
-  
   const socialLinks: SocialLink[] = [
     { 
-      name: 'Twitter', 
-      icon: 'twitter', 
-      color: '#1DA1F2', 
-      url: 'https://twitter.com/skatehive' 
+      name: 'X', 
+      imageUrl: 'local://logo-white.png',
+      color: '#FFFFFF', 
+      url: 'https://x.com/skatehive' 
     },
     { 
       name: 'Instagram', 
       icon: 'instagram', 
       color: '#E4405F', 
       url: 'https://instagram.com/skatehive' 
+    },
+    { 
+      name: 'Discord', 
+      imageUrl: 'local://Discord-Symbol-Blurple.png',
+      color: '#5865F2', 
+      url: 'https://discord.gg/caUtgq3XPC' 
     },
     { 
       name: 'GitHub', 
@@ -102,9 +105,23 @@ export function ProfileSpectatorInfo() {
               accessibilityRole="link"
               style={styles.socialLink}
             >
-              <View style={styles.socialLinkContent}>
-                <FontAwesome name={link.icon as any} size={32} color={link.color} />
-                <Text style={styles.socialLinkText}>{link.name}</Text>
+              <View style={link.name === 'X' ? [styles.socialLinkContent, styles.xIconContent] : styles.socialLinkContent}>
+                {link.imageUrl ? (
+                  <Image 
+                    source={
+                      link.imageUrl.startsWith('local://') 
+                        ? link.imageUrl === 'local://logo-white.png'
+                          ? require('../../assets/images/logo-white.png')
+                          : require('../../assets/images/Discord-Symbol-Blurple.png')
+                        : { uri: link.imageUrl }
+                    }
+                    style={link.name === 'X' ? styles.xLogoImage : styles.socialIconImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <FontAwesome name={link.icon as any} size={32} color={link.color} />
+                )}
+                <Text style={link.name === 'X' ? [styles.socialLinkText, styles.xTextAlignment] : styles.socialLinkText}>{link.name}</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -161,12 +178,30 @@ const styles = StyleSheet.create({
   socialLinkContent: {
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: theme.spacing.sm,
+    minHeight: 64,
   },
   socialLinkText: {
     fontSize: theme.fontSizes.sm,
     textAlign: 'center',
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
+  },
+  socialIconImage: {
+    width: 32,
+    height: 32,
+  },
+  xLogoImage: {
+    width: 24,
+    height: 24,
+    marginTop: 4,
+  },
+  xTextAlignment: {
+    marginTop: 0,
+  },
+  xIconContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

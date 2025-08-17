@@ -1,8 +1,19 @@
 # CreatePost Component Refactor - Documentation
 
-## Overview
+#### Environment Variables
 
-The CreatePost component has been completely refactored to support modern video and image upload functionality using Pinata for video storage and Hive's image service for image storage. The component now uses the authentication system properly and posts directly to the Hive blockchain.
+No additional environment variables are required for video uploads. The custom transcoding service is publicly accessible.
+
+```env
+# Only these environment variables are still needed:
+LOADING_EFFECT=your_loading_effect_preference
+SNAPS_CONTAINER_AUTHOR=your_snaps_container_author
+SNAPS_PAGE_MIN_SIZE=your_page_min_size
+SNAPS_CONTAINER_FETCH_LIMIT=your_fetch_limit
+COMMUNITY_TAG=your_community_tag
+```
+
+The CreatePost component has been completely refactored to support modern video and image upload functionality using a custom video transcoding service for video storage and Hive's image service for image storage. The component now uses the authentication system properly and posts directly to the Hive blockchain.
 
 ## Key Changes
 
@@ -11,9 +22,9 @@ The CreatePost component has been completely refactored to support modern video 
 - Retrieves the decrypted private key from `session.decryptedKey` instead of SecureStore
 - Properly validates authentication before allowing posts
 
-### 2. Video Upload with Pinata
-- Videos are uploaded to IPFS via Pinata's API
-- Uses environment variables for Pinata API credentials
+### 2. Video Upload with Custom Transcoding Service
+- Videos are uploaded to a custom video transcoding API
+- Returns CID and gateway URL for IPFS access
 - Creates HTML iframe markup for video embedding in posts
 - Supports progress tracking during upload
 
@@ -32,9 +43,8 @@ The CreatePost component has been completely refactored to support modern video 
 ## New Files Created
 
 ### `/lib/upload/video-upload.ts`
-Handles video upload to Pinata IPFS:
-- `uploadVideoToPinata()` - Uploads video file to Pinata
-- `getIPFSUrl()` - Generates public IPFS URL
+Handles video upload to custom transcoding service:
+- `uploadVideoToWorker()` - Uploads video file to transcoding API
 - `createVideoIframe()` - Creates HTML iframe for video embedding
 
 ### `/lib/upload/image-upload.ts`
@@ -72,7 +82,7 @@ EXPO_PUBLIC_PINATA_SECRET_API_KEY=your_pinata_secret_api_key_here
 
 ### Upload Flow
 1. **Image Upload**: Local file → Hive Images Service → Markdown in post body
-2. **Video Upload**: Local file → Pinata IPFS → HTML iframe in post body
+2. **Video Upload**: Local file → Custom Transcoding API → HTML iframe in post body
 3. **Post Creation**: Content + media markup → Hive blockchain via `comment` function
 
 ### UI Improvements
@@ -81,14 +91,12 @@ EXPO_PUBLIC_PINATA_SECRET_API_KEY=your_pinata_secret_api_key_here
 - Better error handling and user feedback
 - Improved layout with proper spacing and visual hierarchy
 
-## Usage
+## Usage Instructions
 
-Users can now:
-1. Create posts with optional titles
-2. Upload images that get embedded as markdown
-3. Upload videos that get embedded as HTML iframes
-4. Have hashtags automatically extracted and included in metadata
-5. See upload progress and proper error messages
+1. User must be logged in with valid Hive account
+2. Select post title and content  
+3. Optionally add media files (images/videos)
+4. Submit to create post on Hive blockchain
 
 ## Mobile-Specific Considerations
 

@@ -98,7 +98,8 @@ export default function ProfileScreen() {
     return <LoadingScreen />;
   }
 
-  if (error || !hiveAccount) {
+  // Only show error for non-SPECTATOR users when there's an actual error or missing account
+  if (profileUsername !== "SPECTATOR" && (error || !hiveAccount)) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>
@@ -108,22 +109,28 @@ export default function ProfileScreen() {
     );
   }
 
-  // Calculate stats from hiveAccount
-  // Use reputation from profile data if available, otherwise calculate it
-  const reputation = hiveAccount?.profile?.reputation || 
-    (hiveAccount.reputation ? 
-      Math.log10(Math.abs(Number(hiveAccount.reputation))) * 9 + 25 : 25);
+  // Calculate stats from hiveAccount (only for non-SPECTATOR users)
+  let reputation = 25; // Default reputation
+  let hivepower = 0; // Default hive power
+  let vp = 100; // Default voting power
+  let rc = 100; // Default RC
   
-  const vestingShares = parseFloat(typeof hiveAccount.vesting_shares === 'string' ? hiveAccount.vesting_shares.split(' ')[0] : hiveAccount.vesting_shares.amount.toString());
-  const receivedVestingShares = parseFloat(typeof hiveAccount.received_vesting_shares === 'string' ? hiveAccount.received_vesting_shares.split(' ')[0] : hiveAccount.received_vesting_shares.amount.toString());
-  const delegatedVestingShares = parseFloat(typeof hiveAccount.delegated_vesting_shares === 'string' ? hiveAccount.delegated_vesting_shares.split(' ')[0] : hiveAccount.delegated_vesting_shares.amount.toString());
-  const totalVests = vestingShares + receivedVestingShares - delegatedVestingShares;
-  
-  // Simple HP calculation (actual conversion requires global props)
-  const hivepower = totalVests / 1000; // Simplified calculation
+  if (profileUsername !== "SPECTATOR" && hiveAccount) {
+    // Use reputation from profile data if available, otherwise calculate it
+    reputation = hiveAccount.profile?.reputation || 
+      (hiveAccount.reputation ? 
+        Math.log10(Math.abs(Number(hiveAccount.reputation))) * 9 + 25 : 25);
+    
+    const vestingShares = parseFloat(typeof hiveAccount.vesting_shares === 'string' ? hiveAccount.vesting_shares.split(' ')[0] : hiveAccount.vesting_shares.amount.toString());
+    const receivedVestingShares = parseFloat(typeof hiveAccount.received_vesting_shares === 'string' ? hiveAccount.received_vesting_shares.split(' ')[0] : hiveAccount.received_vesting_shares.amount.toString());
+    const delegatedVestingShares = parseFloat(typeof hiveAccount.delegated_vesting_shares === 'string' ? hiveAccount.delegated_vesting_shares.split(' ')[0] : hiveAccount.delegated_vesting_shares.amount.toString());
+    const totalVests = vestingShares + receivedVestingShares - delegatedVestingShares;
+    
+    // Simple HP calculation (actual conversion requires global props)
+    hivepower = totalVests / 1000; // Simplified calculation
 
-  const vp = hiveAccount.voting_power ? hiveAccount.voting_power / 100 : 100;
-  const rc = 100; // RC calculation is complex, would need additional API calls
+    vp = hiveAccount.voting_power ? hiveAccount.voting_power / 100 : 100;
+  }
 
   // Get dynamic color based on percentage value
   const getDynamicColor = (percentage: number): string => {

@@ -81,7 +81,7 @@ importers:
         specifier: ^16.0.5
         version: 16.0.5(expo@53.0.20(@babel/core@7.26.10)(@expo/metro-runtime@5.0.4(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))
       expo-media-library:
-        specifier: ~17.1.7
+        specifier: ^17.1.7
         version: 17.1.7(expo@53.0.20(@babel/core@7.26.10)(@expo/metro-runtime@5.0.4(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0))
       expo-navigation-bar:
         specifier: ~4.2.7

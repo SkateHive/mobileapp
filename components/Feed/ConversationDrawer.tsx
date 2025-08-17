@@ -13,13 +13,15 @@ import {
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Text } from '../ui/text';
-import { PostCard } from './PostCard';
+import { Text } from '~/components/ui/text';
+import { ConversationReply } from './ConversationReply';
+import { MediaPreview } from './MediaPreview';
+import { ReplyComposer } from '~/components/ui/ReplyComposer';
 import { useReplies } from '~/lib/hooks/useReplies';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
 import { createHiveComment } from '~/lib/upload/post-utils';
-import { uploadVideoToPinata, createVideoIframe } from '~/lib/upload/video-upload';
+import { uploadVideoToWorker, createVideoIframe } from '~/lib/upload/video-upload';
 import { uploadImageToHive, createImageMarkdown } from '~/lib/upload/image-upload';
 import { theme } from '~/lib/theme';
 import type { Discussion } from '@hiveio/dhive';
@@ -49,6 +51,10 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+
+  const handleReplySuccess = (newReply: Discussion) => {
+    setOptimisticReplies((prev) => [...prev, newReply]);
+  };
 
   const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -165,14 +171,20 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
           const imageMarkdown = createImageMarkdown(imageResult.url, 'Uploaded image');
           replyBody += replyBody ? `\n\n${imageMarkdown}` : imageMarkdown;
         } else if (mediaType === 'video') {
+          const fileName = media.split('/').pop() || `${Date.now()}.mp4`;
+          
           setUploadProgress('Uploading video...');
-          const videoResult = await uploadVideoToPinata(
+          
+          const videoResult = await uploadVideoToWorker(
             media,
             fileName,
             'video/mp4',
-            { creator: username }
+            { 
+              creator: username,
+            }
           );
-          const videoIframe = createVideoIframe(videoResult.IpfsHash, 'Video');
+          
+          const videoIframe = createVideoIframe(videoResult.gatewayUrl, 'Video');
           replyBody += replyBody ? `\n\n${videoIframe}` : videoIframe;
         }
       }
@@ -426,9 +438,12 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
             ) : (
               allReplies.map((reply, index) => (
                 <View key={`${reply.author}/${reply.permlink}-${index}`} style={styles.replyContainer}>
-                  <PostCard 
+                  <ConversationReply 
                     post={reply} 
                     currentUsername={username}
+                    depth={reply.depth || 0}
+                    maxDepth={3}
+                    onReplySuccess={handleReplySuccess}
                   />
                   {index < allReplies.length - 1 && (
                     <View style={styles.replySeparator} />

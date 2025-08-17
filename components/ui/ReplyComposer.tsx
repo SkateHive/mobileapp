@@ -17,7 +17,7 @@ import { VideoPlayer } from '../Feed/VideoPlayer';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
 import { createHiveComment } from '~/lib/upload/post-utils';
-import { uploadVideoToPinata, createVideoIframe } from '~/lib/upload/video-upload';
+import { uploadVideoToWorker, createVideoIframe } from '~/lib/upload/video-upload';
 import { uploadImageToHive, createImageMarkdown } from '~/lib/upload/image-upload';
 import { theme } from '~/lib/theme';
 import type { Discussion } from '@hiveio/dhive';
@@ -153,7 +153,7 @@ export function ReplyComposer({
           setUploadProgress("Uploading video to IPFS...");
           
           try {
-            const videoResult = await uploadVideoToPinata(
+            const videoResult = await uploadVideoToWorker(
               media,
               fileName,
               mediaMimeType,
@@ -162,8 +162,8 @@ export function ReplyComposer({
               }
             );
             
-            videoUrls.push(videoResult.IpfsHash);
-            const videoIframe = createVideoIframe(videoResult.IpfsHash, "Video");
+            videoUrls.push(videoResult.cid);
+            const videoIframe = createVideoIframe(videoResult.gatewayUrl, "Video");
             replyBody += replyBody ? `\n\n${videoIframe}` : videoIframe;
             
           } catch (videoError) {

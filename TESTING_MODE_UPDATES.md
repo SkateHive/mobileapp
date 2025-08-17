@@ -2,11 +2,11 @@
 
 ## Changes Made
 
-### 1. Environment Variables Fixed
-- Updated code to use your existing `.env` variables (`PINATA_API_KEY`, `PINATA_SECRET_API_KEY`)
-- Added babel plugin configuration for environment variables
-- Created type definitions for `@env` imports
-- Updated all files to use `@env` imports instead of `process.env`
+### 1. Video Upload Service Migration
+- Migrated from Pinata to custom video transcoding service
+- Removed all Pinata-related environment variables and dependencies
+- Updated video upload to use new API endpoint: `https://video-worker-e7s1.onrender.com/transcode`
+- Videos now return CID and gateway URL directly from the service
 
 ### 2. Simplified for Microblog/Comments Only
 - Removed title input field and related state
@@ -51,7 +51,7 @@
 
 ## Current Flow
 1. User adds content and/or media
-2. Media gets uploaded (images to Hive, videos to Pinata)
+2. Media gets uploaded (images to Hive, videos to custom transcoding service)
 3. Post body gets formatted with media markup
 4. **Data is logged to console** (instead of posting to blockchain)
 5. Success message shows and form clears

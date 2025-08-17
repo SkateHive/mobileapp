@@ -20,7 +20,7 @@ import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateSpectatorInfo } from "~/components/SpectatorMode/CreateSpectatorInfo";
-import { uploadVideoToPinata, createVideoIframe } from "~/lib/upload/video-upload";
+import { uploadVideoToWorker, createVideoIframe } from "~/lib/upload/video-upload";
 import { uploadImageToHive, createImageMarkdown } from "~/lib/upload/image-upload";
 import { createHiveComment } from "~/lib/upload/post-utils";
 import { SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG, getLastSnapsContainer } from "~/lib/hive-utils";
@@ -167,7 +167,7 @@ export default function CreatePost() {
           setUploadProgress("Uploading video to IPFS...");
           
           try {
-            const videoResult = await uploadVideoToPinata(
+            const videoResult = await uploadVideoToWorker(
               media,
               fileName,
               mediaMimeType,
@@ -176,10 +176,10 @@ export default function CreatePost() {
               }
             );
             
-            videoUrls.push(videoResult.IpfsHash);
+            videoUrls.push(videoResult.cid);
             
             // Add video iframe to post body
-            const videoIframe = createVideoIframe(videoResult.IpfsHash, "Video");
+            const videoIframe = createVideoIframe(videoResult.gatewayUrl, "Video");
             postBody += postBody ? `\n\n${videoIframe}` : videoIframe;
             
           } catch (videoError) {
