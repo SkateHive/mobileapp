@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   },
   shareButtonText: {
     fontFamily: theme.fonts.bold,
-    color: theme.colors.text,
+    color: theme.colors.black,
   },
   mediaPreviewContainer: {
     marginHorizontal: theme.spacing.md,

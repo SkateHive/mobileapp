@@ -13,12 +13,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.skatehive.app",
+      "bundleIdentifier": "com.bgrana.skatehive.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication to protect your private keys."
       }
     },
     "android": {
@@ -40,6 +43,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router",
       "expo-secure-store",
       "expo-video",
@@ -63,8 +67,11 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "cb49cb24-702c-4d0c-9747-1d7197c9c4d8"
       }
     },
-    "owner": "r4topunk"
+    "owner": "bgrana"
   }
 }

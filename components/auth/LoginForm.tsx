@@ -52,16 +52,27 @@ export function LoginForm({
   // Check device authentication capabilities on mount
   useEffect(() => {
     const checkDeviceAuth = async () => {
-      const authInfo = await hasDeviceAuthentication();
-      setDeviceAuth(authInfo);
-      
-      // Set method based on device capabilities - no user choice needed
-      if (authInfo.hasBiometric || authInfo.hasDevicePin) {
-        // Device has security, use biometric method (which includes device PIN)
-        setMethod('biometric');
-      } else {
-        // Device has no security, fallback to app PIN
+      try {
+        const authInfo = await hasDeviceAuthentication();
+        setDeviceAuth(authInfo);
+        
+        // Set method based on device capabilities - no user choice needed
+        if (authInfo.hasBiometric || authInfo.hasDevicePin) {
+          // Device has security, use biometric method (which includes device PIN)
+          setMethod('biometric');
+        } else {
+          // Device has no security, fallback to app PIN
+          setMethod('pin');
+        }
+      } catch (error) {
+        console.error('Error checking device auth:', error);
+        // Fallback to PIN method if there's an error
         setMethod('pin');
+        setDeviceAuth({
+          hasBiometric: false,
+          hasDevicePin: false,
+          biometricTypes: [],
+        });
       }
     };
     

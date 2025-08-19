@@ -180,7 +180,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         encrypted = encryptKey(postingKey, secret, iv);
       } else if (method === 'biometric') {
         const ok = await authenticateBiometric();
-        if (!ok) throw new AuthError('Biometric authentication failed');
+        if (!ok) throw new AuthError('Biometric authentication was cancelled or failed');
+        
         salt = await generateSalt();
         iv = await generateSalt();
         // Use a device secret for biometric (simulate with salt for now)
@@ -198,7 +199,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         iv,
         createdAt: Date.now(),
       };
+      
       await storeEncryptedKey(normalizedUsername, encryptedKey);
+      
       const user: StoredUser = {
         username: normalizedUsername,
         method,
@@ -218,7 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       } else {
         console.error('Error during login:', error);
-        throw new AuthError('Failed to authenticate with Hive blockchain');
+        throw new AuthError('Failed to authenticate: ' + (error instanceof Error ? error.message : 'Unknown error'));
       }
     }
   };
@@ -228,20 +231,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const encryptedKey = await getEncryptedKey(selectedUsername);
       if (!encryptedKey) throw new AuthError('No stored credentials found');
+      
       let decryptedKey = '';
       if (encryptedKey.method === 'pin') {
         if (!pin || pin.length !== 6) throw new AuthError('PIN must be 6 digits');
         const secret = deriveKeyFromPin(pin, encryptedKey.salt);
         decryptedKey = decryptKey(encryptedKey.encrypted, secret, encryptedKey.iv);
       } else if (encryptedKey.method === 'biometric') {
-        const ok = await authenticateBiometric();
-        if (!ok) throw new AuthError('Biometric authentication failed');
-        const secret = encryptedKey.salt;
-        decryptedKey = decryptKey(encryptedKey.encrypted, secret, encryptedKey.iv);
+        try {
+          const ok = await authenticateBiometric();
+          if (!ok) throw new AuthError('Biometric authentication was cancelled or failed');
+        } catch (bioError) {
+          throw new AuthError('Biometric authentication failed: ' + (bioError instanceof Error ? bioError.message : 'Unknown error'));
+        }
+        
+        try {
+          const secret = encryptedKey.salt;
+          decryptedKey = decryptKey(encryptedKey.encrypted, secret, encryptedKey.iv);
+        } catch (decryptError) {
+          throw new AuthError('Failed to decrypt stored key: ' + (decryptError instanceof Error ? decryptError.message : 'Unknown error'));
+        }
       } else {
         throw new AuthError('Invalid encryption method');
       }
-      if (!decryptedKey) throw new AuthError('Failed to decrypt key');
+      if (!decryptedKey) {
+        // If decryption fails, it might be due to dev/prod encryption mismatch
+        // Clear the stored user to force re-login
+        await deleteEncryptedKey(selectedUsername);
+        throw new AuthError('Stored credentials are incompatible. Please log in again.');
+      }
       setUsername(selectedUsername);
       setIsAuthenticated(true);
       setSession({ username: selectedUsername, decryptedKey, loginTime: Date.now() });
@@ -256,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       } else {
         console.error('Error with stored user login:', error);
-        throw new AuthError('Failed to authenticate with stored credentials');
+        throw new AuthError('Failed to authenticate with stored credentials: ' + (error instanceof Error ? error.message : 'Unknown error'));
       }
     }
   };
@@ -291,6 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Delete all stored users and keys
   const deleteAllStoredUsers = async () => {
     try {
+      console.log('🔐 Clearing all stored users and credentials...');
       for (const user of storedUsers) {
         await deleteEncryptedKey(user.username);
       }
@@ -300,6 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       setUsername(null);
       setIsAuthenticated(false);
+      console.log('🔐 All stored data cleared successfully');
     } catch (error) {
       console.error('Error deleting all users:', error);
       throw error;

@@ -27,6 +27,7 @@ export async function generateSalt(length = 16): Promise<string> {
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
   } catch (err) {
+    console.warn('⚠️ Native crypto not available, using fallback (NOT SECURE for production!)');
     // Fallback for Expo Go/dev: NOT SECURE, do not use in production!
     let salt = '';
     for (let i = 0; i < length; i++) {
@@ -38,42 +39,50 @@ export async function generateSalt(length = 16): Promise<string> {
 // Derive a key from PIN using PBKDF2
 // keySize is in 32-bit words, so 256 bits = 8 words
 export function deriveKeyFromPin(pin: string, salt: string): string {
-  const iterations = __DEV__ ? 1000 : 100000;
+  const iterations = 100000; // Always use production-level iterations
   return PBKDF2(pin, salt, { keySize: 8, iterations }).toString();
 }
 
-// Encrypt the private key with AES (mock in Expo Go/dev)
+// Encrypt the private key with AES 
 export function encryptKey(
   key: string,
   secret: string,
   iv: string
 ): string {
-  if (__DEV__) {
-    // DEV ONLY: mock encryption for Expo Go (NOT SECURE)
+  try {
+    return AES.encrypt(key, secret, { iv: CryptoJS.enc.Hex.parse(iv) }).toString();
+  } catch (error) {
+    console.warn('⚠️ AES encryption failed, using fallback (NOT SECURE for production!)', error);
+    // Fallback for when AES fails (like in Expo Go)
     return Buffer.from(`${key}::${secret}::${iv}`, 'utf8').toString('base64');
   }
-  return AES.encrypt(key, secret, { iv: CryptoJS.enc.Hex.parse(iv) }).toString();
 }
 
-// Decrypt the private key with AES (mock in Expo Go/dev)
+// Decrypt the private key with AES
 export function decryptKey(
   encrypted: string,
   secret: string,
   iv: string
 ): string {
-  if (__DEV__) {
-    // DEV ONLY: mock decryption for Expo Go (NOT SECURE)
-    try {
-      const decoded = Buffer.from(encrypted, 'base64').toString('utf8');
-      const [k, s, v] = decoded.split('::');
-      if (s === secret && v === iv) return k;
-      return '';
-    } catch (e) {
-      return '';
-    }
+  // First try AES decryption (production method)
+  try {
+    const bytes = AES.decrypt(encrypted, secret, { iv: CryptoJS.enc.Hex.parse(iv) });
+    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+    if (decrypted) return decrypted;
+  } catch (e) {
+    console.warn('⚠️ AES decryption failed, trying fallback method');
   }
-  const bytes = AES.decrypt(encrypted, secret, { iv: CryptoJS.enc.Hex.parse(iv) });
-  return bytes.toString(CryptoJS.enc.Utf8);
+  
+  // Fallback to base64 decryption (for data encrypted in Expo Go)
+  try {
+    const decoded = Buffer.from(encrypted, 'base64').toString('utf8');
+    const [k, s, v] = decoded.split('::');
+    if (s === secret && v === iv) return k;
+    return '';
+  } catch (e) {
+    console.error('Both AES and fallback decryption failed:', e);
+    return '';
+  }
 }
 
 
@@ -116,11 +125,31 @@ export async function deleteEncryptedKey(username: string) {
 
 // Biometric authentication
 export async function authenticateBiometric(): Promise<boolean> {
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: 'Authenticate to unlock your key',
-    fallbackLabel: 'Use PIN',
-  });
-  return result.success;
+  try {
+    // Check if biometric authentication is available
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    
+    if (!hasHardware) {
+      return false;
+    }
+    
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    
+    if (!isEnrolled) {
+      return false;
+    }
+    
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Authenticate to unlock your key',
+      fallbackLabel: 'Use PIN',
+      disableDeviceFallback: false,
+    });
+    
+    return result.success;
+  } catch (error) {
+    console.error('Biometric authentication error:', error);
+    return false;
+  }
 }
 
 // Check if device has biometric or device PIN/passcode available
@@ -142,6 +171,15 @@ export async function hasDeviceAuthentication(): Promise<{
     // Check if device has a device lock (passcode/PIN)
     const securityLevel = await LocalAuthentication.getEnrolledLevelAsync();
     
+    // In simulator or development, if biometric setup seems problematic, fallback to PIN
+    if (__DEV__ && (!hasHardware || !isEnrolled || authTypes.length === 0)) {
+      return {
+        hasBiometric: false,
+        hasDevicePin: false,
+        biometricTypes: [],
+      };
+    }
+    
     return {
       hasBiometric: hasHardware && isEnrolled && authTypes.length > 0,
       hasDevicePin: securityLevel >= LocalAuthentication.SecurityLevel.SECRET,
@@ -149,8 +187,18 @@ export async function hasDeviceAuthentication(): Promise<{
     };
   } catch (error) {
     console.error('Error checking device authentication:', error);
+    // On any error in development, fallback to PIN
+    if (__DEV__) {
+      return {
+        hasBiometric: false,
+        hasDevicePin: false,
+        biometricTypes: [],
+      };
+    }
+    
+    // In production, still try biometric as fallback
     return {
-      hasBiometric: false,
+      hasBiometric: true,
       hasDevicePin: false,
       biometricTypes: [],
     };

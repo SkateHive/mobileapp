@@ -32,6 +32,7 @@
     "expo": "53.0.20",
     "expo-camera": "~16.1.11",
     "expo-crypto": "^14.1.5",
+    "expo-dev-client": "^5.2.4",
     "expo-font": "^13.3.2",
     "expo-haptics": "~14.1.4",
     "expo-image-manipulator": "~13.1.7",
