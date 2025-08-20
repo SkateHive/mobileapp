@@ -271,23 +271,34 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
   };
 
   const renderSmallReplyBox = () => (
-    <Pressable
-      style={styles.smallReplyBox}
-      onPress={() => setIsReplyExpanded(true)}
-    >
-      <View style={styles.smallReplyContent}>
+    <View style={styles.smallReplyBox}>
+      <Pressable
+        style={styles.smallReplyContent}
+        onPress={() => setIsReplyExpanded(true)}
+      >
         <View style={styles.profilePicSmall}>
           <Text style={styles.profileInitial}>
             {username ? username[0].toUpperCase() : 'U'}
           </Text>
         </View>
         <Text style={styles.smallReplyPlaceholder}>Add a comment...</Text>
-      </View>
+      </Pressable>
       <View style={styles.smallReplyIcons}>
-        <FontAwesome name="smile-o" size={20} color={theme.colors.gray} />
-        <FontAwesome name="image" size={18} color={theme.colors.gray} />
+        <Pressable
+          onPress={() => setIsReplyExpanded(true)}
+          style={styles.smallIconButton}
+        >
+          <FontAwesome name="smile-o" size={20} color={theme.colors.gray} />
+        </Pressable>
+        <Pressable
+          onPress={pickMedia}
+          style={styles.smallIconButton}
+          disabled={isUploading}
+        >
+          <FontAwesome name="image" size={18} color={theme.colors.gray} />
+        </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 
   const renderExpandedReplyBox = () => (
@@ -342,22 +353,14 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
 
       {/* Actions */}
       <View style={styles.expandedActions}>
-        <View style={styles.mediaActions}>
-          <Pressable
-            onPress={pickMedia}
-            style={styles.mediaActionButton}
-            disabled={isUploading}
-          >
-            <Ionicons name="image-outline" size={20} color={theme.colors.green} />
-          </Pressable>
-          <Pressable
-            onPress={pickMedia}
-            style={styles.mediaActionButton}
-            disabled={isUploading}
-          >
-            <Ionicons name="videocam-outline" size={20} color={theme.colors.green} />
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={pickMedia}
+          style={styles.mediaActionButton}
+          disabled={isUploading}
+        >
+          <Ionicons name="image-outline" size={20} color={theme.colors.green} />
+          <Text style={styles.mediaButtonText}>Add media</Text>
+        </Pressable>
         
         <Pressable
           onPress={handleReply}
@@ -566,18 +569,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.card,
+    paddingBottom: theme.spacing.xs, // Add some bottom padding
   },
   smallReplyBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: theme.spacing.md,
+    padding: theme.spacing.sm,
     backgroundColor: theme.colors.card,
+    minHeight: 56, // Ensure minimum touch target height
   },
   smallReplyContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    paddingVertical: theme.spacing.xs,
   },
   profilePicSmall: {
     width: 32,
@@ -600,6 +606,13 @@ const styles = StyleSheet.create({
   smallReplyIcons: {
     flexDirection: 'row',
     gap: theme.spacing.md,
+  },
+  smallIconButton: {
+    padding: theme.spacing.xs,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   expandedReplyBox: {
     backgroundColor: theme.colors.card,
@@ -653,8 +666,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: theme.fontSizes.md,
     fontFamily: theme.fonts.default,
-    minHeight: 80,
-    maxHeight: 120,
+    minHeight: 60,
+    maxHeight: 100,
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -666,13 +679,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  mediaActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
   },
   mediaActionButton: {
-    padding: theme.spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    minHeight: 44,
+  },
+  mediaButtonText: {
+    color: theme.colors.green,
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.default,
   },
   postButton: {
     backgroundColor: theme.colors.green,

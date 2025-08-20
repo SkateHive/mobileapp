@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { PrivateKey } from '@hiveio/dhive';
 import { Buffer } from 'buffer';
 import { sha256 } from 'js-sha256';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 interface ImageUploadResult {
   url: string;
@@ -61,6 +62,9 @@ export async function uploadImageToHive(
   options: ImageUploadOptions
 ): Promise<ImageUploadResult> {
   try {
+    // Prevent device from sleeping during upload
+    await activateKeepAwakeAsync('image-upload');
+    
     // Create signature
     const signature = await createImageSignature(fileUri, options.privateKey);
 
@@ -100,6 +104,9 @@ export async function uploadImageToHive(
   } catch (error) {
     console.error('Failed to upload image to Hive:', error);
     throw new Error(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  } finally {
+    // Always deactivate keep awake, even if upload fails
+    deactivateKeepAwake('image-upload');
   }
 }
 

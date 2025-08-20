@@ -77,6 +77,9 @@ importers:
       expo-image-picker:
         specifier: ^16.1.4
         version: 16.1.4(expo@53.0.20(@babel/core@7.26.10)(@expo/metro-runtime@5.0.4(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))
+      expo-keep-awake:
+        specifier: ^14.1.4
+        version: 14.1.4(expo@53.0.20(@babel/core@7.26.10)(@expo/metro-runtime@5.0.4(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))(react@19.0.0)
       expo-linking:
         specifier: ~7.1.7
         version: 7.1.7(expo@53.0.20(@babel/core@7.26.10)(@expo/metro-runtime@5.0.4(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0)))(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.26.10)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)

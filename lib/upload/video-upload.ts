@@ -1,3 +1,5 @@
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+
 interface VideoUploadResult {
   cid: string;
   gatewayUrl: string;
@@ -25,6 +27,9 @@ export async function uploadVideoToWorker(
   const WORKER_API_URL = 'https://video-worker-e7s1.onrender.com/transcode';
 
   try {
+    // Prevent device from sleeping during upload
+    await activateKeepAwakeAsync('video-upload');
+    
     // Create FormData for the upload
     const formData = new FormData();
 
@@ -61,6 +66,9 @@ export async function uploadVideoToWorker(
   } catch (error) {
     console.error('Failed to upload video to worker:', error);
     throw new Error(`Video upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  } finally {
+    // Always deactivate keep awake, even if upload fails
+    deactivateKeepAwake('video-upload');
   }
 }
 
