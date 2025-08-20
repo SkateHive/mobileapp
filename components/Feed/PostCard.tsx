@@ -3,12 +3,12 @@ import { FontAwesome } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet } from 'react-native';
-import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
 import { Text } from '../ui/text';
+import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
 import { ConversationDrawer } from './ConversationDrawer';
@@ -216,31 +216,12 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
               {showSlider ? (
                 /* Voting slider mode - takes entire bottom bar */
                 <View style={styles.votingSliderContainer}>
-                  <View style={styles.customSliderContainer}>
-                    <View style={styles.sliderTrack}>
-                      <View 
-                        style={[
-                          styles.sliderProgress, 
-                          { width: `${voteWeight}%` }
-                        ]} 
-                      />
-                      <Pressable
-                        style={[
-                          styles.sliderThumb,
-                          { left: `${voteWeight - 2}%` }
-                        ]}
-                        onPress={() => {}}
-                      />
-                    </View>
-                    <Pressable
-                      style={styles.sliderTouchArea}
-                      onPress={(event) => {
-                        const { locationX } = event.nativeEvent;
-                        const percentage = Math.min(100, Math.max(1, (locationX / 200) * 100));
-                        setVoteWeight(Math.round(percentage));
-                      }}
-                    />
-                  </View>
+                  <VotingSlider
+                    value={voteWeight}
+                    onValueChange={setVoteWeight}
+                    minimumValue={1}
+                    maximumValue={100}
+                  />
                   <View style={styles.sliderControls}>
                     <Pressable
                       style={styles.cancelVoteButton}
@@ -427,18 +408,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 20,
+    height: 32,
     marginBottom: theme.spacing.xxs,
-  },
-  fullWidthSlider: {
-    flex: 1,
-    height: 12,
-    marginRight: theme.spacing.xs,
   },
   sliderControls: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xxs,
+    marginLeft: theme.spacing.xs,
   },
   cancelVoteButton: {
     padding: 2,
@@ -453,38 +430,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 24,
     height: 24,
-  },
-  // Custom slider styles
-  customSliderContainer: {
-    flex: 1,
-    position: 'relative',
-    marginRight: theme.spacing.xs,
-  },
-  sliderTrack: {
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
-    position: 'relative',
-  },
-  sliderProgress: {
-    height: 4,
-    backgroundColor: theme.colors.green,
-    borderRadius: 2,
-  },
-  sliderThumb: {
-    width: 16,
-    height: 16,
-    backgroundColor: theme.colors.green,
-    borderRadius: 6,
-    position: 'absolute',
-    top: -6,
-    marginLeft: -6,
-  },
-  sliderTouchArea: {
-    position: 'absolute',
-    top: -8,
-    left: 0,
-    right: 0,
-    height: 20,
   },
 });
