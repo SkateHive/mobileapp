@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: theme.fontSizes.md,
     fontFamily: theme.fonts.default,
-    minHeight: 60,
+    minHeight: 80,
     maxHeight: 100,
     textAlignVertical: 'top',
     borderWidth: 1,

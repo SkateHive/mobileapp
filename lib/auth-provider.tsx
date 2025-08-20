@@ -60,14 +60,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Delete a single stored user and update state
-  const deleteStoredUser = async (username: string) => {
+  const removeStoredUser = async (usernameToRemove: string) => {
     try {
-      await deleteEncryptedKey(username);
-      const updatedUsers = storedUsers.filter((u: StoredUser) => u.username !== username);
-      setStoredUsers(updatedUsers);
+      await deleteEncryptedKey(usernameToRemove);
+      const updatedUsers = storedUsers.filter(user => user.username !== usernameToRemove);
       await SecureStore.setItemAsync(STORED_USERS_KEY, JSON.stringify(updatedUsers));
+      setStoredUsers(updatedUsers);
+      
+      if (username === usernameToRemove) {
+        setSession(null);
+        setUsername(null);
+        setIsAuthenticated(false);
+      }
     } catch (error) {
-      console.error('Error deleting stored user:', error);
+      console.error('Error removing stored user:', error);
       throw error;
     }
   };
@@ -309,7 +315,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Delete all stored users and keys
   const deleteAllStoredUsers = async () => {
     try {
-      console.log('🔐 Clearing all stored users and credentials...');
       for (const user of storedUsers) {
         await deleteEncryptedKey(user.username);
       }
@@ -319,7 +324,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       setUsername(null);
       setIsAuthenticated(false);
-      console.log('🔐 All stored data cleared successfully');
     } catch (error) {
       console.error('Error deleting all users:', error);
       throw error;
@@ -339,7 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         enterSpectatorMode,
         deleteAllStoredUsers,
-        deleteStoredUser,
+        deleteStoredUser: removeStoredUser,
         resetInactivityTimer,
       }}
     >

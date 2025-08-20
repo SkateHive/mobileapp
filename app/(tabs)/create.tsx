@@ -200,7 +200,6 @@ export default function CreatePost() {
         const snapsContainer = await getLastSnapsContainer();
         parentAuthor = snapsContainer.author;
         parentPermlink = snapsContainer.permlink;
-        console.log("📦 Using snaps container:", { parentAuthor, parentPermlink });
       } catch (error) {
         console.warn("Failed to get snaps container, using community fallback:", error);
         // Keep default values
@@ -220,8 +219,6 @@ export default function CreatePost() {
           tags: [COMMUNITY_TAG, '...extracted hashtags'],
         }
       };
-
-      console.log("📝 Post data prepared for blockchain:", commentData);
 
       // Post to blockchain
       await createHiveComment(

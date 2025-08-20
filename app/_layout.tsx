@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, useFocusEffect } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, FiraCode_400Regular, FiraCode_700Bold } from '@expo-google-fonts/fira-code';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
@@ -123,6 +123,7 @@ export default function RootLayout() {
                       options={{
                         animation: 'none',
                         contentStyle: { backgroundColor: theme.colors.background },
+                        gestureEnabled: false,
                       }}
                     />
                   </Stack>

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
+import { StyleSheet, View, PanResponder } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { useRef } from 'react';
 import { theme } from '~/lib/theme';
 
 const TAB_ITEMS = [
@@ -38,51 +39,74 @@ const TAB_ITEMS = [
 ] as const;
 
 export default function TabLayout() {
+  const router = useRouter();
+
+  // Create swipe gesture using PanResponder (simpler, less likely to crash)
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to horizontal swipes
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 20;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Detect swipe from left to right
+        if (gestureState.dx > 100 && gestureState.vx > 0.5) {
+          router.push('/(tabs)/create');
+        }
+      },
+    })
+  ).current;
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    gestureContainer: {
+      flex: 1,
     },
   });
   
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container} edges={['top']}>
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-            tabBarStyle: {
-              backgroundColor: theme.colors.background,
-            },
-            tabBarActiveTintColor: theme.colors.text,
-            tabBarInactiveTintColor: theme.colors.gray,
-            tabBarShowLabel: false,
-            sceneStyle: { backgroundColor: theme.colors.background },
-          }}
-        >
-          {TAB_ITEMS.map((tab) => (
-            <Tabs.Screen
-              key={tab.name}
-              name={tab.name}
-              options={{
-                title: tab.title,
-                tabBarIcon: ({ color }) => (
-                  <TabBarIcon 
-                    name={tab.icon} 
-                    color={color} 
-                    iconFamily={tab.iconFamily}
-                  />
-                ),
-                ...(tab.name === 'profile' && {
-                  href: {
-                    pathname: "/(tabs)/profile",
-                    params: {}
-                  }
-                })
-              }}
-            />
-          ))}
-        </Tabs>
+        <View style={styles.gestureContainer} {...panResponder.panHandlers}>
+          <Tabs
+            screenOptions={{
+              headerShown: false,
+              tabBarStyle: {
+                backgroundColor: theme.colors.background,
+              },
+              tabBarActiveTintColor: theme.colors.text,
+              tabBarInactiveTintColor: theme.colors.gray,
+              tabBarShowLabel: false,
+              sceneStyle: { backgroundColor: theme.colors.background },
+            }}
+          >
+            {TAB_ITEMS.map((tab) => (
+              <Tabs.Screen
+                key={tab.name}
+                name={tab.name}
+                options={{
+                  title: tab.title,
+                  tabBarIcon: ({ color }) => (
+                    <TabBarIcon 
+                      name={tab.icon} 
+                      color={color} 
+                      iconFamily={tab.iconFamily}
+                    />
+                  ),
+                  ...(tab.name === 'profile' && {
+                    href: {
+                      pathname: "/(tabs)/profile",
+                      params: {}
+                    }
+                  })
+                }}
+              />
+            ))}
+          </Tabs>
+        </View>
       </SafeAreaView>
     </SafeAreaProvider>
   );
