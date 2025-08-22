@@ -76,7 +76,6 @@ export default function useHiveAccount(username: string | null) {
 
         setHiveAccount(userAccount);
       } catch (error) {
-        console.error("❌ useHiveAccount: Error loading account:", error);
         setError("Loading account error!");
         setHiveAccount(null);
       } finally {

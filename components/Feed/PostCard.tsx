@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
+import { useVoteValue } from '~/lib/hooks/useVoteValue';
 import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
@@ -49,6 +50,7 @@ interface PostCardProps {
 
 export function PostCard({ post, currentUsername }: PostCardProps) {
   const { session } = useAuth();
+  const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [isVoting, setIsVoting] = useState(false);
@@ -62,6 +64,13 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
       ? post.active_votes.filter((vote: any) => vote.weight > 0).length
       : 0
   );
+  // Track the post's payout value for dynamic updates
+  const [payoutValue, setPayoutValue] = useState(() => {
+    const pending = parseFloat(post.pending_payout_value?.toString?.() || '0');
+    const total = parseFloat(post.total_payout_value?.toString?.() || '0');
+    const curator = parseFloat(post.curator_payout_value?.toString?.() || '0');
+    return pending + total + curator;
+  });
   const { showToast } = useToast();
 
   // Check if user has already voted on this post
@@ -94,10 +103,30 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
       // Trigger haptic feedback before the vote
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      // Calculate vote value before submitting
+      const votePercentage = customWeight ?? voteWeight;
+      let estimatedValue = 0;
+      
+      try {
+        if (!isVoteValueLoading) {
+          estimatedValue = await estimateVoteValue(votePercentage);
+        }
+      } catch (err) {
+        // Continue with vote even if estimation fails
+      }
+
       // Optimistically update the UI
       const previousLikedState = isLiked;
+      const previousVoteCount = voteCount;
+      const previousPayoutValue = payoutValue;
+      
       setIsLiked(!isLiked);
       setVoteCount(prevCount => previousLikedState ? prevCount - 1 : prevCount + 1);
+      
+      // Update payout value if we have an estimation and user is voting (not unvoting)
+      if (estimatedValue > 0 && !previousLikedState) {
+        setPayoutValue(prev => prev + estimatedValue);
+      }
 
       try {
         await hiveVote(
@@ -105,12 +134,16 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
           session.username,
           post.author,
           post.permlink,
-          previousLikedState ? 0 : Math.round((customWeight ?? voteWeight) * 100)
+          previousLikedState ? 0 : Math.round(votePercentage * 100)
         );
+        
+        // Show simple success toast
+        showToast('Vote submitted!', 'success');
       } catch (err) {
-        // Revert the optimistic update if the request failed
+        // Revert the optimistic updates if the request failed
         setIsLiked(previousLikedState);
-        setVoteCount(prevCount => previousLikedState ? prevCount + 1 : prevCount - 1);
+        setVoteCount(previousVoteCount);
+        setPayoutValue(previousPayoutValue);
         throw err;
       }
     } catch (error) {
@@ -125,11 +158,8 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
     }
   };
 
-  const calculateTotalValue = (post: Discussion) => {
-    const pending = parseFloat(post.pending_payout_value?.toString?.() || '0');
-    const total = parseFloat(post.total_payout_value?.toString?.() || '0');
-    const curator = parseFloat(post.curator_payout_value?.toString?.() || '0');
-    return (pending + total + curator).toFixed(3);
+  const calculateTotalValue = () => {
+    return payoutValue.toFixed(3);
   };
 
   const navigateToProfile = (username: string) => {
@@ -246,8 +276,8 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
               ) : (
                 /* Normal bottom bar mode */
                 <>
-                  <Text style={[styles.payoutText, { color: parseFloat(calculateTotalValue(post)) > 0 ? theme.colors.green : theme.colors.gray }]}>
-                    ${calculateTotalValue(post)}
+                  <Text style={[styles.payoutText, { color: parseFloat(calculateTotalValue()) > 0 ? theme.colors.green : theme.colors.gray }]}>
+                    ${calculateTotalValue()}
                   </Text>
                   
                   <View style={styles.actionsContainer}>

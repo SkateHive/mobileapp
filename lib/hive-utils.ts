@@ -22,6 +22,9 @@ const HiveClient = new Client([
   "https://hive-api.3speak.tv",
 ]);
 
+// Export the client for reuse in other modules
+export { HiveClient };
+
 // --- Types ---
 export interface ExtendedComment extends Comment {
   active_votes?: any[];
