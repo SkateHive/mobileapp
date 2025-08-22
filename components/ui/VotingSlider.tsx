@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, Dimensions, PanResponder } from 'react-native';
+import { View, StyleSheet, Dimensions, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
 import { theme } from '~/lib/theme';
 import { Text } from './text';
 
@@ -22,41 +22,49 @@ export function VotingSlider({
   step = 1 
 }: VotingSliderProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const trackLayoutRef = useRef<{ x: number; width: number }>({ x: 0, width: SLIDER_WIDTH });
+  const [trackLayout, setTrackLayout] = useState<{ x: number; width: number; y: number }>({ x: 0, width: SLIDER_WIDTH, y: 0 });
   
   const updateValueFromPosition = useCallback((pageX: number) => {
-    const { x, width } = trackLayoutRef.current;
-    const relativeX = pageX - x;
-    const percentage = Math.max(0, Math.min(1, relativeX / width));
+    const relativeX = pageX - trackLayout.x;
+    const percentage = Math.max(0, Math.min(1, relativeX / trackLayout.width));
     const newValue = minimumValue + percentage * (maximumValue - minimumValue);
     const clampedValue = Math.max(minimumValue, Math.min(maximumValue, newValue));
     const steppedValue = Math.round(clampedValue / step) * step;
     onValueChange(steppedValue);
-  }, [onValueChange, minimumValue, maximumValue, step]);
+  }, [onValueChange, minimumValue, maximumValue, step, trackLayout]);
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: (event) => {
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => false,
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
+    
+    onPanResponderGrant: (event: GestureResponderEvent) => {
       setIsDragging(true);
       updateValueFromPosition(event.nativeEvent.pageX);
     },
-    onPanResponderMove: (event) => {
+    
+    onPanResponderMove: (event: GestureResponderEvent) => {
       updateValueFromPosition(event.nativeEvent.pageX);
     },
+    
     onPanResponderRelease: () => {
       setIsDragging(false);
     },
+    
     onPanResponderTerminate: () => {
       setIsDragging(false);
     },
   });
 
-  const onTrackLayout = (event: any) => {
-    event.target.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-      trackLayoutRef.current = { x: pageX, width };
+  const onTrackLayout = useCallback((event: any) => {
+    const view = event.currentTarget || event.target;
+    view.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
+      setTrackLayout({ x: pageX, width, y: pageY });
     });
-  };
+  }, []);
 
   const thumbPosition = ((value - minimumValue) / (maximumValue - minimumValue)) * SLIDER_WIDTH;
 
@@ -78,9 +86,9 @@ export function VotingSlider({
             style={[
               styles.thumb,
               { 
-                left: Math.max(0, Math.min(SLIDER_WIDTH - 16, thumbPosition - 8)),
+                left: Math.max(0, Math.min(SLIDER_WIDTH - 18, thumbPosition - 9)),
                 backgroundColor: isDragging ? theme.colors.primary : theme.colors.green,
-                transform: [{ scale: isDragging ? 1.3 : 1 }]
+                transform: [{ scale: isDragging ? 1.2 : 1 }]
               }
             ]}
           />
@@ -105,7 +113,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: 32,
     justifyContent: 'center',
-    paddingVertical: 14, // Increase touch area
+    paddingVertical: 14, // Good touch area
   },
   track: {
     height: 4,
@@ -123,12 +131,12 @@ const styles = StyleSheet.create({
   },
   thumb: {
     position: 'absolute',
-    width: 16,
-    height: 16,
+    width: 18, // Reasonable size - not too big, not too small
+    height: 18,
     backgroundColor: theme.colors.green,
-    borderRadius: 8,
-    top: 8, // Center vertically (32 - 16) / 2
-    elevation: 4,
+    borderRadius: 9,
+    top: 7, // Center vertically ((32 - 18) / 2)
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,

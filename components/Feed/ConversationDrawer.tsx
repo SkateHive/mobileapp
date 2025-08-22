@@ -10,6 +10,8 @@ import {
   Dimensions,
   TextInput,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -51,6 +53,25 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Scroll to bottom when keyboard appears and reply is expanded
+  useEffect(() => {
+    if (keyboardHeight > 0 && isReplyExpanded) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [keyboardHeight, isReplyExpanded]);
+
+  const handleExpandReply = () => {
+    setIsReplyExpanded(true);
+    // Scroll to bottom after a brief delay to ensure the expanded box is rendered
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   const handleReplySuccess = (newReply: Discussion) => {
     setOptimisticReplies((prev) => [...prev, newReply]);
@@ -60,6 +81,27 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   const allReplies = [...optimisticReplies, ...comments];
+
+  // Listen for keyboard events
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener?.remove();
+      keyboardWillHideListener?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -109,6 +151,8 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
       setReplyContent('');
       setMedia(null);
       setMediaType(null);
+      setKeyboardHeight(0); // Reset keyboard height
+      Keyboard.dismiss();
     });
   };
 
@@ -274,7 +318,7 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
     <View style={styles.smallReplyBox}>
       <Pressable
         style={styles.smallReplyContent}
-        onPress={() => setIsReplyExpanded(true)}
+        onPress={handleExpandReply}
       >
         <View style={styles.profilePicSmall}>
           <Text style={styles.profileInitial}>
@@ -285,7 +329,7 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
       </Pressable>
       <View style={styles.smallReplyIcons}>
         <Pressable
-          onPress={() => setIsReplyExpanded(true)}
+          onPress={handleExpandReply}
           style={styles.smallIconButton}
         >
           <FontAwesome name="smile-o" size={20} color={theme.colors.gray} />
@@ -402,70 +446,75 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
           style={[
             styles.drawer,
             {
+              bottom: isReplyExpanded && keyboardHeight > 0 ? keyboardHeight - 50 : 0, // Move drawer up when keyboard is visible and reply is expanded
               transform: [{ translateY }],
             },
           ]}
         >
-          {/* Handle */}
-          <View style={styles.handle} />
+          {/* Remove KeyboardAvoidingView since we're handling it manually */}
+          <View style={styles.keyboardAvoidingView}>
+            {/* Handle */}
+            <View style={styles.handle} />
 
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable onPress={handleClose} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-            </Pressable>
-            <Text style={styles.headerTitle}>Comments</Text>
-            <View style={styles.headerSpacer} />
-          </View>
+            {/* Header */}
+            <View style={styles.header}>
+              <Pressable onPress={handleClose} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+              </Pressable>
+              <Text style={styles.headerTitle}>Comments</Text>
+              <View style={styles.headerSpacer} />
+            </View>
 
-          {/* Content */}
-          <ScrollView 
-            style={styles.content} 
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Comments */}
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.green} />
-                <Text style={styles.loadingText}>Loading comments...</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error loading comments</Text>
-              </View>
-            ) : allReplies.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
+            {/* Content */}
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.content} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Comments */}
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={theme.colors.green} />
+                  <Text style={styles.loadingText}>Loading comments...</Text>
+                </View>
+              ) : error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>Error loading comments</Text>
+                </View>
+              ) : allReplies.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
+                </View>
+              ) : (
+                allReplies.map((reply, index) => (
+                  <View key={`${reply.author}/${reply.permlink}-${index}`} style={styles.replyContainer}>
+                    <ConversationReply 
+                      post={reply} 
+                      currentUsername={username}
+                      depth={reply.depth || 0}
+                      maxDepth={3}
+                      onReplySuccess={handleReplySuccess}
+                    />
+                    {index < allReplies.length - 1 && (
+                      <View style={styles.replySeparator} />
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            {/* Reply Section */}
+            {username && username !== 'SPECTATOR' ? (
+              <View style={styles.replySection}>
+                {isReplyExpanded ? renderExpandedReplyBox() : renderSmallReplyBox()}
               </View>
             ) : (
-              allReplies.map((reply, index) => (
-                <View key={`${reply.author}/${reply.permlink}-${index}`} style={styles.replyContainer}>
-                  <ConversationReply 
-                    post={reply} 
-                    currentUsername={username}
-                    depth={reply.depth || 0}
-                    maxDepth={3}
-                    onReplySuccess={handleReplySuccess}
-                  />
-                  {index < allReplies.length - 1 && (
-                    <View style={styles.replySeparator} />
-                  )}
-                </View>
-              ))
+              <View style={styles.loginPrompt}>
+                <Text style={styles.loginPromptText}>Please log in to comment</Text>
+              </View>
             )}
-          </ScrollView>
-
-          {/* Reply Section */}
-          {username && username !== 'SPECTATOR' ? (
-            <View style={styles.replySection}>
-              {isReplyExpanded ? renderExpandedReplyBox() : renderSmallReplyBox()}
-            </View>
-          ) : (
-            <View style={styles.loginPrompt}>
-              <Text style={styles.loginPromptText}>Please log in to comment</Text>
-            </View>
-          )}
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -493,6 +542,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: theme.spacing.xs,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   handle: {
     width: 40,
@@ -569,7 +621,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.card,
-    paddingBottom: theme.spacing.xs, // Add some bottom padding
+    paddingBottom: theme.spacing.md, // Add bottom padding to entire section
   },
   smallReplyBox: {
     flexDirection: 'row',
@@ -618,7 +670,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.card,
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.sm,
+    paddingBottom: theme.spacing.md, // Increased bottom padding
   },
   expandedReplyHeader: {
     flexDirection: 'row',
@@ -666,20 +718,22 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: theme.fontSizes.md,
     fontFamily: theme.fonts.default,
-    minHeight: 80,
-    maxHeight: 100,
+    minHeight: 100,
+    maxHeight: 120,
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
   },
   expandedActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: theme.spacing.sm,
+    paddingBottom: theme.spacing.lg, // Increased bottom padding for buttons
+    marginBottom: theme.spacing.sm, // Add margin for extra space
   },
   mediaActionButton: {
     flexDirection: 'row',
