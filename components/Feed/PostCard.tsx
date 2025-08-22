@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { FontAwesome } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
@@ -48,7 +48,7 @@ interface PostCardProps {
 }
 
 
-export function PostCard({ post, currentUsername }: PostCardProps) {
+export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
   const { session } = useAuth();
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -58,20 +58,46 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
   const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
-  // Use active_votes for vote count
-  const [voteCount, setVoteCount] = useState(
+  
+  // Memoize expensive calculations
+  const initialVoteCount = useMemo(() => 
     Array.isArray(post.active_votes)
       ? post.active_votes.filter((vote: any) => vote.weight > 0).length
-      : 0
+      : 0,
+    [post.active_votes]
   );
-  // Track the post's payout value for dynamic updates
-  const [payoutValue, setPayoutValue] = useState(() => {
+  
+  const [voteCount, setVoteCount] = useState(initialVoteCount);
+  
+  // Memoize payout value calculation
+  const initialPayoutValue = useMemo(() => {
     const pending = parseFloat(post.pending_payout_value?.toString?.() || '0');
     const total = parseFloat(post.total_payout_value?.toString?.() || '0');
     const curator = parseFloat(post.curator_payout_value?.toString?.() || '0');
     return pending + total + curator;
-  });
+  }, [post.pending_payout_value, post.total_payout_value, post.curator_payout_value]);
+  
+  // Track the post's payout value for dynamic updates
+  const [payoutValue, setPayoutValue] = useState(initialPayoutValue);
   const { showToast } = useToast();
+
+  // Memoize media extraction
+  const media = useMemo(() => extractMediaFromBody(post.body), [post.body]);
+  
+  // Memoize post content processing
+  const postContent = useMemo(() => 
+    post.body.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '').trim(),
+    [post.body]
+  );
+  
+  // Memoize formatted date
+  const formattedDate = useMemo(() => {
+    const dateStr = post.created;
+    if (!dateStr) return '';
+    const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+    if (isNaN(date.getTime())) return '';
+    return formatTimeAbbreviated(date);
+  }, [post.created]);
 
   // Check if user has already voted on this post
   useEffect(() => {
@@ -169,9 +195,6 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
     });
   };
 
-  const media = extractMediaFromBody(post.body);
-  const postContent = post.body.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '').trim();
-  
   const handleProfilePress = () => {
     router.push({
       pathname: "/(tabs)/profile",
@@ -209,13 +232,7 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
                 <Text style={styles.authorText}>{post.author}</Text>
               </Pressable>
               <Text style={styles.dateText}>
-                {(() => {
-                  const dateStr = post.created;
-                  if (!dateStr) return '';
-                  const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
-                  if (isNaN(date.getTime())) return '';
-                  return formatTimeAbbreviated(date);
-                })()}
+                {formattedDate}
               </Text>
             </View>
 
@@ -327,7 +344,7 @@ export function PostCard({ post, currentUsername }: PostCardProps) {
       />
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
