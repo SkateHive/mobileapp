@@ -1,21 +1,23 @@
 import React from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl, ViewToken } from 'react-native';
 import { Text } from '../ui/text';
 import { PostCard } from './PostCard';
 import { ActivityIndicator } from 'react-native';
 import { useAuth } from '~/lib/auth-provider';
 import { useSnaps } from '~/lib/hooks/useSnaps';
 import { theme } from '~/lib/theme';
+import { ViewportTrackerProvider, useViewportTracker } from '~/lib/ViewportTracker';
 import type { Discussion } from '@hiveio/dhive';
 
 interface FeedProps {
   refreshTrigger?: number;
 }
 
-export function Feed({ refreshTrigger }: FeedProps) {
+function FeedContent({ refreshTrigger }: FeedProps) {
   const { username } = useAuth();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const { updateVisibleItems } = useViewportTracker();
 
   // Handle pull-to-refresh
   const handleRefresh = React.useCallback(async () => {
@@ -23,6 +25,23 @@ export function Feed({ refreshTrigger }: FeedProps) {
     await refresh();
     setIsRefreshing(false);
   }, [refresh]);
+
+  // Handle viewable items change for video autoplay
+  const onViewableItemsChanged = React.useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const visiblePermlinks = viewableItems
+        .filter(item => item.isViewable && item.item)
+        .map(item => (item.item as Discussion).permlink);
+      updateVisibleItems(visiblePermlinks);
+    },
+    [updateVisibleItems]
+  );
+
+  // Viewability config - item is considered viewable when 60% is visible
+  const viewabilityConfig = React.useMemo(() => ({
+    viewAreaCoveragePercentThreshold: 60,
+    minimumViewTime: 100,
+  }), []);
 
   // Map blockchain comments (Discussion) to Post for PostCard compatibility
   const feedData: Discussion[] = comments as unknown as Discussion[];
@@ -62,6 +81,8 @@ export function Feed({ refreshTrigger }: FeedProps) {
         contentContainerStyle={styles.contentContainer}
         onEndReached={hasMore ? loadNextPage : undefined}
         onEndReachedThreshold={0.5}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         refreshControl={
           <RefreshControl 
             refreshing={isRefreshing} 
@@ -80,6 +101,14 @@ export function Feed({ refreshTrigger }: FeedProps) {
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       />
     </View>
+  );
+}
+
+export function Feed(props: FeedProps) {
+  return (
+    <ViewportTrackerProvider>
+      <FeedContent {...props} />
+    </ViewportTrackerProvider>
   );
 }
 

@@ -9,6 +9,7 @@ interface VideoPlayerProps {
 export const VideoPlayer = React.memo(({ url, playing = true }: VideoPlayerProps) => {
   const player = useVideoPlayer(url, player => {
     player.loop = true;
+    player.muted = true; // Start muted for autoplay (better UX)
   });
 
   // console.log("Playing video:", url);

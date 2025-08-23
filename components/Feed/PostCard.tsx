@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import { vote as hiveVote } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
+import { useViewportTracker } from '~/lib/ViewportTracker';
 import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
@@ -51,6 +52,7 @@ interface PostCardProps {
 export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
   const { session } = useAuth();
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
+  const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [isVoting, setIsVoting] = useState(false);
@@ -58,6 +60,15 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
   const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
+  
+  // Register/unregister with viewport tracker
+  useEffect(() => {
+    registerItem(post.permlink);
+    return () => unregisterItem(post.permlink);
+  }, [post.permlink, registerItem, unregisterItem]);
+  
+  // Check if this post is currently visible
+  const isVisible = isItemVisible(post.permlink);
   
   // Memoize expensive calculations
   const initialVoteCount = useMemo(() => 
@@ -253,6 +264,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                     selectedMedia={selectedMedia}
                     isModalVisible={isModalVisible}
                     onCloseModal={() => setIsModalVisible(false)}
+                    isVisible={isVisible}
                   />
                 </View>
               )}

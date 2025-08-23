@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Modal, Pressable, View, Dimensions, StyleSheet } from 'react-native';
 import { VideoPlayer } from './VideoPlayer';
+import { VideoWithAutoplay } from './VideoWithAutoplay';
 import type { Media } from '../../lib/types';
 import { FontAwesome } from '@expo/vector-icons';
 import { theme } from '../../lib/theme';
@@ -11,6 +12,7 @@ interface MediaPreviewProps {
   selectedMedia: Media | null;
   isModalVisible: boolean;
   onCloseModal: () => void;
+  isVisible?: boolean; // For autoplay control
 }
 
 // For calculating image dimensions
@@ -23,41 +25,10 @@ export function MediaPreview({
   selectedMedia,
   isModalVisible,
   onCloseModal,
+  isVisible = true,
 }: MediaPreviewProps) {
   // Track dimensions for each image to maintain proper aspect ratio
   const [imageDimensions, setImageDimensions] = useState<Record<number, { width: number, height: number }>>({});
-  // Track which videos are playing
-  const [playingVideos, setPlayingVideos] = useState<Record<number, boolean>>({});
-  // Track which videos have had their initial interaction (play button clicked)
-  const [interactedVideos, setInteractedVideos] = useState<Record<number, boolean>>({});
-
-  // Handle initial video play - this will only work for the first interaction
-  const handleInitialPlay = (index: number) => {
-    // Only handle the press if the video hasn't been interacted with
-    if (!interactedVideos[index]) {
-      // Start playing the video
-      setPlayingVideos(prev => ({
-        ...prev,
-        [index]: true
-      }));
-      
-      // Mark this video as interacted with
-      setInteractedVideos(prev => ({
-        ...prev,
-        [index]: true
-      }));
-    }
-  };
-
-  // Determine if a specific video is playing
-  const isVideoPlaying = (index: number) => {
-    return !!playingVideos[index];
-  };
-  
-  // Determine if a specific video has been interacted with
-  const hasVideoBeenInteracted = (index: number) => {
-    return !!interactedVideos[index];
-  };
 
   // Calculate appropriate dimensions when image loads
   const handleImageLoad = (index: number, width: number, height: number) => {
@@ -68,7 +39,7 @@ export function MediaPreview({
   };
 
   // Calculate display width based on number of media items
-  const getContainerWidth = (index: number) => {
+  const getContainerWidth = () => {
     const containerWidth = media.length === 1 
       ? screenWidth - 16 // Full width (minus padding)
       : (screenWidth - 24) / 2; // Half width (minus padding and gap)
@@ -81,11 +52,11 @@ export function MediaPreview({
     const dimensions = imageDimensions[index];
     if (!dimensions) return 200; // Default height until image loads
     
-    const containerWidth = getContainerWidth(index);
+    const containerWidth = getContainerWidth();
     const aspectRatio = dimensions.width / dimensions.height;
     const calculatedHeight = containerWidth / aspectRatio;
     
-    // Apply maximum height constraint (3/4 of screen height)
+    // Apply maximum height constraint
     return Math.min(calculatedHeight, MAX_IMAGE_HEIGHT);
   };
 
@@ -103,24 +74,11 @@ export function MediaPreview({
             ]}
           >
             {item.type === 'video' ? (
-              // Only make it a Pressable if the video hasn't been interacted with yet
-              hasVideoBeenInteracted(index) ? (
-                // After interaction, just render the video player without pressable wrapper
-                <VideoPlayer url={item.url} playing={isVideoPlaying(index)} />
-              ) : (
-                // Before first interaction, use Pressable with play button overlay
-                <Pressable 
-                  style={styles.fullSize} 
-                  onPress={() => handleInitialPlay(index)}
-                >
-                  <VideoPlayer url={item.url} playing={false} />
-                  
-                  {/* Play button overlay - only shown before first interaction */}
-                  <View style={styles.playOverlay}>
-                    <FontAwesome name="play-circle" size={50} color="white" />
-                  </View>
-                </Pressable>
-              )
+              <VideoWithAutoplay 
+                url={item.url} 
+                isVisible={isVisible}
+                style={styles.fullSize}
+              />
             ) : (
               <Pressable
                 onPress={() => onMediaPress(item)}
