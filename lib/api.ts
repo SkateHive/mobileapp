@@ -39,18 +39,7 @@ export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
 }
 
 /**
- * Fetches the trending feed
- */
-export async function getTrending(): Promise<Post[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/feed/trending`);
-    const data: ApiResponse<Post[]> = await response.json();
-    return data.success && Array.isArray(data.data) ? data.data : [];
-  } catch (error) {
-    console.error('Error fetching trending:', error);
-    return [];
-  }
-}
+ * Get balance
 
 
 /**

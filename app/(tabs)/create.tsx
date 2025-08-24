@@ -243,8 +243,6 @@ export default function CreatePost() {
 
       // Invalidate queries to refresh feed data
       queryClient.invalidateQueries({ queryKey: ["feed"] });
-      queryClient.invalidateQueries({ queryKey: ["trending"] });
-      queryClient.invalidateQueries({ queryKey: ["following"] });
       queryClient.invalidateQueries({ queryKey: ["userFeed", username] });
 
       // Navigate to feed

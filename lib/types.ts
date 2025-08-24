@@ -103,3 +103,15 @@ export interface AuthSession {
   decryptedKey: string;
   loginTime: number;
 }
+
+// --- Notification Types ---
+
+export interface HiveNotification {
+  id: number;
+  type: string;
+  score: number;
+  date: string;
+  msg: string;
+  url: string;
+  isRead?: boolean;
+}

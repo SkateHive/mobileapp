@@ -4,6 +4,8 @@ import { StyleSheet, View, PanResponder } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useRef } from 'react';
 import { theme } from '~/lib/theme';
+import { BadgedIcon } from '~/components/ui/BadgedIcon';
+import { useNotifications } from '~/lib/hooks/useNotifications';
 
 const TAB_ITEMS = [
   {
@@ -31,6 +33,12 @@ const TAB_ITEMS = [
     iconFamily: 'Ionicons'
   },
   {
+    name: 'notifications',
+    title: 'Notifications',
+    icon: 'notifications-outline',
+    iconFamily: 'Ionicons'
+  },
+  {
     name: 'profile',
     title: 'Profile',
     icon: 'person-outline',
@@ -40,6 +48,7 @@ const TAB_ITEMS = [
 
 export default function TabLayout() {
   const router = useRouter();
+  const { unreadCount } = useNotifications();
 
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
@@ -94,6 +103,8 @@ export default function TabLayout() {
                       name={tab.icon} 
                       color={color} 
                       iconFamily={tab.iconFamily}
+                      showBadge={tab.name === 'notifications'}
+                      badgeCount={tab.name === 'notifications' ? unreadCount : 0}
                     />
                   ),
                   ...(tab.name === 'profile' && {
@@ -116,8 +127,14 @@ function TabBarIcon(props: {
   name: string;
   color: string;
   iconFamily: 'Ionicons';
+  showBadge?: boolean;
+  badgeCount?: number;
 }) {
-  const { name, color } = props;
+  const { name, color, showBadge = false, badgeCount = 0 } = props;
+  
+  if (showBadge) {
+    return <BadgedIcon name={name} color={color} badgeCount={badgeCount} />;
+  }
   
   return <Ionicons name={name as any} size={24} color={color} style={{ marginBottom: -10 }} />;
 }

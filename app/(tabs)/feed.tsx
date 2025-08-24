@@ -3,15 +3,22 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Feed } from "~/components/Feed/Feed";
 import { theme } from "~/lib/theme";
+import { useNotifications } from "~/lib/hooks/useNotifications";
 
 export default function FeedPage() {
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const { refresh: refreshNotifications } = useNotifications();
 
   useFocusEffect(
     React.useCallback(() => {
       setRefreshKey((prev) => prev + 1);
     }, [])
   );
+
+  const handleFeedRefresh = React.useCallback(() => {
+    // Trigger notifications refresh when feed is refreshed
+    refreshNotifications();
+  }, [refreshNotifications]);
 
   const styles = StyleSheet.create({
     container: {
@@ -22,7 +29,7 @@ export default function FeedPage() {
 
   return (
     <View style={styles.container}>
-      <Feed refreshTrigger={refreshKey} />
+      <Feed refreshTrigger={refreshKey} onRefresh={handleFeedRefresh} />
     </View>
   );
 }

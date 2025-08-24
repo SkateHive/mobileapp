@@ -654,3 +654,155 @@ export async function getBlockchainRewards(username: string): Promise<{
   }
 }
 
+// --- NOTIFICATIONS ---
+
+/**
+ * Interface for Hive notifications with read status
+ */
+export interface HiveNotification {
+  id: number;
+  type: string;
+  score: number;
+  date: string;
+  msg: string;
+  url: string;
+  isRead?: boolean; // Added to track read status
+}
+
+/**
+ * Find the last notification reset date for a user
+ * @param username - Hive username
+ * @param start - Starting point for history search
+ * @param loopCount - Current loop count for recursion
+ * @returns ISO date string of last reset, or fallback date
+ */
+export async function findLastNotificationsReset(
+  username: string,
+  start: number = -1,
+  loopCount: number = 0
+): Promise<string> {
+  if (loopCount >= 5) {
+    return '1970-01-01T00:00:00Z';
+  }
+
+  try {
+    const params = {
+      account: username,
+      start: start,
+      limit: 1000,
+      include_reversible: true,
+      operation_filter_low: 262144,
+    };
+
+    const transactions = await HiveClient.call('account_history_api', 'get_account_history', params);
+    const history = transactions.history.reverse();
+      
+    if (history.length === 0) {
+      return '1970-01-01T00:00:00Z';
+    }
+    
+    for (const item of history) {
+      if (item[1].op.value.id === 'notify') {
+        const json = JSON.parse(item[1].op.value.json);
+        return json[1].date;
+      }
+    }
+
+    return findLastNotificationsReset(username, start - 1000, loopCount + 1);
+  } catch (error) {
+    console.error('Error finding last notifications reset:', error);
+    return '1970-01-01T00:00:00Z';
+  }
+}
+
+/**
+ * Fetch ALL notifications for a user with pagination support
+ * @param username - Hive username
+ * @param limit - Number of notifications to fetch (default 100)
+ * @param lastId - Last notification ID for pagination
+ * @returns Array of all notifications with read status
+ */
+export async function fetchAllNotifications(
+  username: string, 
+  limit: number = 100, 
+  lastId?: number
+): Promise<HiveNotification[]> {
+  try {
+    const params: any = {
+      account: username,
+      limit: limit
+    };
+    
+    if (lastId) {
+      params.last_id = lastId;
+    }
+
+    const notifications: HiveNotification[] = await HiveClient.call('bridge', 'account_notifications', params);
+    
+    // Get the last read date to determine which notifications are read
+    const lastDate = await findLastNotificationsReset(username);
+    
+    // Mark notifications as read or unread based on their date
+    const notificationsWithReadStatus = notifications.map(notification => ({
+      ...notification,
+      isRead: lastDate ? notification.date <= lastDate : false
+    }));
+    
+    return notificationsWithReadStatus;
+  } catch (error) {
+    console.error('Error fetching all notifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetch new notifications for a user (only unread ones)
+ * @param username - Hive username
+ * @returns Array of new notifications since last reset
+ */
+export async function fetchNewNotifications(username: string): Promise<HiveNotification[]> {
+  try {
+    const notifications: HiveNotification[] = await HiveClient.call('bridge', 'account_notifications', { 
+      account: username, 
+      limit: 100 
+    });
+    const lastDate = await findLastNotificationsReset(username);
+    
+    if (lastDate) {
+      const filteredNotifications = notifications.filter(notification => notification.date > lastDate);
+      return filteredNotifications.map(n => ({ ...n, isRead: false }));
+    } else {
+      return notifications.map(n => ({ ...n, isRead: false }));
+    }
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Mark notifications as read by posting a custom JSON operation
+ * @param privateKey - User's posting private key
+ * @param username - Hive username
+ * @returns Transaction broadcast result
+ */
+export async function markNotificationsAsRead(
+  privateKey: string,
+  username: string
+): Promise<any> {
+  const now = new Date().toISOString();
+  const json = JSON.stringify(['setLastRead', { date: now }]);
+  
+  const operation: any = [
+    'custom_json',
+    {
+      required_auths: [],
+      required_posting_auths: [username],
+      id: 'notify',
+      json: json,
+    },
+  ];
+  
+  return sendOperation(privateKey, [operation]);
+}
+

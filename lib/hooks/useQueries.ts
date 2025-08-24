@@ -34,9 +34,8 @@ export function useFeedPaginated(page: number, limit: number) {
 import { useQuery } from '@tanstack/react-query';
 import { 
   getFeed, 
-  getTrending, 
-  getFollowing, 
-  getBalance, getRewards } from '../api';
+  getBalance,
+  getRewards } from '../api';
 import { API_BASE_URL } from '../constants';
 import type { Post } from '../types';
 
@@ -87,22 +86,6 @@ const SPECTATOR_PROFILE: ProfileData = {
 };
 
 // Deprecated: useFeed is not compatible with paginated API. Use useFeedPaginated instead for infinite scroll.
-
-export function useTrending() {
-  return useQuery({
-    queryKey: ['trending'],
-    queryFn: getTrending,
-    refetchInterval: 60000,
-  });
-}
-
-export function useFollowing(username: string) {
-  return useQuery({
-    queryKey: ['following'],
-    queryFn: () => getFollowing(username),
-    refetchInterval: 60000,
-  });
-}
 
 export function useBalance(username: string | null) {
   return useQuery({

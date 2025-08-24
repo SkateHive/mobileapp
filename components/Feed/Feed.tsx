@@ -11,9 +11,10 @@ import type { Discussion } from '@hiveio/dhive';
 
 interface FeedProps {
   refreshTrigger?: number;
+  onRefresh?: () => void;
 }
 
-function FeedContent({ refreshTrigger }: FeedProps) {
+function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const { username } = useAuth();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -23,8 +24,12 @@ function FeedContent({ refreshTrigger }: FeedProps) {
   const handleRefresh = React.useCallback(async () => {
     setIsRefreshing(true);
     await refresh();
+    // Trigger notifications refresh when feed is refreshed
+    if (onRefresh) {
+      onRefresh();
+    }
     setIsRefreshing(false);
-  }, [refresh]);
+  }, [refresh, onRefresh]);
 
   // Handle viewable items change for video autoplay
   const onViewableItemsChanged = React.useCallback(
@@ -104,10 +109,10 @@ function FeedContent({ refreshTrigger }: FeedProps) {
   );
 }
 
-export function Feed(props: FeedProps) {
+export function Feed({ refreshTrigger, onRefresh }: FeedProps) {
   return (
     <ViewportTrackerProvider>
-      <FeedContent {...props} />
+      <FeedContent refreshTrigger={refreshTrigger} onRefresh={onRefresh} />
     </ViewportTrackerProvider>
   );
 }
