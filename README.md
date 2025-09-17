@@ -9,6 +9,7 @@ MyCommunity App is built using the latest React Native and Expo technologies, of
 ## 🌟 Key Features
 
 ### Content Creation & Sharing
+
 - 📝 Long-form articles with Markdown support
 - 📱 Short posts for quick updates
 - 🖼️ Rich media support (images & videos)
@@ -16,6 +17,7 @@ MyCommunity App is built using the latest React Native and Expo technologies, of
 - 📊 Post analytics and earnings tracking
 
 ### Secure Wallet Integration
+
 - 🔒 Encrypted credential storage
 - 💰 HIVE wallet integration
 - 🎁 Easy community rewards distribution
@@ -23,6 +25,7 @@ MyCommunity App is built using the latest React Native and Expo technologies, of
 - 🔐 Secure voting mechanism
 
 ### Community Features
+
 - 👥 Community building tools
 - 🏷️ Custom tags and categories
 - 💬 Interactive discussions
@@ -30,6 +33,7 @@ MyCommunity App is built using the latest React Native and Expo technologies, of
 - 📊 Community analytics
 
 ### UI/UX
+
 - 🌓 Dark/Light theme toggle
 - 📱 Native mobile experience
 - ⚡ Fast and responsive interface
@@ -83,8 +87,8 @@ mycommunity-app/
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/r4topunk/mycommunity-app.git
-cd mycommunity-app
+git clone https://github.com/r4topunk/mobileapp.git
+cd mobileapp
 ```
 
 2. Install dependencies with pnpm:
@@ -198,6 +202,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 💎 Powered by HIVE
 
 Built on the HIVE blockchain, enabling:
+
 - Decentralized content storage
 - Community rewards
 - Transparent monetization
