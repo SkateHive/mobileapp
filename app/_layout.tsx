@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
 import { ViewportTrackerProvider } from '~/lib/ViewportTracker';
+import { NotificationProvider } from '~/lib/notifications-context';
 import { theme } from '~/lib/theme';
 
 // Keep splash screen visible while fonts are loading
@@ -83,57 +84,59 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NavigationGuard>
-          <ToastProvider>
-            <ViewportTrackerProvider>
-              <SafeAreaProvider>
-                <ActivityWrapper>
-                  <View style={styles.container}>
-                    <Stack
-                      screenOptions={{
-                        headerShown: false,
-                        animation: 'none',
-                        contentStyle: { backgroundColor: theme.colors.background },
-                      }}
-                      initialRouteName="index"
-                    >
-                      <Stack.Screen 
-                        name="index" 
-                        options={{
-                          contentStyle: { backgroundColor: theme.colors.background },
-                        }}
-                      />
-                      <Stack.Screen 
-                        name="login"
-                        options={{
-                          contentStyle: { backgroundColor: theme.colors.background },
-                        }}
-                      />
-                      <Stack.Screen 
-                        name="about"
-                        options={{
-                          contentStyle: { backgroundColor: theme.colors.background },
-                        }}
-                      />
-                      <Stack.Screen 
-                        name="conversation"
-                        options={{
-                          contentStyle: { backgroundColor: theme.colors.background },
-                        }}
-                      />
-                      <Stack.Screen 
-                        name="(tabs)"
-                        options={{
+          <NotificationProvider>
+            <ToastProvider>
+              <ViewportTrackerProvider>
+                <SafeAreaProvider>
+                  <ActivityWrapper>
+                    <View style={styles.container}>
+                      <Stack
+                        screenOptions={{
+                          headerShown: false,
                           animation: 'none',
                           contentStyle: { backgroundColor: theme.colors.background },
-                          gestureEnabled: false,
                         }}
-                      />
-                    </Stack>
-                  </View>
-                </ActivityWrapper>
-              </SafeAreaProvider>
-            </ViewportTrackerProvider>
-          </ToastProvider>
+                        initialRouteName="index"
+                      >
+                        <Stack.Screen 
+                          name="index" 
+                          options={{
+                            contentStyle: { backgroundColor: theme.colors.background },
+                          }}
+                        />
+                        <Stack.Screen 
+                          name="login"
+                          options={{
+                            contentStyle: { backgroundColor: theme.colors.background },
+                          }}
+                        />
+                        <Stack.Screen 
+                          name="about"
+                          options={{
+                            contentStyle: { backgroundColor: theme.colors.background },
+                          }}
+                        />
+                        <Stack.Screen 
+                          name="conversation"
+                          options={{
+                            contentStyle: { backgroundColor: theme.colors.background },
+                          }}
+                        />
+                        <Stack.Screen 
+                          name="(tabs)"
+                          options={{
+                            animation: 'none',
+                            contentStyle: { backgroundColor: theme.colors.background },
+                            gestureEnabled: false,
+                          }}
+                        />
+                      </Stack>
+                    </View>
+                  </ActivityWrapper>
+                </SafeAreaProvider>
+              </ViewportTrackerProvider>
+            </ToastProvider>
+          </NotificationProvider>
         </NavigationGuard>
       </AuthProvider>
     </QueryClientProvider>

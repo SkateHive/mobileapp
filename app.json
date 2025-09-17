@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SkateHiveApp",
-    "slug": "skatehive-app",
+    "name": "SkateHive",
+    "slug": "skatehive",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication to protect your private keys."

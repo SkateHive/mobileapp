@@ -5,7 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useRef } from 'react';
 import { theme } from '~/lib/theme';
 import { BadgedIcon } from '~/components/ui/BadgedIcon';
-import { useNotifications } from '~/lib/hooks/useNotifications';
+import { useNotificationContext } from '~/lib/notifications-context';
 
 const TAB_ITEMS = [
   {
@@ -48,7 +48,7 @@ const TAB_ITEMS = [
 
 export default function TabLayout() {
   const router = useRouter();
-  const { unreadCount } = useNotifications();
+  const { badgeCount } = useNotificationContext();
 
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
@@ -104,7 +104,7 @@ export default function TabLayout() {
                       color={color} 
                       iconFamily={tab.iconFamily}
                       showBadge={tab.name === 'notifications'}
-                      badgeCount={tab.name === 'notifications' ? unreadCount : 0}
+                      badgeCount={tab.name === 'notifications' ? badgeCount : 0}
                     />
                   ),
                   ...(tab.name === 'profile' && {

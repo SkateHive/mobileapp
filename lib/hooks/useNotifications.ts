@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchAllNotifications, fetchNewNotifications, markNotificationsAsRead, HiveNotification } from '../hive-utils';
 import { useAuth } from '../auth-provider';
 
-export function useNotifications() {
+export function useNotifications(disableAutoRefresh: boolean = false) {
   const { session, username } = useAuth();
   const [notifications, setNotifications] = useState<HiveNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -100,8 +100,9 @@ export function useNotifications() {
   }, [fetchNotifications]);
 
   // Auto-refresh notifications every 2 minutes (only the first page to check for new ones)
+  // Disabled when disableAutoRefresh is true (e.g., when on notifications screen)
   useEffect(() => {
-    if (!username || username === 'SPECTATOR') return;
+    if (!username || username === 'SPECTATOR' || disableAutoRefresh) return;
 
     const interval = setInterval(() => {
       // Only refresh if we're not loading more to avoid conflicts
@@ -111,7 +112,7 @@ export function useNotifications() {
     }, 120000); // 2 minutes
 
     return () => clearInterval(interval);
-  }, [fetchNotifications, username, isLoadingMore]);
+  }, [fetchNotifications, username, isLoadingMore, disableAutoRefresh]);
 
   // Calculate unread count
   const unreadCount = notifications.filter(n => !n.isRead).length;

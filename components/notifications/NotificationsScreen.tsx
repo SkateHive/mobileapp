@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { useNotifications } from '~/lib/hooks/useNotifications';
+import { useNotificationContext } from '~/lib/notifications-context';
 import { NotificationItem } from './NotificationItem';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
@@ -12,6 +13,7 @@ import type { HiveNotification } from '~/lib/types';
 export const NotificationsScreen = React.memo(() => {
   const { username } = useAuth();
   const { showToast } = useToast();
+  const { onNotificationsMarkedAsRead } = useNotificationContext();
   const {
     notifications,
     isLoading,
@@ -22,13 +24,15 @@ export const NotificationsScreen = React.memo(() => {
     refresh,
     loadMore,
     markAsRead,
-  } = useNotifications();
+  } = useNotifications(true); // Disable auto-refresh when on notifications screen
 
   const handleMarkAsRead = async () => {
     if (unreadCount === 0) return;
     
     try {
       await markAsRead();
+      // Immediately clear the badge and refresh it
+      onNotificationsMarkedAsRead();
       showToast('Notifications marked as read', 'success');
     } catch (error) {
       showToast('Failed to mark notifications as read', 'error');

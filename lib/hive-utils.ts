@@ -1,4 +1,4 @@
-import { Client, Comment, PrivateKey } from '@hiveio/dhive';
+import { Client, Comment, PrivateKey, Discussion } from '@hiveio/dhive';
 import { 
   SNAPS_CONTAINER_AUTHOR as ENV_SNAPS_CONTAINER_AUTHOR,
   SNAPS_PAGE_MIN_SIZE as ENV_SNAPS_PAGE_MIN_SIZE,
@@ -278,6 +278,22 @@ export async function getContentReplies({
   permlink: string;
 }): Promise<ExtendedComment[]> {
   return HiveClient.database.call('get_content_replies', [author, permlink]);
+}
+
+/**
+ * Get a single post/comment content by author and permlink
+ */
+export async function getContent(author: string, permlink: string): Promise<Discussion | null> {
+  try {
+    const content = await HiveClient.database.call('get_content', [author, permlink]);
+    if (content && content.author) {
+      return content as Discussion;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching content:', error);
+    return null;
+  }
 }
 
 // Define custom error classes for better error handling

@@ -1,18 +1,83 @@
-import React from 'react';
-import { View, Pressable, StyleSheet, Image, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, Pressable, StyleSheet, Image } from 'react-native';
+import { router } from 'expo-router';
 import { HiveNotification } from '~/lib/types';
 import { Text } from '../ui/text';
+import { ConversationDrawer } from '../Feed/ConversationDrawer';
+import { getContent } from '~/lib/hive-utils';
 import { theme } from '~/lib/theme';
+import type { Discussion } from '@hiveio/dhive';
 
 interface NotificationItemProps {
   notification: HiveNotification;
 }
 
 export const NotificationItem = React.memo(({ notification }: NotificationItemProps) => {
+  const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
+  const [postData, setPostData] = useState<Discussion | null>(null);
+
   // Extract author from the notification message (usually starts with @username)
   const getAuthor = (msg: string): string => {
     const match = msg.match(/@([a-zA-Z0-9.-]+)/);
     return match ? match[1] : 'user';
+  };
+
+  // Determine notification type based on message content and type
+  const getNotificationType = (notification: HiveNotification): 'reply' | 'mention' | 'vote' | 'follow' | 'other' => {
+    const msg = notification.msg.toLowerCase();
+    const type = notification.type;
+    
+    // Check for replies and mentions
+    if (msg.includes('replied to') || msg.includes('commented on') || type === 'reply') {
+      return 'reply';
+    }
+    
+    if (msg.includes('mentioned you') || msg.includes('mentioned') || type === 'mention') {
+      return 'mention';
+    }
+    
+    // Check for votes
+    if (msg.includes('upvoted') || msg.includes('voted') || msg.includes('liked') || type === 'vote') {
+      return 'vote';
+    }
+    
+    // Check for follows
+    if (msg.includes('started following') || msg.includes('followed') || type === 'follow') {
+      return 'follow';
+    }
+    
+    return 'other';
+  };
+
+  // Extract post data from notification URL for conversation drawer
+  const getPostDataFromUrl = (url: string): { author: string; permlink: string } | null => {
+    try {
+      // Parse URLs like: /@author/permlink or /category/@author/permlink
+      const match = url.match(/@([a-zA-Z0-9.-]+)\/([a-zA-Z0-9-]+)/);
+      if (match) {
+        return {
+          author: match[1],
+          permlink: match[2]
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing notification URL:', error);
+    }
+    return null;
+  };
+
+  // Fetch the actual reply content from the notification URL
+  const fetchReplyContent = async (url: string): Promise<Discussion | null> => {
+    const postInfo = getPostDataFromUrl(url);
+    if (!postInfo) return null;
+
+    try {
+      const content = await getContent(postInfo.author, postInfo.permlink);
+      return content;
+    } catch (error) {
+      console.error('Error fetching reply content:', error);
+      return null;
+    }
   };
 
   // Format the notification date
@@ -30,17 +95,155 @@ export const NotificationItem = React.memo(({ notification }: NotificationItemPr
   };
 
   const handlePress = async () => {
-    if (notification.url) {
-      try {
-        // Try to open the URL - in a real app you might navigate to an internal screen
-        const url = notification.url.startsWith('http') 
-          ? notification.url 
-          : `https://ecency.com${notification.url}`;
-        
-        await Linking.openURL(url);
-      } catch (error) {
-        console.error('Error opening notification URL:', error);
+    const notificationType = getNotificationType(notification);
+    const author = getAuthor(notification.msg);
+    
+    try {
+      if (notificationType === 'reply' || notificationType === 'mention') {
+        // For replies and mentions, open conversation drawer
+        const postInfo = getPostDataFromUrl(notification.url);
+        if (postInfo) {
+          // Fetch the actual reply content
+          const replyContent = await fetchReplyContent(notification.url);
+          
+          // Create a discussion object for the parent post (we need the parent, not the reply itself)
+          let parentDiscussion: Discussion;
+          
+          if (replyContent && replyContent.parent_author && replyContent.parent_permlink) {
+            // Fetch the parent post
+            const parentContent = await getContent(replyContent.parent_author, replyContent.parent_permlink);
+            if (parentContent) {
+              parentDiscussion = parentContent;
+            } else {
+              // Fallback: create minimal parent discussion
+              parentDiscussion = {
+                author: replyContent.parent_author,
+                permlink: replyContent.parent_permlink,
+                title: '',
+                body: '',
+                category: '',
+                created: '',
+                last_update: '',
+                depth: 0,
+                children: 0,
+                net_rshares: '0',
+                abs_rshares: '0',
+                vote_rshares: '0',
+                children_abs_rshares: '0',
+                cashout_time: '',
+                max_cashout_time: '',
+                total_vote_weight: '0',
+                reward_weight: 10000,
+                total_payout_value: '0.000 HBD',
+                curator_payout_value: '0.000 HBD',
+                author_rewards: '0',
+                net_votes: 0,
+                root_comment: 0,
+                max_accepted_payout: '1000000.000 HBD',
+                percent_hbd: 10000,
+                allow_replies: true,
+                allow_votes: true,
+                allow_curation_rewards: true,
+                beneficiaries: [],
+                url: `/@${replyContent.parent_author}/${replyContent.parent_permlink}`,
+                pending_payout_value: '0.000 HBD',
+                total_pending_payout_value: '0.000 HBD',
+                active_votes: [],
+                replies: [],
+                author_reputation: 0,
+                promoted: '0.000 HBD',
+                body_length: '0',
+                reblogged_by: [],
+                blacklists: [],
+                parent_author: '',
+                parent_permlink: '',
+                json_metadata: '{}',
+                last_payout: '1970-01-01T00:00:00',
+                active: '',
+                id: 0,
+                root_title: '',
+                stats: {
+                  hide: false,
+                  gray: false,
+                  total_votes: 0,
+                  flag_weight: 0
+                }
+              } as unknown as Discussion;
+            }
+          } else {
+            // If we can't get the reply content, create a minimal discussion for the original URL
+            parentDiscussion = {
+              author: postInfo.author,
+              permlink: postInfo.permlink,
+              title: '',
+              body: '',
+              category: '',
+              created: '',
+              last_update: '',
+              depth: 0,
+              children: 0,
+              net_rshares: '0',
+              abs_rshares: '0',
+              vote_rshares: '0',
+              children_abs_rshares: '0',
+              cashout_time: '',
+              max_cashout_time: '',
+              total_vote_weight: '0',
+              reward_weight: 10000,
+              total_payout_value: '0.000 HBD',
+              curator_payout_value: '0.000 HBD',
+              author_rewards: '0',
+              net_votes: 0,
+              root_comment: 0,
+              max_accepted_payout: '1000000.000 HBD',
+              percent_hbd: 10000,
+              allow_replies: true,
+              allow_votes: true,
+              allow_curation_rewards: true,
+              beneficiaries: [],
+              url: notification.url,
+              pending_payout_value: '0.000 HBD',
+              total_pending_payout_value: '0.000 HBD',
+              active_votes: [],
+              replies: [],
+              author_reputation: 0,
+              promoted: '0.000 HBD',
+              body_length: '0',
+              reblogged_by: [],
+              blacklists: [],
+              parent_author: '',
+              parent_permlink: '',
+              json_metadata: '{}',
+              last_payout: '1970-01-01T00:00:00',
+              active: '',
+              id: 0,
+              root_title: '',
+              stats: {
+                hide: false,
+                gray: false,
+                total_votes: 0,
+                flag_weight: 0
+              }
+            } as unknown as Discussion;
+          }
+          
+          setPostData(parentDiscussion);
+          setIsConversationDrawerVisible(true);
+        }
+      } else {
+        // For votes, follows, and other notifications, navigate to the user's profile
+        router.push({
+          pathname: "/(tabs)/profile",
+          params: { username: author }
+        });
       }
+    } catch (error) {
+      console.error('Error handling notification press:', error);
+      // Fallback: navigate to user profile
+      router.push({
+        pathname: "/(tabs)/profile",
+        params: { username: author }
+      });
     }
   };
 
@@ -48,32 +251,43 @@ export const NotificationItem = React.memo(({ notification }: NotificationItemPr
   const isUnread = !notification.isRead;
 
   return (
-    <Pressable 
-      style={({ pressed }) => [
-        styles.container,
-        pressed && styles.pressed
-      ]} 
-      onPress={handlePress}
-    >
-      {/* Unread indicator - red dot on the right */}
-      {isUnread && <View style={styles.unreadIndicator} />}
-      
-      <View style={styles.avatarContainer}>
-        <Image
-          source={{ uri: `https://images.hive.blog/u/${author}/avatar/small` }}
-          style={styles.avatar}
+    <>
+      <Pressable 
+        style={({ pressed }) => [
+          styles.container,
+          pressed && styles.pressed
+        ]} 
+        onPress={handlePress}
+      >
+        {/* Unread indicator - red dot on the right */}
+        {isUnread && <View style={styles.unreadIndicator} />}
+        
+        <View style={styles.avatarContainer}>
+          <Image
+            source={{ uri: `https://images.hive.blog/u/${author}/avatar/small` }}
+            style={styles.avatar}
+          />
+        </View>
+        
+        <View style={styles.content}>
+          <Text style={[styles.message, isUnread && styles.unreadText]} numberOfLines={3}>
+            {notification.msg}
+          </Text>
+          <Text style={styles.date}>
+            {formatDate(notification.date)}
+          </Text>
+        </View>
+      </Pressable>
+
+      {/* Conversation Drawer for replies and mentions */}
+      {postData && (
+        <ConversationDrawer
+          visible={isConversationDrawerVisible}
+          onClose={() => setIsConversationDrawerVisible(false)}
+          discussion={postData}
         />
-      </View>
-      
-      <View style={styles.content}>
-        <Text style={[styles.message, isUnread && styles.unreadText]} numberOfLines={3}>
-          {notification.msg}
-        </Text>
-        <Text style={styles.date}>
-          {formatDate(notification.date)}
-        </Text>
-      </View>
-    </Pressable>
+      )}
+    </>
   );
 });
 
