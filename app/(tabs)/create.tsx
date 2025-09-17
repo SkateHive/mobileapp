@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { Button } from "~/components/ui/button";
 import { Text } from "~/components/ui/text";
+import { RecentMediaGallery } from "~/components/ui/RecentMediaGallery";
 import { useAuth } from "~/lib/auth-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateSpectatorInfo } from "~/components/SpectatorMode/CreateSpectatorInfo";
@@ -95,6 +96,42 @@ export default function CreatePost() {
       Alert.alert("Error", "Failed to select media. Please try again.");
     } finally {
       setIsSelectingMedia(false);
+    }
+  };
+
+  const handleGalleryMediaSelect = async (mediaAsset: any) => {
+    try {
+      setMedia(mediaAsset.uri);
+      setMediaType(mediaAsset.mediaType === "video" ? "video" : "image");
+      
+      // Get the actual MIME type based on the asset type
+      const fileExtension = mediaAsset.uri.split(".").pop()?.toLowerCase();
+      if (mediaAsset.mediaType === "photo") {
+        const imageMimeTypes: Record<string, string> = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+          heic: "image/heic",
+        };
+        setMediaMimeType(imageMimeTypes[fileExtension || ""] || "image/jpeg");
+      } else if (mediaAsset.mediaType === "video") {
+        const videoMimeTypes: Record<string, string> = {
+          mp4: "video/mp4",
+          mov: "video/quicktime",
+          avi: "video/x-msvideo",
+          wmv: "video/x-ms-wmv",
+          webm: "video/webm",
+        };
+        setMediaMimeType(videoMimeTypes[fileExtension || ""] || "video/mp4");
+      }
+
+      setIsVideoPlaying(false);
+      setHasVideoInteraction(false);
+    } catch (error) {
+      console.error("Error selecting media from gallery:", error);
+      Alert.alert("Error", "Failed to select media from gallery. Please try again.");
     }
   };
 
@@ -363,6 +400,9 @@ export default function CreatePost() {
               <Text style={styles.errorText}>{errorMessage}</Text>
             </View>
           )}
+
+          {/* Recent Media Gallery */}
+          <RecentMediaGallery onMediaSelect={handleGalleryMediaSelect} />
         </ScrollView>
       </TouchableWithoutFeedback>
     )}
