@@ -21,10 +21,20 @@ import { RecentMediaGallery } from "~/components/ui/RecentMediaGallery";
 import { useAuth } from "~/lib/auth-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateSpectatorInfo } from "~/components/SpectatorMode/CreateSpectatorInfo";
-import { uploadVideoToWorker, createVideoIframe } from "~/lib/upload/video-upload";
-import { uploadImageToHive, createImageMarkdown } from "~/lib/upload/image-upload";
+import {
+  uploadVideoToWorker,
+  createVideoIframe,
+} from "~/lib/upload/video-upload";
+import {
+  uploadImageToHive,
+  createImageMarkdown,
+} from "~/lib/upload/image-upload";
 import { createHiveComment } from "~/lib/upload/post-utils";
-import { SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG, getLastSnapsContainer } from "~/lib/hive-utils";
+import {
+  SNAPS_CONTAINER_AUTHOR,
+  COMMUNITY_TAG,
+  getLastSnapsContainer,
+} from "~/lib/hive-utils";
 import { theme } from "~/lib/theme";
 
 export default function CreatePost() {
@@ -103,7 +113,7 @@ export default function CreatePost() {
     try {
       setMedia(mediaAsset.uri);
       setMediaType(mediaAsset.mediaType === "video" ? "video" : "image");
-      
+
       // Get the actual MIME type based on the asset type
       const fileExtension = mediaAsset.uri.split(".").pop()?.toLowerCase();
       if (mediaAsset.mediaType === "photo") {
@@ -131,7 +141,10 @@ export default function CreatePost() {
       setHasVideoInteraction(false);
     } catch (error) {
       console.error("Error selecting media from gallery:", error);
-      Alert.alert("Error", "Failed to select media from gallery. Please try again.");
+      Alert.alert(
+        "Error",
+        "Failed to select media from gallery. Please try again."
+      );
     }
   };
 
@@ -152,7 +165,10 @@ export default function CreatePost() {
 
   const handlePost = async () => {
     if (!content.trim() && !media) {
-      Alert.alert("Validation Error", "Please add some content or media to your post");
+      Alert.alert(
+        "Validation Error",
+        "Please add some content or media to your post"
+      );
       return;
     }
 
@@ -173,11 +189,13 @@ export default function CreatePost() {
 
       // Handle media upload
       if (media && mediaType && mediaMimeType) {
-        const fileName = media.split("/").pop() || `${Date.now()}.${mediaType === "image" ? "jpg" : "mp4"}`;
+        const fileName =
+          media.split("/").pop() ||
+          `${Date.now()}.${mediaType === "image" ? "jpg" : "mp4"}`;
 
         if (mediaType === "image") {
           setUploadProgress("Uploading image...");
-          
+
           try {
             const imageResult = await uploadImageToHive(
               media,
@@ -188,21 +206,22 @@ export default function CreatePost() {
                 privateKey: session.decryptedKey,
               }
             );
-            
+
             imageUrls.push(imageResult.url);
-            
+
             // Add image to post body
-            const imageMarkdown = createImageMarkdown(imageResult.url, "Uploaded image");
+            const imageMarkdown = createImageMarkdown(
+              imageResult.url,
+              "Uploaded image"
+            );
             postBody += postBody ? `\n\n${imageMarkdown}` : imageMarkdown;
-            
           } catch (imageError) {
             console.error("Image upload failed:", imageError);
             throw new Error("Failed to upload image. Please try again.");
           }
-          
         } else if (mediaType === "video") {
           setUploadProgress("Uploading video to IPFS...");
-          
+
           try {
             const videoResult = await uploadVideoToWorker(
               media,
@@ -212,13 +231,15 @@ export default function CreatePost() {
                 creator: username,
               }
             );
-            
+
             videoUrls.push(videoResult.cid);
-            
+
             // Add video iframe to post body
-            const videoIframe = createVideoIframe(videoResult.gatewayUrl, "Video");
+            const videoIframe = createVideoIframe(
+              videoResult.gatewayUrl,
+              "Video"
+            );
             postBody += postBody ? `\n\n${videoIframe}` : videoIframe;
-            
           } catch (videoError) {
             console.error("Video upload failed:", videoError);
             throw new Error("Failed to upload video. Please try again.");
@@ -231,14 +252,17 @@ export default function CreatePost() {
       // Get the latest snaps container for microblog posting
       let parentAuthor = "";
       let parentPermlink = COMMUNITY_TAG; // Default fallback
-      
+
       try {
         setUploadProgress("Fetching snaps container...");
         const snapsContainer = await getLastSnapsContainer();
         parentAuthor = snapsContainer.author;
         parentPermlink = snapsContainer.permlink;
       } catch (error) {
-        console.warn("Failed to get snaps container, using community fallback:", error);
+        console.warn(
+          "Failed to get snaps container, using community fallback:",
+          error
+        );
         // Keep default values
       }
 
@@ -252,9 +276,9 @@ export default function CreatePost() {
         videos: videoUrls,
         isSnapsPost: parentAuthor === SNAPS_CONTAINER_AUTHOR,
         metadata: {
-          app: 'mycommunity-mobile',
-          tags: [COMMUNITY_TAG, '...extracted hashtags'],
-        }
+          app: "mycommunity-mobile",
+          tags: [COMMUNITY_TAG, "...extracted hashtags"],
+        },
       };
 
       // Post to blockchain
@@ -270,7 +294,10 @@ export default function CreatePost() {
       );
 
       // Success
-      Alert.alert("Success", "Your post data is ready! Check console for details.");
+      Alert.alert(
+        "Success",
+        "Your post data is ready! Check console for details."
+      );
 
       // Clear form
       setContent("");
@@ -284,9 +311,9 @@ export default function CreatePost() {
 
       // Navigate to feed
       router.push("/(tabs)/feed");
-      
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
+      const errorMsg =
+        error instanceof Error ? error.message : "An unknown error occurred";
       setErrorMessage(errorMsg);
       Alert.alert("Error", errorMsg);
       console.error("Post error:", error);
@@ -298,114 +325,125 @@ export default function CreatePost() {
 
   return (
     <>
-    { username === "SPECTATOR" ? (
-      <ScrollView style={styles.container}>
-        <CreateSpectatorInfo />
-      </ScrollView>
-    ) : (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      {username === "SPECTATOR" ? (
         <ScrollView style={styles.container}>
-          {/* Header */}
-          <Text style={styles.headerText}>Create</Text>
-
-          <View style={styles.card}>
-            {/* Content Input */}
-            <TextInput
-              multiline
-              placeholder="What's on your mind?"
-              value={content}
-              onChangeText={setContent}
-              style={styles.textInput}
-              placeholderTextColor={theme.colors.gray}
-              numberOfLines={5}
-            />
-          </View>
-
-          {/* Upload Progress */}
-          {uploadProgress ? (
-            <View style={styles.progressCard}>
-              <Text style={styles.progressText}>{uploadProgress}</Text>
-            </View>
-          ) : null}
-
-          {/* Action Bar */}
-          <View style={styles.actionBar}>
-            <Pressable
-              onPress={pickMedia}
-              style={styles.mediaButton}
-              disabled={isUploading || isSelectingMedia}
-            >
-              {isSelectingMedia ? (
-                <>
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={theme.colors.text} />
-                  </View>
-                  <Text style={styles.buttonTextSecondary}>Selecting...</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="image-outline" size={24} color={theme.colors.gray} />
-                  <Text style={styles.buttonTextSecondary}>
-                    {media ? "Replace media" : "Add media"}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-
-            <Button
-              onPress={handlePost}
-              disabled={(!content.trim() && !media) || isUploading}
-            >
-              <Text style={styles.shareButtonText}>
-                {isUploading ? "Publishing..." : "Share"}
-              </Text>
-            </Button>
-          </View>
-
-          {/* Media Preview */}
-          {media && (
-            <View style={styles.mediaPreviewContainer}>
-              <View style={styles.mediaCard}>
-                {mediaType === "image" ? (
-                  <Image
-                    source={{ uri: media }}
-                    style={styles.mediaImage}
-                  />
-                ) : mediaType === "video" ? (
-                  hasVideoInteraction ? (
-                    <VideoPlayer url={media} playing={isVideoPlaying} />
-                  ) : (
-                    <Pressable style={styles.videoContainer} onPress={handleVideoPress}>
-                      <VideoPlayer url={media} playing={false} />
-                      <View style={styles.playButtonOverlay}>
-                        <FontAwesome name="play-circle" size={50} color="white" />
-                      </View>
-                    </Pressable>
-                  )
-                ) : null}
-                <Pressable
-                  onPress={removeMedia}
-                  style={styles.removeButton}
-                  disabled={isUploading}
-                >
-                  <Ionicons name="close" size={20} color="white" />
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          {/* Error Message */}
-          {errorMessage && (
-            <View style={styles.errorCard}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
-          )}
-
-          {/* Recent Media Gallery */}
-          <RecentMediaGallery onMediaSelect={handleGalleryMediaSelect} />
+          <CreateSpectatorInfo />
         </ScrollView>
-      </TouchableWithoutFeedback>
-    )}
+      ) : (
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView style={styles.container}>
+            {/* Header */}
+            <Text style={styles.headerText}>Create</Text>
+
+            <View style={styles.card}>
+              {/* Content Input */}
+              <TextInput
+                multiline
+                placeholder="What's on your mind?"
+                value={content}
+                onChangeText={setContent}
+                style={styles.textInput}
+                placeholderTextColor={theme.colors.gray}
+                numberOfLines={5}
+              />
+            </View>
+
+            {/* Upload Progress */}
+            {uploadProgress ? (
+              <View style={styles.progressCard}>
+                <Text style={styles.progressText}>{uploadProgress}</Text>
+              </View>
+            ) : null}
+
+            {/* Action Bar */}
+            <View style={styles.actionBar}>
+              <Pressable
+                onPress={pickMedia}
+                style={styles.mediaButton}
+                disabled={isUploading || isSelectingMedia}
+              >
+                {isSelectingMedia ? (
+                  <>
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator
+                        size="small"
+                        color={theme.colors.text}
+                      />
+                    </View>
+                    <Text style={styles.buttonTextSecondary}>Selecting...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons
+                      name="image-outline"
+                      size={24}
+                      color={theme.colors.gray}
+                    />
+                    <Text style={styles.buttonTextSecondary}>
+                      {media ? "Replace media" : "Add media"}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Button
+                onPress={handlePost}
+                disabled={(!content.trim() && !media) || isUploading}
+              >
+                <Text style={styles.shareButtonText}>
+                  {isUploading ? "Publishing..." : "Share"}
+                </Text>
+              </Button>
+            </View>
+
+            {/* Media Preview */}
+            {media && (
+              <View style={styles.mediaPreviewContainer}>
+                <View style={styles.mediaCard}>
+                  {mediaType === "image" ? (
+                    <Image source={{ uri: media }} style={styles.mediaImage} />
+                  ) : mediaType === "video" ? (
+                    hasVideoInteraction ? (
+                      <VideoPlayer url={media} playing={isVideoPlaying} />
+                    ) : (
+                      <Pressable
+                        style={styles.videoContainer}
+                        onPress={handleVideoPress}
+                      >
+                        <VideoPlayer url={media} playing={false} />
+                        <View style={styles.playButtonOverlay}>
+                          <FontAwesome
+                            name="play-circle"
+                            size={50}
+                            color="white"
+                          />
+                        </View>
+                      </Pressable>
+                    )
+                  ) : null}
+                  <Pressable
+                    onPress={removeMedia}
+                    style={styles.removeButton}
+                    disabled={isUploading}
+                  >
+                    <Ionicons name="close" size={20} color="white" />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Error Message */}
+            {errorMessage && (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            )}
+
+            {/* Recent Media Gallery */}
+            <RecentMediaGallery onMediaSelect={handleGalleryMediaSelect} />
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      )}
     </>
   );
 }
@@ -439,7 +477,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.lg,
     fontFamily: theme.fonts.default,
     minHeight: 150,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   progressCard: {
     backgroundColor: theme.colors.card,
@@ -456,22 +494,22 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.default,
   },
   actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: theme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
   },
   mediaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   loadingContainer: {
     width: 24,
     height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonTextSecondary: {
     marginLeft: theme.spacing.xs,
@@ -487,44 +525,44 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   mediaCard: {
-    position: 'relative',
+    position: "relative",
     borderColor: theme.colors.border,
     borderWidth: 1,
     borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-    width: '100%',
+    overflow: "hidden",
+    width: "100%",
     aspectRatio: 1,
   },
   mediaImage: {
-    resizeMode: 'cover',
-    width: '100%',
-    height: '100%',
+    resizeMode: "cover",
+    width: "100%",
+    height: "100%",
   },
   videoContainer: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   playButtonOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
   },
   removeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: theme.spacing.xs,
     right: theme.spacing.xs,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 20,
     padding: theme.spacing.xxs,
   },
   errorCard: {
-    backgroundColor: '#330000',
-    borderColor: '#cc0000',
+    backgroundColor: "#330000",
+    borderColor: "#cc0000",
     borderWidth: 1,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.sm,
@@ -532,7 +570,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   errorText: {
-    color: '#ff6666',
+    color: "#ff6666",
     fontSize: theme.fontSizes.sm,
     fontFamily: theme.fonts.default,
   },
