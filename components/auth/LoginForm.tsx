@@ -36,13 +36,14 @@ export function LoginForm({
   onDeleteUser,
   deletingUser,
 }: LoginFormProps) {
-  const [method, setMethod] = useState<EncryptionMethod>('biometric');
+  const [method, setMethod] = useState<EncryptionMethod>('pin');
   const [pin, setPin] = useState('');
   const [showPinInput, setShowPinInput] = useState(false);
   const [quickLoginUser, setQuickLoginUser] = useState<StoredUser | null>(null);
   const [quickPin, setQuickPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showNewUserForm, setShowNewUserForm] = useState(false);
+  const [useBiometric, setUseBiometric] = useState(false);
   const [deviceAuth, setDeviceAuth] = useState({
     hasBiometric: false,
     hasDevicePin: false,
@@ -56,18 +57,19 @@ export function LoginForm({
         const authInfo = await hasDeviceAuthentication();
         setDeviceAuth(authInfo);
         
-        // Set method based on device capabilities - no user choice needed
+        // Only enable biometric option if device has biometric authentication
+        // User can still choose to use PIN even if biometric is available
         if (authInfo.hasBiometric || authInfo.hasDevicePin) {
-          // Device has security, use biometric method (which includes device PIN)
-          setMethod('biometric');
+          // Device has security - let user choose
+          setUseBiometric(false); // Default to PIN, user can toggle to biometric
         } else {
-          // Device has no security, fallback to app PIN
-          setMethod('pin');
+          // Device has no security, force PIN method
+          setUseBiometric(false);
         }
       } catch (error) {
         console.error('Error checking device auth:', error);
         // Fallback to PIN method if there's an error
-        setMethod('pin');
+        setUseBiometric(false);
         setDeviceAuth({
           hasBiometric: false,
           hasDevicePin: false,
@@ -79,6 +81,11 @@ export function LoginForm({
     checkDeviceAuth();
   }, []);
 
+  // Update method based on user's biometric preference
+  useEffect(() => {
+    setMethod(useBiometric ? 'biometric' : 'pin');
+  }, [useBiometric]);
+
   // Determine what to show based on stored users
   const hasStoredUsers = storedUsers.filter(user => user.username !== "SPECTATOR").length > 0;
   const shouldShowNewUserForm = !hasStoredUsers || showNewUserForm;
@@ -87,8 +94,10 @@ export function LoginForm({
   const handleQuickLogin = (user: StoredUser) => {
     setQuickLoginUser(user);
     if (user.method === 'pin') {
+      // PIN users always enter PIN
       setShowPinInput(true);
-    } else if (onQuickLogin) {
+    } else if (user.method === 'biometric' && onQuickLogin) {
+      // Biometric users use biometric - no fallback to PIN
       setIsLoading(true);
       onQuickLogin(user.username, user.method).finally(() => setIsLoading(false));
     }
@@ -212,7 +221,44 @@ export function LoginForm({
                 textContentType="password"
               />
 
-              {/* PIN input for new login if device has no security */}
+              {/* Biometric/PIN Toggle - only show if device has biometric capabilities */}
+              {(deviceAuth.hasBiometric || deviceAuth.hasDevicePin) && (
+                <View style={styles.authMethodContainer}>
+                  <Text style={styles.authMethodLabel}>Authentication Method:</Text>
+                  <View style={styles.toggleContainer}>
+                    <Pressable
+                      style={[
+                        styles.toggleOption,
+                        !useBiometric && styles.toggleOptionActive
+                      ]}
+                      onPress={() => setUseBiometric(false)}
+                    >
+                      <Text style={[
+                        styles.toggleText,
+                        !useBiometric && styles.toggleTextActive
+                      ]}>
+                        PIN
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.toggleOption,
+                        useBiometric && styles.toggleOptionActive
+                      ]}
+                      onPress={() => setUseBiometric(true)}
+                    >
+                      <Text style={[
+                        styles.toggleText,
+                        useBiometric && styles.toggleTextActive
+                      ]}>
+                        {deviceAuth.hasBiometric ? 'Biometric' : 'Device PIN'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* PIN input - always show when method is PIN */}
               {method === 'pin' && (
                 <Input
                   placeholder="Set 6-digit APP PIN"
@@ -224,6 +270,13 @@ export function LoginForm({
                   style={styles.input}
                   placeholderTextColor={theme.colors.muted}
                 />
+              )}
+
+              {/* Biometric info text */}
+              {method === 'biometric' && (
+                <Text style={styles.biometricInfo}>
+                  Your posting key will be secured with {deviceAuth.hasBiometric ? 'biometric authentication' : 'device PIN'}
+                </Text>
               )}
 
               <Button
@@ -395,6 +448,47 @@ const styles = StyleSheet.create({
   loadingText: {
     color: theme.colors.text,
     fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.regular,
+  },
+  authMethodContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  authMethodLabel: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.fonts.regular,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.xxs,
+  },
+  toggleOption: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.spacing.xs,
+    alignItems: 'center',
+  },
+  toggleOptionActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  toggleText: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.text,
+    fontFamily: theme.fonts.regular,
+  },
+  toggleTextActive: {
+    color: theme.colors.background,
+    fontFamily: theme.fonts.bold,
+  },
+  biometricInfo: {
+    fontSize: theme.fontSizes.xs,
+    color: theme.colors.muted,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
     fontFamily: theme.fonts.regular,
   },
 });

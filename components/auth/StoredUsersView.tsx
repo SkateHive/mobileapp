@@ -38,9 +38,14 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
                     size={24}
                     color={theme.colors.text}
                   />
-                  <Text style={styles.username}>
-                    {'@' + user.username}
-                  </Text>
+                  <View style={styles.userDetails}>
+                    <Text style={styles.username}>
+                      {'@' + user.username}
+                    </Text>
+                    <Text style={styles.authMethod}>
+                      {user.method === 'biometric' ? '🔒 Biometric' : '🔢 PIN'}
+                    </Text>
+                  </View>
                 </View>
                 <Ionicons
                   name="arrow-forward-outline"
@@ -96,12 +101,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  userDetails: {
+    marginLeft: theme.spacing.sm,
+  },
   username: {
     fontSize: theme.fontSizes.lg,
     fontWeight: '500',
     color: theme.colors.text,
-    marginLeft: theme.spacing.sm,
     fontFamily: theme.fonts.regular,
+  },
+  authMethod: {
+    fontSize: theme.fontSizes.xs,
+    color: theme.colors.muted,
+    fontFamily: theme.fonts.regular,
+    marginTop: theme.spacing.xxs,
   },
   deleteButton: {
     marginLeft: theme.spacing.sm,
