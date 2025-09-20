@@ -2,10 +2,10 @@ import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { FontAwesome } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet } from 'react-native';
+import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
-import { vote as hiveVote } from '~/lib/hive-utils';
+import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
 import { useViewportTracker } from '~/lib/ViewportTracker';
@@ -50,7 +50,7 @@ interface PostCardProps {
 
 
 export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
-  const { session } = useAuth();
+  const { session, followingList, updateUserRelationship } = useAuth();
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -60,6 +60,11 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
   const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReportReason, setSelectedReportReason] = useState('');
+  const [reportAdditionalInfo, setReportAdditionalInfo] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   
   // Register/unregister with viewport tracker
   useEffect(() => {
@@ -217,6 +222,95 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
     setIsConversationDrawerVisible(true);
   };
 
+  const handleUserMenuPress = () => {
+    setShowUserMenu(true);
+  };
+
+  const handleUserAction = async (action: 'follow' | 'unfollow' | 'mute') => {
+    if (!session || session.username === 'SPECTATOR') {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      let relationship: 'blog' | 'ignore' | '' = '';
+      let successMessage = '';
+
+      switch (action) {
+        case 'follow':
+          relationship = 'blog';
+          successMessage = `Following ${post.author}`;
+          break;
+        case 'unfollow':
+          relationship = '';
+          successMessage = `Unfollowed ${post.author}`;
+          break;
+        case 'mute':
+          relationship = 'ignore';
+          successMessage = `Muted ${post.author}`;
+          break;
+      }
+
+      const success = await updateUserRelationship(post.author, relationship);
+      if (success) {
+        showToast(successMessage, 'success');
+      } else {
+        showToast('Failed to update relationship', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to update relationship', 'error');
+    } finally {
+      setShowUserMenu(false);
+    }
+  };
+
+  const handleReportPost = () => {
+    setShowReportModal(true);
+    setShowUserMenu(false);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!selectedReportReason) {
+      showToast('Please select a reason for reporting', 'error');
+      return;
+    }
+
+    if (!session || session.username === 'SPECTATOR') {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsSubmittingReport(true);
+      
+      const success = await submitEncryptedReport(
+        session.decryptedKey!,
+        session.username,
+        post.author,
+        post.permlink,
+        selectedReportReason,
+        reportAdditionalInfo
+      );
+
+      if (success) {
+        showToast('Report submitted successfully', 'success');
+        setShowReportModal(false);
+        setSelectedReportReason('');
+        setReportAdditionalInfo('');
+      } else {
+        showToast('Failed to submit report', 'error');
+      }
+    } catch (error) {
+      let errorMessage = 'Failed to submit report';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      showToast(errorMessage, 'error');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   // Create dynamic styles based on theme with Fira Code font
 
   return (
@@ -245,6 +339,13 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               <Text style={styles.dateText}>
                 {formattedDate}
               </Text>
+              
+              {/* Three dots menu - only show if not viewing own post */}
+              {currentUsername && post.author !== currentUsername && (
+                <Pressable onPress={handleUserMenuPress} style={styles.menuButton}>
+                  <FontAwesome name="ellipsis-h" size={16} color={theme.colors.text} />
+                </Pressable>
+              )}
             </View>
 
             {/* Content */}
@@ -354,6 +455,125 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         onClose={() => setIsConversationDrawerVisible(false)}
         discussion={post}
       />
+
+      {/* User Menu Modal */}
+      <Modal
+        visible={showUserMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUserMenu(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowUserMenu(false)}>
+          <View style={styles.userMenuContainer}>
+            <Text style={styles.userMenuTitle}>@{post.author}</Text>
+            
+            {followingList.includes(post.author) ? (
+              <Pressable
+                style={styles.userMenuButton}
+                onPress={() => handleUserAction('unfollow')}
+              >
+                <Text style={styles.userMenuButtonText}>Unfollow</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                style={styles.userMenuButton}
+                onPress={() => handleUserAction('follow')}
+              >
+                <Text style={styles.userMenuButtonText}>Follow</Text>
+              </Pressable>
+            )}
+            
+            <Pressable
+              style={styles.userMenuButton}
+              onPress={() => handleUserAction('mute')}
+            >
+              <Text style={styles.userMenuButtonText}>Mute/Block</Text>
+            </Pressable>
+            
+            <Pressable
+              style={styles.userMenuButton}
+              onPress={() => handleReportPost()}
+            >
+              <Text style={styles.userMenuButtonText}>Report Post</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal
+        visible={showReportModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.reportModalContainer}>
+            <ScrollView style={styles.reportModalContent}>
+              <Text style={styles.reportModalTitle}>Report Post</Text>
+              <Text style={styles.reportModalSubtitle}>@{post.author}</Text>
+              
+              <Text style={styles.reportSectionTitle}>Reason for reporting:</Text>
+              
+              {['Spam', 'Harassment or Abuse', 'Inappropriate Content', 'Copyright Violation', 'Misinformation', 'Other'].map((reason) => (
+                <Pressable
+                  key={reason}
+                  style={[
+                    styles.reportReasonButton,
+                    selectedReportReason === reason && styles.reportReasonButtonSelected
+                  ]}
+                  onPress={() => setSelectedReportReason(reason)}
+                >
+                  <Text style={[
+                    styles.reportReasonText,
+                    selectedReportReason === reason && styles.reportReasonTextSelected
+                  ]}>
+                    {reason}
+                  </Text>
+                </Pressable>
+              ))}
+              
+              <Text style={styles.reportSectionTitle}>Additional Information (Optional):</Text>
+              <TextInput
+                style={styles.reportTextInput}
+                multiline
+                numberOfLines={4}
+                placeholder="Provide additional details about this report..."
+                placeholderTextColor={theme.colors.gray}
+                value={reportAdditionalInfo}
+                onChangeText={setReportAdditionalInfo}
+                editable={!isSubmittingReport}
+              />
+              
+              <View style={styles.reportModalButtons}>
+                <Pressable
+                  style={[styles.reportModalButton, styles.reportCancelButton]}
+                  onPress={() => setShowReportModal(false)}
+                  disabled={isSubmittingReport}
+                >
+                  <Text style={styles.reportCancelButtonText}>Cancel</Text>
+                </Pressable>
+                
+                <Pressable
+                  style={[
+                    styles.reportModalButton, 
+                    styles.reportSubmitButton,
+                    (!selectedReportReason || isSubmittingReport) && styles.reportSubmitButtonDisabled
+                  ]}
+                  onPress={handleSubmitReport}
+                  disabled={!selectedReportReason || isSubmittingReport}
+                >
+                  {isSubmittingReport ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.reportSubmitButtonText}>Submit Report</Text>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 });
@@ -489,5 +709,148 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 24,
     height: 24,
+  },
+  menuButton: {
+    padding: theme.spacing.xs,
+    marginLeft: 'auto',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userMenuContainer: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+    minWidth: 200,
+  },
+  userMenuTitle: {
+    fontSize: theme.fontSizes.lg,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+    fontFamily: theme.fonts.bold,
+  },
+  userMenuButton: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(50, 205, 50, 0.1)',
+  },
+  userMenuButtonText: {
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.text,
+    textAlign: 'center',
+    fontFamily: theme.fonts.regular,
+  },
+  // Report Modal Styles
+  reportModalContainer: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.lg,
+    margin: theme.spacing.md,
+    maxHeight: '80%',
+    width: '90%',
+    alignSelf: 'center',
+  },
+  reportModalContent: {
+    padding: theme.spacing.lg,
+  },
+  reportModalTitle: {
+    fontSize: theme.fontSizes.xl,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.fonts.bold,
+  },
+  reportModalSubtitle: {
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.gray,
+    textAlign: 'center',
+    marginBottom: theme.spacing.lg,
+    fontFamily: theme.fonts.regular,
+  },
+  reportSectionTitle: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    fontFamily: theme.fonts.bold,
+  },
+  reportReasonButton: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.gray,
+    backgroundColor: 'transparent',
+  },
+  reportReasonButtonSelected: {
+    backgroundColor: 'rgba(50, 205, 50, 0.2)',
+    borderColor: theme.colors.green,
+  },
+  reportReasonText: {
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.text,
+    textAlign: 'center',
+    fontFamily: theme.fonts.regular,
+  },
+  reportReasonTextSelected: {
+    color: theme.colors.green,
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
+  },
+  reportTextInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.gray,
+    borderRadius: theme.borderRadius.sm,
+    padding: theme.spacing.sm,
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.text,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    textAlignVertical: 'top',
+    marginBottom: theme.spacing.lg,
+    fontFamily: theme.fonts.regular,
+  },
+  reportModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+  },
+  reportModalButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportCancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.gray,
+  },
+  reportCancelButtonText: {
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.gray,
+    fontFamily: theme.fonts.regular,
+  },
+  reportSubmitButton: {
+    backgroundColor: theme.colors.green,
+  },
+  reportSubmitButtonDisabled: {
+    backgroundColor: theme.colors.gray,
+    opacity: 0.5,
+  },
+  reportSubmitButtonText: {
+    fontSize: theme.fontSizes.md,
+    color: '#000',
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
   },
 });

@@ -23,6 +23,10 @@ import {
   deriveKeyFromPin,
   authenticateBiometric
 } from './secure-key';
+import {
+  getUserRelationshipList,
+  setUserRelationship
+} from './hive-utils';
 
 // Custom error types for authentication
 export class AuthError extends Error {
@@ -39,6 +43,9 @@ interface AuthContextType {
   isLoading: boolean;
   storedUsers: StoredUser[];
   session: AuthSession | null;
+  followingList: string[];
+  mutedList: string[];
+  blacklistedList: string[];
   login: (username: string, postingKey: string, method: EncryptionMethod, pin?: string) => Promise<void>;
   loginStoredUser: (username: string, pin?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -46,6 +53,8 @@ interface AuthContextType {
   deleteAllStoredUsers: () => Promise<void>;
   deleteStoredUser: (username: string) => Promise<void>;
   resetInactivityTimer: () => void;
+  updateUserRelationship: (targetUsername: string, relationship: 'blog' | 'ignore' | 'blacklist' | '') => Promise<boolean>;
+  refreshUserRelationships: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -57,6 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [storedUsers, setStoredUsers] = useState<StoredUser[]>([]);
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [followingList, setFollowingList] = useState<string[]>([]);
+  const [mutedList, setMutedList] = useState<string[]>([]);
+  const [blacklistedList, setBlacklistedList] = useState<string[]>([]);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Delete a single stored user and update state
@@ -116,6 +128,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleInactivityLogout = async () => {
     await logout();
+  };
+
+  // Load user relationship lists (following, muted, blacklisted)
+  const refreshUserRelationships = async () => {
+    if (!username || username === 'SPECTATOR') {
+      setFollowingList([]);
+      setMutedList([]);
+      setBlacklistedList([]);
+      return;
+    }
+
+    try {
+      const [following, muted, blacklisted] = await Promise.all([
+        getUserRelationshipList(username, 'blog'),
+        getUserRelationshipList(username, 'ignore'),
+        getUserRelationshipList(username, 'blacklist'),
+      ]);
+      
+      setFollowingList(following);
+      setMutedList(muted);
+      setBlacklistedList(blacklisted);
+    } catch (error) {
+      console.error('Error loading user relationships:', error);
+      // Don't throw error, just log it to avoid breaking the app
+    }
+  };
+
+  // Update user relationship and refresh the lists
+  const updateUserRelationship = async (
+    targetUsername: string,
+    relationship: 'blog' | 'ignore' | 'blacklist' | ''
+  ): Promise<boolean> => {
+    if (!session || !session.username || !session.decryptedKey || session.username === 'SPECTATOR') {
+      return false;
+    }
+
+    try {
+      const success = await setUserRelationship(
+        session.decryptedKey,
+        session.username,
+        targetUsername,
+        relationship
+      );
+
+      if (success) {
+        // Update local state immediately for better UX
+        if (relationship === 'blog') {
+          setFollowingList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+        } else if (relationship === 'ignore') {
+          setMutedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setFollowingList(prev => prev.filter(u => u !== targetUsername));
+        } else if (relationship === 'blacklist') {
+          setBlacklistedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setFollowingList(prev => prev.filter(u => u !== targetUsername));
+        } else if (relationship === '') {
+          // Unfollow
+          setFollowingList(prev => prev.filter(u => u !== targetUsername));
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error('Error updating user relationship:', error);
+      return false;
+    }
   };
 
   // Load stored users (usernames and methods)
@@ -217,6 +294,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUsername(normalizedUsername);
       setIsAuthenticated(true);
       setSession({ username: normalizedUsername, decryptedKey: postingKey, loginTime: Date.now() });
+      
+      // Load user relationships after successful login
+      setTimeout(() => refreshUserRelationships(), 100);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -270,6 +350,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(true);
       setSession({ username: selectedUsername, decryptedKey, loginTime: Date.now() });
       await updateStoredUsers({ username: selectedUsername, method: encryptedKey.method, createdAt: encryptedKey.createdAt });
+      
+      // Load user relationships after successful login
+      setTimeout(() => refreshUserRelationships(), 100);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -292,6 +375,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       setIsAuthenticated(false);
       setUsername(null);
+      setFollowingList([]);
+      setMutedList([]);
+      setBlacklistedList([]);
       await SecureStore.deleteItemAsync('lastLoggedInUser');
     } catch (error) {
       console.error('Error during logout:', error);
@@ -338,6 +424,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         storedUsers,
         session,
+        followingList,
+        mutedList,
+        blacklistedList,
         login,
         loginStoredUser,
         logout,
@@ -345,6 +434,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         deleteAllStoredUsers,
         deleteStoredUser: removeStoredUser,
         resetInactivityTimer,
+        updateUserRelationship,
+        refreshUserRelationships,
       }}
     >
       {children}

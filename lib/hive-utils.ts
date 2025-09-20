@@ -1,9 +1,11 @@
-import { Client, Comment, PrivateKey, Discussion } from '@hiveio/dhive';
+import { Client, Comment, PrivateKey, Discussion, PublicKey } from '@hiveio/dhive';
+import CryptoJS from 'crypto-js';
 import { 
   SNAPS_CONTAINER_AUTHOR as ENV_SNAPS_CONTAINER_AUTHOR,
   SNAPS_PAGE_MIN_SIZE as ENV_SNAPS_PAGE_MIN_SIZE,
   SNAPS_CONTAINER_FETCH_LIMIT as ENV_SNAPS_CONTAINER_FETCH_LIMIT,
-  COMMUNITY_TAG as ENV_COMMUNITY_TAG
+  COMMUNITY_TAG as ENV_COMMUNITY_TAG,
+  MODERATOR_PUBLIC_KEY as ENV_MODERATOR_PUBLIC_KEY
 } from '@env';
 
 // --- HIVE CONSTANTS (from .env) ---
@@ -11,6 +13,7 @@ export const SNAPS_CONTAINER_AUTHOR = ENV_SNAPS_CONTAINER_AUTHOR || 'peak.snaps'
 export const SNAPS_PAGE_MIN_SIZE = Number(ENV_SNAPS_PAGE_MIN_SIZE) || 10;
 export const SNAPS_CONTAINER_FETCH_LIMIT = Number(ENV_SNAPS_CONTAINER_FETCH_LIMIT) || 3;
 export const COMMUNITY_TAG = ENV_COMMUNITY_TAG || 'hive-173115';
+export const MODERATOR_PUBLIC_KEY = ENV_MODERATOR_PUBLIC_KEY;
 
 // --- Hive Client ---
 const HiveClient = new Client([
@@ -820,5 +823,212 @@ export async function markNotificationsAsRead(
   ];
   
   return sendOperation(privateKey, [operation]);
+}
+
+/**
+ * Follow, mute, or blacklist a user on Hive
+ * @param privateKey - User's posting private key (WIF)
+ * @param follower - The username performing the action
+ * @param following - The username to follow/mute/blacklist
+ * @param type - Type of action: 'blog' (follow), 'ignore' (mute), 'blacklist' (blacklist), or '' (unfollow)
+ * @returns True if the transaction was successful
+ * @example
+ *   await setUserRelationship(privateKey, 'alice', 'bob', 'blog'); // Follow
+ *   await setUserRelationship(privateKey, 'alice', 'bob', 'ignore'); // Mute
+ *   await setUserRelationship(privateKey, 'alice', 'bob', 'blacklist'); // Blacklist
+ *   await setUserRelationship(privateKey, 'alice', 'bob', ''); // Unfollow
+ */
+export async function setUserRelationship(
+  privateKey: string,
+  follower: string,
+  following: string,
+  type: 'blog' | 'ignore' | 'blacklist' | ''
+): Promise<boolean> {
+  try {
+    const json = JSON.stringify([
+      'follow',
+      {
+        follower,
+        following,
+        what: [type], // Empty array or array with type
+      },
+    ]);
+
+    const operation: any = [
+      'custom_json',
+      {
+        required_auths: [],
+        required_posting_auths: [follower],
+        id: 'follow',
+        json,
+      },
+    ];
+
+    await sendOperation(privateKey, [operation]);
+    return true;
+  } catch (error) {
+    console.error('Error setting user relationship:', error);
+    return false;
+  }
+}
+
+/**
+ * Get the list of users that a user is following, muting, or blacklisting
+ * @param username - The username to get the list for
+ * @param type - Type of relationship: 'blog' (following), 'ignore' (muted), 'blacklist' (blacklisted)
+ * @param startFollowing - Starting point for pagination (optional)
+ * @param limit - Maximum number of results to return (default 100)
+ * @returns Array of usernames in the specified relationship type
+ * @example
+ *   const following = await getUserRelationshipList('alice', 'blog'); // Get following list
+ *   const muted = await getUserRelationshipList('alice', 'ignore'); // Get muted list
+ *   const blacklisted = await getUserRelationshipList('alice', 'blacklist'); // Get blacklisted list
+ */
+export async function getUserRelationshipList(
+  username: string,
+  type: 'blog' | 'ignore' | 'blacklist',
+  startFollowing: string = '',
+  limit: number = 100
+): Promise<string[]> {
+  try {
+    const result = await HiveClient.call('follow_api', 'get_following', [
+      username,
+      startFollowing,
+      type,
+      limit,
+    ]);
+
+    // Extract usernames from the result
+    return result.map((item: any) => item.following);
+  } catch (error) {
+    console.error('Error fetching user relationship list:', error);
+    return [];
+  }
+}
+
+/**
+ * Encrypt data using Hive-style public key encryption
+ * @param data - The data to encrypt
+ * @param publicKey - The public key to encrypt for
+ * @returns Encrypted data string in format: tempPublicKey:encryptedData
+ */
+function encryptForPublicKey(data: any, publicKey: string): string {
+  try {
+    const jsonString = JSON.stringify(data);
+    
+    // Use a React Native compatible approach for generating random values
+    const randomValue1 = Math.random().toString(36).substring(2, 15);
+    const randomValue2 = Math.random().toString(36).substring(2, 15);
+    const timestamp = Date.now().toString();
+    const nonce = `${timestamp}-${randomValue1}-${randomValue2}`;
+    
+    // Generate a temporary private key for this encryption
+    const tempPrivate = PrivateKey.fromSeed(nonce);
+    const targetPubKey = PublicKey.fromString(publicKey);
+    
+    // Create shared secret using ECDH
+    const sharedSecret = tempPrivate.get_shared_secret(targetPubKey);
+    
+    // Encrypt data with shared secret
+    const encrypted = CryptoJS.AES.encrypt(jsonString, sharedSecret.toString('hex')).toString();
+    
+    // Return: temp_public_key:encrypted_data
+    return `${tempPrivate.createPublic().toString()}:${encrypted}`;
+  } catch (error) {
+    console.error('Encryption error:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Check if it's specifically a crypto module error
+    if (errorMessage.includes('Native crypto module') || errorMessage.includes('secure random')) {
+      throw new Error('Crypto module not available in React Native environment. This is a known limitation.');
+    }
+    
+    throw new Error(`Encryption failed: ${errorMessage}`);
+  }
+}
+
+/**
+ * Decrypt data that was encrypted with encryptForPublicKey
+ * @param encryptedData - The encrypted data string
+ * @param privateKey - The private key to decrypt with
+ * @returns Decrypted data object
+ */
+export function decryptFromPrivateKey(encryptedData: string, privateKey: string): any {
+  const [tempPublicKeyStr, encrypted] = encryptedData.split(':');
+  const moderatorPrivate = PrivateKey.fromString(privateKey);
+  const tempPublic = PublicKey.fromString(tempPublicKeyStr);
+  
+  // Recreate shared secret
+  const sharedSecret = moderatorPrivate.get_shared_secret(tempPublic);
+  
+  // Decrypt
+  const decrypted = CryptoJS.AES.decrypt(encrypted, sharedSecret.toString('hex'));
+  return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
+}
+
+/**
+ * Submit an encrypted report for a post or user
+ * @param privateKey - Reporter's posting private key (WIF)
+ * @param reporter - The username submitting the report
+ * @param reportedAuthor - The author being reported
+ * @param reportedPermlink - The permlink being reported
+ * @param reason - The reason for the report
+ * @param additionalInfo - Optional additional information
+ * @returns True if the report was submitted successfully
+ * @example
+ *   await submitEncryptedReport(privateKey, 'alice', 'bob', 'spam-post', 'spam', 'This post is clearly spam content');
+ */
+export async function submitEncryptedReport(
+  privateKey: string,
+  reporter: string,
+  reportedAuthor: string,
+  reportedPermlink: string,
+  reason: string,
+  additionalInfo?: string
+): Promise<boolean> {
+  try {
+    if (!MODERATOR_PUBLIC_KEY) {
+      throw new Error('Report system not configured - missing moderator public key');
+    }
+    
+    const reportData = {
+      type: 'post_report',
+      reported_author: reportedAuthor,
+      reported_permlink: reportedPermlink,
+      reason: reason,
+      additional_info: additionalInfo || '',
+      timestamp: new Date().toISOString(),
+      reporter: reporter,
+      app: 'skatehive_mobile',
+      version: '1.0'
+    };
+
+    // Encrypt the report data for the moderator
+    const encryptedData = encryptForPublicKey(reportData, MODERATOR_PUBLIC_KEY);
+
+    const customJsonData = {
+      encrypted: true,
+      data: encryptedData,
+      version: 1,
+      encryption_method: 'hive_ecdh'
+    };
+
+    const operation: any = [
+      'custom_json',
+      {
+        required_auths: [],
+        required_posting_auths: [reporter],
+        id: 'skatehive_reports',
+        json: JSON.stringify(customJsonData),
+      },
+    ];
+
+    const result = await sendOperation(privateKey, [operation]);
+    return true;
+  } catch (error) {
+    console.error('Error submitting encrypted report:', error);
+    throw error;
+  }
 }
 

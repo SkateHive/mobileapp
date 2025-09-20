@@ -15,7 +15,7 @@ interface FeedProps {
 }
 
 function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
-  const { username } = useAuth();
+  const { username, mutedList, blacklistedList } = useAuth();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
@@ -50,6 +50,19 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
   // Map blockchain comments (Discussion) to Post for PostCard compatibility
   const feedData: Discussion[] = comments as unknown as Discussion[];
+  
+  // Filter out posts from muted and blacklisted users
+  const filteredFeedData = React.useMemo(() => {
+    if (!feedData || feedData.length === 0) return [];
+    
+    return feedData.filter(post => {
+      // Don't filter out the user's own posts
+      if (post.author === username) return true;
+      
+      // Filter out muted and blacklisted users
+      return !mutedList.includes(post.author) && !blacklistedList.includes(post.author);
+    });
+  }, [feedData, mutedList, blacklistedList, username]);
 
   const renderItem = React.useCallback(({ item }: { item: Discussion }) => (
     <PostCard key={item.permlink} post={item} currentUsername={username || ''} />
@@ -76,7 +89,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   return (
     <View style={styles.container}>
       <FlatList
-        data={feedData}
+        data={filteredFeedData}
         showsVerticalScrollIndicator={false}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
