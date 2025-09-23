@@ -16,6 +16,7 @@ import { useAuth } from "~/lib/auth-provider";
 import { ProfileSpectatorInfo } from "~/components/SpectatorMode/ProfileSpectatorInfo";
 import { PostCard } from "~/components/Feed/PostCard";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
+import { FollowersModal } from "~/components/Profile/FollowersModal";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
@@ -24,6 +25,8 @@ export default function ProfileScreen() {
   const { username: currentUsername, logout } = useAuth();
   const params = useLocalSearchParams();
   const [message, setMessage] = useState("");
+  const [followersModalVisible, setFollowersModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<'followers' | 'following'>('followers');
 
   // Use the URL param username if available, otherwise use current user's username
   const profileUsername = (params.username as string) || currentUsername;
@@ -45,6 +48,18 @@ export default function ProfileScreen() {
       console.error("Error logging out:", error);
       setMessage("Error logging out");
     }
+  };
+
+  const handleFollowersPress = () => {
+    if (profileUsername === "SPECTATOR") return;
+    setModalType('followers');
+    setFollowersModalVisible(true);
+  };
+
+  const handleFollowingPress = () => {
+    if (profileUsername === "SPECTATOR") return;
+    setModalType('following');
+    setFollowersModalVisible(true);
   };
 
   const renderProfileImage = () => {
@@ -132,14 +147,6 @@ export default function ProfileScreen() {
     vp = hiveAccount.voting_power ? hiveAccount.voting_power / 100 : 100;
   }
 
-  // Get dynamic color based on percentage value
-  const getDynamicColor = (percentage: number): string => {
-    if (percentage > 90) return "#4CAF50"; // Green
-    if (percentage >= 70) return "#FFD600"; // Yellow
-    if (percentage >= 60) return "#FF9800"; // Orange
-    return "#FF6B6B"; // Red
-  };
-
   // Render the profile header section
   const renderProfileHeader = () => (
     <View>
@@ -211,14 +218,28 @@ export default function ProfileScreen() {
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-              <Text style={styles.statLabel}>Following</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-              <Text style={styles.statLabel}>Followers</Text>
-            </View>
+            {profileUsername === "SPECTATOR" ? (
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                <Text style={styles.statLabel}>Following</Text>
+              </View>
+            ) : (
+              <Pressable style={styles.statItem} onPress={handleFollowingPress}>
+                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                <Text style={styles.statLabel}>Following</Text>
+              </Pressable>
+            )}
+            {profileUsername === "SPECTATOR" ? (
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </View>
+            ) : (
+              <Pressable style={styles.statItem} onPress={handleFollowersPress}>
+                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </Pressable>
+            )}
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{vp.toFixed(0)}%</Text>
               <Text style={styles.statLabel}>VP</Text>
@@ -299,7 +320,16 @@ export default function ProfileScreen() {
           initialNumToRender={5}
           maxToRenderPerBatch={3}
           windowSize={7}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        />
+      )}
+
+      {/* Followers/Following Modal */}
+      {profileUsername !== "SPECTATOR" && (
+        <FollowersModal
+          visible={followersModalVisible}
+          onClose={() => setFollowersModalVisible(false)}
+          username={profileUsername || ''}
+          type={modalType}
         />
       )}
     </View>

@@ -454,7 +454,29 @@ export async function getUserComments(
     }
 
     const posts = await HiveClient.call('bridge', 'get_account_posts', params);
-    return posts || [];
+    
+    // Fetch full content for each post to get active_votes data
+    const postsWithVotes = await Promise.all(
+      (posts || []).map(async (post: any) => {
+        try {
+          const fullContent = await getContent(post.author, post.permlink);
+          if (fullContent) {
+            // Merge the bridge data with full content data (including active_votes)
+            return {
+              ...post,
+              active_votes: fullContent.active_votes || [],
+              net_votes: fullContent.net_votes || 0,
+            };
+          }
+          return post;
+        } catch (error) {
+          console.error(`Error fetching full content for ${post.author}/${post.permlink}:`, error);
+          return post;
+        }
+      })
+    );
+    
+    return postsWithVotes;
   } catch (error) {
     console.error('Error fetching user comments:', error);
     throw error;
@@ -873,6 +895,46 @@ export async function setUserRelationship(
 }
 
 /**
+ * Get the relationship between two accounts using Bridge API
+ * @param follower - The account that might be following
+ * @param following - The account that might be followed
+ * @returns Object with relationship information
+ * @example
+ *   const relationship = await getRelationshipBetweenAccounts('alice', 'bob');
+ *   console.log(relationship.follows); // true if alice follows bob
+ *   console.log(relationship.ignores); // true if alice has muted bob
+ *   console.log(relationship.blacklists); // true if alice has blacklisted bob
+ */
+export async function getRelationshipBetweenAccounts(
+  follower: string,
+  following: string
+): Promise<{
+  follows: boolean;
+  ignores: boolean;
+  blacklists: boolean;
+}> {
+  try {
+    const result = await HiveClient.call('bridge', 'get_relationship_between_accounts', [
+      follower,
+      following
+    ]);
+
+    return {
+      follows: result?.follows || false,
+      ignores: result?.ignores || false,
+      blacklists: result?.blacklists || false,
+    };
+  } catch (error) {
+    console.error('Error fetching relationship between accounts:', error);
+    return {
+      follows: false,
+      ignores: false,
+      blacklists: false,
+    };
+  }
+}
+
+/**
  * Get the list of users that a user is following, muting, or blacklisting
  * @param username - The username to get the list for
  * @param type - Type of relationship: 'blog' (following), 'ignore' (muted), 'blacklist' (blacklisted)
@@ -891,6 +953,7 @@ export async function getUserRelationshipList(
   limit: number = 100
 ): Promise<string[]> {
   try {
+    // Use the traditional follow_api for getting full lists
     const result = await HiveClient.call('follow_api', 'get_following', [
       username,
       startFollowing,
@@ -1029,6 +1092,80 @@ export async function submitEncryptedReport(
   } catch (error) {
     console.error('Error submitting encrypted report:', error);
     throw error;
+  }
+}
+
+/**
+ * Get the following list for a user
+ * @param username - The username to get following list for
+ * @param startFollowing - Optional: username to start from for pagination
+ * @param limit - Optional: number of results to return (default: 100)
+ * @returns Array of usernames that the user is following
+ */
+export async function getFollowing(
+  username: string,
+  startFollowing: string = '',
+  limit: number = 100
+): Promise<string[]> {
+  try {
+    const result = await HiveClient.database.call('get_following', [
+      username,
+      startFollowing,
+      'blog',
+      limit
+    ]);
+    
+    // The result is an array of objects with 'following' property
+    return result.map((item: any) => item.following).filter(Boolean);
+  } catch (error) {
+    console.error('Error fetching following list:', error);
+    return [];
+  }
+}
+
+/**
+ * Get the followers list for a user
+ * @param username - The username to get followers list for
+ * @param startFollower - Optional: username to start from for pagination
+ * @param limit - Optional: number of results to return (default: 100)
+ * @returns Array of usernames that follow the user
+ */
+export async function getFollowers(
+  username: string,
+  startFollower: string = '',
+  limit: number = 100
+): Promise<string[]> {
+  try {
+    const result = await HiveClient.database.call('get_followers', [
+      username,
+      startFollower,
+      'blog',
+      limit
+    ]);
+    
+    // The result is an array of objects with 'follower' property
+    return result.map((item: any) => item.follower).filter(Boolean);
+  } catch (error) {
+    console.error('Error fetching followers list:', error);
+    return [];
+  }
+}
+
+/**
+ * Get follow count (following and followers) for a user
+ * @param username - The username to get follow count for
+ * @returns Object with following and followers count
+ */
+export async function getFollowCount(username: string): Promise<{ following: number; followers: number }> {
+  try {
+    const result = await HiveClient.database.call('get_follow_count', [username]);
+    return {
+      following: result.following_count || 0,
+      followers: result.follower_count || 0
+    };
+  } catch (error) {
+    console.error('Error fetching follow count:', error);
+    return { following: 0, followers: 0 };
   }
 }
 
