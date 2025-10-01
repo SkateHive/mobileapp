@@ -1124,6 +1124,34 @@ export async function getFollowing(
 }
 
 /**
+ * Get the muted users list for a user
+ * @param username - The username to get muted list for
+ * @param startMuted - Optional: username to start from for pagination
+ * @param limit - Optional: number of results to return (default: 100)
+ * @returns Array of usernames that the user has muted
+ */
+export async function getMuted(
+  username: string,
+  startMuted: string = '',
+  limit: number = 100
+): Promise<string[]> {
+  try {
+    const result = await HiveClient.database.call('get_following', [
+      username,
+      startMuted,
+      'ignore',
+      limit
+    ]);
+    
+    // The result is an array of objects with 'following' property
+    return result.map((item: any) => item.following).filter(Boolean);
+  } catch (error) {
+    console.error('Error fetching muted list:', error);
+    return [];
+  }
+}
+
+/**
  * Get the followers list for a user
  * @param username - The username to get followers list for
  * @param startFollower - Optional: username to start from for pagination

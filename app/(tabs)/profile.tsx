@@ -26,7 +26,7 @@ export default function ProfileScreen() {
   const params = useLocalSearchParams();
   const [message, setMessage] = useState("");
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
-  const [modalType, setModalType] = useState<'followers' | 'following'>('followers');
+  const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
 
   // Use the URL param username if available, otherwise use current user's username
   const profileUsername = (params.username as string) || currentUsername;
@@ -59,6 +59,12 @@ export default function ProfileScreen() {
   const handleFollowingPress = () => {
     if (profileUsername === "SPECTATOR") return;
     setModalType('following');
+    setFollowersModalVisible(true);
+  };
+
+  const handleMutedPress = () => {
+    if (profileUsername === "SPECTATOR") return;
+    setModalType('muted');
     setFollowersModalVisible(true);
   };
 
@@ -240,6 +246,13 @@ export default function ProfileScreen() {
                 <Text style={styles.statLabel}>Followers</Text>
               </Pressable>
             )}
+            {/* Show muted count only for the logged-in user's own profile */}
+            {profileUsername === currentUsername && profileUsername !== "SPECTATOR" && (
+              <Pressable style={styles.statItem} onPress={handleMutedPress}>
+                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.muted || "0"}</Text>
+                <Text style={styles.statLabel}>Muted</Text>
+              </Pressable>
+            )}
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{vp.toFixed(0)}%</Text>
               <Text style={styles.statLabel}>VP</Text>
@@ -323,7 +336,7 @@ export default function ProfileScreen() {
         />
       )}
 
-      {/* Followers/Following Modal */}
+      {/* Followers/Following/Muted Modal */}
       {profileUsername !== "SPECTATOR" && (
         <FollowersModal
           visible={followersModalVisible}

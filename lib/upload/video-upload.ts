@@ -24,7 +24,7 @@ export async function uploadVideoToWorker(
   mimeType: string,
   options: VideoUploadOptions
 ): Promise<VideoUploadResult> {
-  const WORKER_API_URL = 'https://video-worker-e7s1.onrender.com/transcode';
+  const WORKER_API_URL = 'https://146-235-239-243.sslip.io/transcode';
 
   try {
     // Prevent device from sleeping during upload

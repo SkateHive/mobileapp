@@ -12,21 +12,24 @@ import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
-import { getFollowing, getFollowers } from '~/lib/hive-utils';
+import { getFollowing, getFollowers, getMuted, setUserRelationship } from '~/lib/hive-utils';
+import { useAuth } from '~/lib/auth-provider';
 
 interface FollowersModalProps {
   visible: boolean;
   onClose: () => void;
   username: string;
-  type: 'followers' | 'following';
+  type: 'followers' | 'following' | 'muted';
 }
 
 interface UserItemProps {
   username: string;
   onPress: (username: string) => void;
+  showUnmuteButton?: boolean;
+  onUnmute?: (username: string) => void;
 }
 
-const UserItem: React.FC<UserItemProps> = ({ username, onPress }) => {
+const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton, onUnmute }) => {
   return (
     <Pressable
       style={styles.userItem}
@@ -39,11 +42,23 @@ const UserItem: React.FC<UserItemProps> = ({ username, onPress }) => {
       <View style={styles.userInfo}>
         <Text style={styles.username}>@{username}</Text>
       </View>
-      <FontAwesome 
-        name="chevron-right" 
-        size={16} 
-        color={theme.colors.gray} 
-      />
+      {showUnmuteButton && onUnmute ? (
+        <Pressable
+          style={styles.unmuteButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onUnmute(username);
+          }}
+        >
+          <Text style={styles.unmuteText}>Unmute</Text>
+        </Pressable>
+      ) : (
+        <FontAwesome 
+          name="chevron-right" 
+          size={16} 
+          color={theme.colors.gray} 
+        />
+      )}
     </Pressable>
   );
 };
@@ -58,6 +73,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { session, username: currentUsername } = useAuth();
 
   useEffect(() => {
     if (visible) {
@@ -77,8 +93,10 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
       let newUsers: string[];
       if (type === 'followers') {
         newUsers = await getFollowers(username, startFrom, 50);
-      } else {
+      } else if (type === 'following') {
         newUsers = await getFollowing(username, startFrom, 50);
+      } else {
+        newUsers = await getMuted(username, startFrom, 50);
       }
 
       if (append) {
@@ -113,8 +131,30 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     });
   };
 
+  const handleUnmute = async (targetUsername: string) => {
+    if (!session?.decryptedKey || !currentUsername) {
+      console.error('No authenticated session found');
+      return;
+    }
+
+    try {
+      // Remove from muted list by setting relationship to empty string
+      await setUserRelationship(session.decryptedKey, currentUsername, targetUsername, '');
+      
+      // Remove from local state
+      setUsers(prevUsers => prevUsers.filter(user => user !== targetUsername));
+    } catch (error) {
+      console.error('Error unmuting user:', error);
+    }
+  };
+
   const renderUser = ({ item }: { item: string }) => (
-    <UserItem username={item} onPress={handleUserPress} />
+    <UserItem 
+      username={item} 
+      onPress={handleUserPress}
+      showUnmuteButton={type === 'muted'}
+      onUnmute={type === 'muted' ? handleUnmute : undefined}
+    />
   );
 
   const renderFooter = () => {
@@ -149,7 +189,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {type === 'followers' ? 'Followers' : 'Following'}
+              {type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Muted'}
             </Text>
             <Pressable onPress={onClose} style={styles.closeButton}>
               <FontAwesome name="times" size={20} color={theme.colors.text} />
@@ -160,7 +200,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.green} />
-              <Text style={styles.loadingText}>Loading {type}...</Text>
+              <Text style={styles.loadingText}>Loading {type === 'muted' ? 'muted users' : type}...</Text>
             </View>
           ) : (
             <FlatList
@@ -261,5 +301,16 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
     textAlign: 'center',
+  },
+  unmuteButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+  },
+  unmuteText: {
+    color: theme.colors.background,
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.bold,
   },
 });
