@@ -174,7 +174,7 @@ export function RecentMediaGallery({
                 {item.duration && (
                   <Text style={styles.durationText}>
                     {Math.floor(item.duration / 60)}:
-                    {(item.duration % 60).toString().padStart(2, "0")}
+                    {Math.floor(item.duration % 60).toString().padStart(2, "0")}
                   </Text>
                 )}
               </View>
