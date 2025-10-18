@@ -10,6 +10,67 @@ export interface VideoUploadOptions {
   thumbnailUrl?: string;
 }
 
+interface TranscodeService {
+  priority: number;
+  name: string;
+  healthUrl: string;
+  transcodeUrl: string;
+  isHealthy: boolean;
+  responseTime: number;
+  lastChecked: string;
+}
+
+interface TranscodeStatusResponse {
+  status: string;
+  timestamp: string;
+  totalResponseTime: string;
+  summary: {
+    healthyServices: number;
+    totalServices: number;
+    systemStatus: string;
+    activeService: {
+      name: string;
+      priority: number;
+      transcodeUrl: string;
+      responseTime: string;
+    };
+  };
+  services: TranscodeService[];
+}
+
+/**
+ * Get the transcoding URL from the status API
+ * @returns Promise with the transcoding URL from the highest priority healthy service
+ */
+async function getTranscodeUrl(): Promise<string> {
+  const STATUS_API_URL = 'https://api.skatehive.app/api/transcode/status';
+  
+  try {
+    const response = await fetch(STATUS_API_URL);
+    
+    if (!response.ok) {
+      throw new Error(`Status API request failed: ${response.status}`);
+    }
+    
+    const data: TranscodeStatusResponse = await response.json();
+    
+    // Filter healthy services and sort by priority
+    const healthyServices = data.services
+      .filter(service => service.isHealthy)
+      .sort((a, b) => a.priority - b.priority);
+    
+    if (healthyServices.length === 0) {
+      throw new Error('No healthy transcoding services available');
+    }
+    
+    // Return the transcoding URL of the highest priority healthy service
+    return healthyServices[0].transcodeUrl;
+  } catch (error) {
+    // Fallback to the hardcoded URL if the status API fails
+    return 'https://146-235-239-243.sslip.io/transcode';
+  }
+}
+
 /**
  * Upload video to the new video transcoding API
  * @param fileUri - Local file URI from Expo ImagePicker
@@ -24,16 +85,15 @@ export async function uploadVideoToWorker(
   mimeType: string,
   options: VideoUploadOptions
 ): Promise<VideoUploadResult> {
-  const WORKER_API_URL = 'https://146-235-239-243.sslip.io/transcode';
-
   try {
     // Prevent device from sleeping during upload
     await activateKeepAwakeAsync('video-upload');
     
+    // Get the dynamic transcoding URL from the status API
+    const WORKER_API_URL = await getTranscodeUrl();
+    
     // Create FormData for the upload
     const formData = new FormData();
-
-    // Add the video file
     const fileData = {
       uri: fileUri,
       type: mimeType,
@@ -49,7 +109,6 @@ export async function uploadVideoToWorker(
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
-      console.error('Video worker upload failed:', uploadResponse.status, errorText);
       throw new Error(`Video upload failed: ${uploadResponse.status} - ${errorText}`);
     }
 
@@ -64,7 +123,6 @@ export async function uploadVideoToWorker(
       gatewayUrl: result.gatewayUrl,
     };
   } catch (error) {
-    console.error('Failed to upload video to worker:', error);
     throw new Error(`Video upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
     // Always deactivate keep awake, even if upload fails

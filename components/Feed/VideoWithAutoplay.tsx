@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     height: '100%',
+    backgroundColor: '#000', // Black background for videos
   },
   pressable: {
     width: '100%',

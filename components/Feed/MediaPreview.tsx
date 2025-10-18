@@ -60,6 +60,17 @@ export function MediaPreview({
     return Math.min(calculatedHeight, MAX_IMAGE_HEIGHT);
   };
 
+  // Calculate video height based on common aspect ratios
+  const getVideoHeight = () => {
+    const containerWidth = getContainerWidth();
+    
+    // Use a more flexible approach for videos
+    // Default to a reasonable height that works for both portrait and landscape
+    const defaultHeight = Math.min(containerWidth * 0.75, 300); // 4:3 aspect ratio, max 300px
+    
+    return defaultHeight;
+  };
+
   return (
     <>
       {/* Preview */}
@@ -70,7 +81,7 @@ export function MediaPreview({
             style={[
               styles.mediaContainer,
               media.length === 1 ? styles.singleMedia : styles.multipleMedia,
-              { height: item.type === 'video' ? 200 : getImageHeight(index) }
+              { height: item.type === 'video' ? getVideoHeight() : getImageHeight(index) }
             ]}
           >
             {item.type === 'video' ? (
@@ -137,6 +148,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: theme.colors.muted,
+    borderRadius: theme.borderRadius.sm,
   },
   singleMedia: {
     width: '100%',
