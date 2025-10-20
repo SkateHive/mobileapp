@@ -20,6 +20,7 @@ import { Text } from "~/components/ui/text";
 import { RecentMediaGallery } from "~/components/ui/RecentMediaGallery";
 import { useAuth } from "~/lib/auth-provider";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "~/lib/toast-provider";
 import { CreateSpectatorInfo } from "~/components/SpectatorMode/CreateSpectatorInfo";
 import {
   uploadVideoToWorker,
@@ -40,6 +41,7 @@ import { theme } from "~/lib/theme";
 export default function CreatePost() {
   const { username, session } = useAuth();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [content, setContent] = useState("");
   const [media, setMedia] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
@@ -294,10 +296,7 @@ export default function CreatePost() {
       );
 
       // Success
-      Alert.alert(
-        "Success",
-        "Your post data is ready! Check console for details."
-      );
+      showToast("Posted Successfully", "success");
 
       // Clear form
       setContent("");

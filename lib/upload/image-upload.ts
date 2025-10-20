@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { PrivateKey } from '@hiveio/dhive';
 import { Buffer } from 'buffer';
 import { sha256 } from 'js-sha256';
@@ -21,13 +21,12 @@ export interface ImageUploadOptions {
  */
 async function createImageSignature(fileUri: string, privateKey: string): Promise<string> {
   try {
-    // Read file as base64
-    const base64Data = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    // Convert base64 to buffer
-    const content = Buffer.from(base64Data, 'base64');
+    // Read file using the new File API
+    const file = new File(fileUri);
+    const arrayBuffer = await file.arrayBuffer();
+    
+    // Convert array buffer to buffer
+    const content = Buffer.from(arrayBuffer);
 
     // Create hash
     const hash = sha256.create();
