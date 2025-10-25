@@ -4,9 +4,10 @@ import React, { useEffect } from 'react';
 interface VideoPlayerProps {
   url: string;
   playing?: boolean;
+  contentFit?: 'contain' | 'cover' | 'fill';
 }
 
-export const VideoPlayer = React.memo(({ url, playing = true }: VideoPlayerProps) => {
+export const VideoPlayer = React.memo(({ url, playing = true, contentFit = 'contain' }: VideoPlayerProps) => {
   const player = useVideoPlayer(url, player => {
     player.loop = true;
     player.muted = true; // Start muted for autoplay (better UX)
@@ -23,7 +24,7 @@ export const VideoPlayer = React.memo(({ url, playing = true }: VideoPlayerProps
   return (
     <VideoView
       style={{ width: '100%', height: '100%' }}
-      contentFit='contain'
+      contentFit={contentFit}
       player={player}
       fullscreenOptions={{ enable: true }}
     />

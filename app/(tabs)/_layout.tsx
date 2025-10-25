@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
-import { StyleSheet, View, PanResponder } from "react-native";
+import { StyleSheet, View, PanResponder, TouchableOpacity } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useRef } from "react";
 import { theme } from "~/lib/theme";
@@ -15,15 +15,15 @@ const TAB_ITEMS = [
     iconFamily: "Ionicons",
   },
   {
-    name: "leaderboard",
-    title: "Leaderboard",
-    icon: "podium-outline",
+    name: "videos",
+    title: "Videos",
+    icon: "film-outline",
     iconFamily: "Ionicons",
   },
   {
-    name: "create",
-    title: "Create",
-    icon: "add-circle-outline",
+    name: "leaderboard",
+    title: "Leaderboard",
+    icon: "podium-outline",
     iconFamily: "Ionicons",
   },
   {
@@ -77,6 +77,25 @@ export default function TabLayout() {
     gestureContainer: {
       flex: 1,
     },
+    floatingButton: {
+      position: 'absolute',
+      bottom: 100,
+      right: 20,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: '#000',
+      borderWidth: 3,
+      borderColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 8,
+      shadowColor: theme.colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.6,
+      shadowRadius: 12,
+      zIndex: 1000,
+    },
   });
 
   return (
@@ -119,7 +138,25 @@ export default function TabLayout() {
                 }}
               />
             ))}
+            
+            {/* Hidden create tab - still accessible but not in tab bar */}
+            <Tabs.Screen
+              name="create"
+              options={{
+                href: null, // Hide from tab bar
+                title: "Create",
+              }}
+            />
           </Tabs>
+          
+          {/* Floating Create Button */}
+          <TouchableOpacity
+            style={styles.floatingButton}
+            onPress={() => router.push("/(tabs)/create")}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={40} color={theme.colors.primary} style={{ fontWeight: 'bold' }} />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
