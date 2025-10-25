@@ -19,7 +19,7 @@ import { vote as hiveVote } from '~/lib/hive-utils';
 import { theme } from '~/lib/theme';
 import { extractMediaFromBody } from '~/lib/utils';
 import type { Discussion } from '@hiveio/dhive';
-import type { Media } from '../../lib/types';
+import type { Media, NestedDiscussion } from '../../lib/types';
 
 // Helper function to format time in abbreviated format
 const formatTimeAbbreviated = (date: Date): string => {
@@ -45,7 +45,7 @@ const formatTimeAbbreviated = (date: Date): string => {
 };
 
 interface ConversationReplyProps {
-  post: Discussion;
+  post: NestedDiscussion;
   currentUsername: string | null;
   depth?: number;
   maxDepth?: number;
@@ -142,15 +142,33 @@ export function ConversationReply({
   const media = extractMediaFromBody(post.body);
   const postContent = post.body.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '').trim();
 
+  // Calculate dynamic styles based on depth
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+      backgroundColor: depth && depth > 0 ? theme.colors.background : theme.colors.card,
+      marginLeft: (depth || 0) * 2, // Subtle indentation increase per depth
+    },
+    leftColumn: {
+      ...styles.leftColumn,
+      width: Math.max(20, 32 - (depth || 0) * 2), // Slightly smaller profile pics for deeper nesting
+    },
+    profileImage: {
+      ...styles.profileImage,
+      width: Math.max(16, 28 - (depth || 0) * 2),
+      height: Math.max(16, 28 - (depth || 0) * 2),
+    },
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       <View style={styles.mainLayout}>
         {/* Left column: Profile pic */}
-        <View style={styles.leftColumn}>
+        <View style={dynamicStyles.leftColumn}>
           <Pressable onPress={handleProfilePress}>
             <Image
               source={{ uri: `https://images.ecency.com/webp/u/${post.author}/avatar/small` }}
-              style={styles.profileImage}
+              style={dynamicStyles.profileImage}
               alt={`${post.author}'s avatar`}
             />
           </Pressable>
@@ -236,6 +254,26 @@ export function ConversationReply({
           buttonLabel="REPLY"
         />
       )}
+
+      {/* Nested Replies - render recursively if within maxDepth */}
+      {post.replies && post.replies.length > 0 && (depth || 0) < (maxDepth || 3) && (
+        <View style={styles.nestedRepliesContainer}>
+          {post.replies.map((nestedReply, index) => (
+            <View key={`${nestedReply.author}/${nestedReply.permlink}-nested-${index}`}>
+              <ConversationReply
+                post={nestedReply}
+                currentUsername={currentUsername}
+                depth={(depth || 0) + 1}
+                maxDepth={maxDepth}
+                onReplySuccess={onReplySuccess}
+              />
+              {index < post.replies.length - 1 && (
+                <View style={styles.nestedReplySeparator} />
+              )}
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -312,5 +350,14 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.7,
+  },
+  nestedRepliesContainer: {
+    marginTop: theme.spacing.xs,
+  },
+  nestedReplySeparator: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginVertical: theme.spacing.xs,
+    marginLeft: 32, // Align with nested reply content
   },
 });

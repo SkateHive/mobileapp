@@ -104,6 +104,15 @@ export interface AuthSession {
   loginTime: number;
 }
 
+// --- Discussion Types (Extended from @hiveio/dhive) ---
+
+import type { Discussion } from '@hiveio/dhive';
+
+export interface NestedDiscussion extends Omit<Discussion, 'replies' | 'depth'> {
+  replies: NestedDiscussion[];
+  depth?: number;
+}
+
 // --- Notification Types ---
 
 export interface HiveNotification {

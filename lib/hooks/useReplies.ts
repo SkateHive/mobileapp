@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getContentReplies, type ExtendedComment } from '../hive-utils';
-import type { Discussion } from '@hiveio/dhive';
+import type { NestedDiscussion } from '../types';
 
 interface UseRepliesResult {
-  comments: Discussion[];
+  comments: NestedDiscussion[];
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -21,7 +21,7 @@ export function useReplies(
   permlink: string,
   enabled: boolean = true
 ): UseRepliesResult {
-  const [comments, setComments] = useState<Discussion[]>([]);
+  const [comments, setComments] = useState<NestedDiscussion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,20 +34,53 @@ export function useReplies(
     try {
       const replies = await getContentReplies({ author, permlink });
       
-      // Convert ExtendedComment to Discussion format using type assertion
-      const discussionReplies: Discussion[] = replies.map((reply) => ({
-        ...reply,
-        replies: [], // Flatten nested replies for now
-        url: `/${reply.category}/@${reply.author}/${reply.permlink}`,
-        root_title: '',
-        pending_payout_value: '0.000 HBD',
-        total_pending_payout_value: '0.000 HBD',
-        author_reputation: 0,
-        promoted: '0.000 HBD',
-        body_length: String(reply.body?.length || 0),
-        reblogged_by: [],
-        blacklists: [],
-      } as unknown as Discussion));
+      // Helper function to recursively fetch and build nested reply structure
+      const buildNestedReplies = async (reply: ExtendedComment, currentDepth: number = 0): Promise<NestedDiscussion> => {
+        // Convert ExtendedComment to NestedDiscussion format
+        const discussionReply: NestedDiscussion = {
+          ...reply,
+          url: `/${reply.category}/@${reply.author}/${reply.permlink}`,
+          root_title: '',
+          pending_payout_value: '0.000 HBD',
+          total_pending_payout_value: '0.000 HBD',
+          author_reputation: 0,
+          promoted: '0.000 HBD',
+          body_length: String(reply.body?.length || 0),
+          reblogged_by: [],
+          blacklists: [],
+          replies: [],
+          depth: currentDepth,
+        } as unknown as NestedDiscussion;
+
+        // Recursively fetch nested replies if this comment has children and we haven't hit max depth
+        if (reply.children > 0 && currentDepth < 5) { // Limit to 5 levels deep to prevent infinite recursion
+          try {
+            const childReplies = await getContentReplies({ 
+              author: reply.author, 
+              permlink: reply.permlink 
+            });
+            
+            // Build nested structure for each child reply
+            const nestedReplies = await Promise.all(
+              childReplies.map(childReply => 
+                buildNestedReplies(childReply, currentDepth + 1)
+              )
+            );
+            
+            discussionReply.replies = nestedReplies;
+          } catch (error) {
+            console.warn(`Failed to fetch nested replies for ${reply.author}/${reply.permlink}:`, error);
+            // Continue without nested replies if fetch fails
+          }
+        }
+
+        return discussionReply;
+      };
+
+      // Build nested structure for all top-level replies
+      const discussionReplies: NestedDiscussion[] = await Promise.all(
+        replies.map(reply => buildNestedReplies(reply, 0))
+      );
 
       setComments(discussionReplies);
     } catch (err) {

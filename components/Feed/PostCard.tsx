@@ -14,6 +14,7 @@ import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
 import { ConversationDrawer } from './ConversationDrawer';
+import { FullConversationDrawer } from './FullConversationDrawer';
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
 import type { Media } from '../../lib/types';
@@ -60,6 +61,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
   const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
+  const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState('');
@@ -222,6 +224,10 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
     setIsConversationDrawerVisible(true);
   };
 
+  const handleBodyPress = () => {
+    setIsFullConversationVisible(true);
+  };
+
   const handleUserMenuPress = () => {
     setShowUserMenu(true);
   };
@@ -349,7 +355,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
             </View>
 
             {/* Content */}
-            <View>
+            <Pressable onPress={handleBodyPress}>
               {postContent !== '' && (
                 <View style={styles.contentContainer}>
                   <EnhancedMarkdownRenderer content={postContent} />
@@ -369,7 +375,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                   />
                 </View>
               )}
-            </View>
+            </Pressable>
 
             {/* Bottom bar */}
             <View style={styles.bottomBar}>
@@ -449,10 +455,17 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         </View>
       </View>
 
-      {/* Conversation Drawer */}
+      {/* Conversation Drawer - Quick reply only */}
       <ConversationDrawer
         visible={isConversationDrawerVisible}
         onClose={() => setIsConversationDrawerVisible(false)}
+        discussion={post}
+      />
+
+      {/* Full Conversation Drawer - Entire conversation thread */}
+      <FullConversationDrawer
+        visible={isFullConversationVisible}
+        onClose={() => setIsFullConversationVisible(false)}
         discussion={post}
       />
 

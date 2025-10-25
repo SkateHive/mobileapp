@@ -16,16 +16,14 @@ import {
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Text } from '~/components/ui/text';
-import { ConversationReply } from './ConversationReply';
-import { MediaPreview } from './MediaPreview';
-import { ReplyComposer } from '~/components/ui/ReplyComposer';
-import { useReplies } from '~/lib/hooks/useReplies';
+import { PostCard } from './PostCard';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
 import { createHiveComment } from '~/lib/upload/post-utils';
 import { uploadVideoToWorker, createVideoIframe } from '~/lib/upload/video-upload';
 import { uploadImageToHive, createImageMarkdown } from '~/lib/upload/image-upload';
 import { theme } from '~/lib/theme';
+import type { NestedDiscussion } from '~/lib/types';
 import type { Discussion } from '@hiveio/dhive';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -40,14 +38,15 @@ interface ConversationDrawerProps {
 export function ConversationDrawer({ visible, onClose, discussion }: ConversationDrawerProps) {
   const { username, session } = useAuth();
   const { showToast } = useToast();
-  const { comments, isLoading, error } = useReplies(
-    discussion.author,
-    discussion.permlink,
-    true
-  );
+  // Remove the useReplies hook since we're not showing comments anymore
+  // const { comments, isLoading, error } = useReplies(
+  //   discussion.author,
+  //   discussion.permlink,
+  //   true
+  // );
 
-  const [optimisticReplies, setOptimisticReplies] = useState<Discussion[]>([]);
-  const [isReplyExpanded, setIsReplyExpanded] = useState(false);
+  const [optimisticReplies, setOptimisticReplies] = useState<NestedDiscussion[]>([]);
+  const [isReplyExpanded, setIsReplyExpanded] = useState(true); // Changed to true to show expanded by default
   const [replyContent, setReplyContent] = useState('');
   const [media, setMedia] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
@@ -74,13 +73,17 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
   };
 
   const handleReplySuccess = (newReply: Discussion) => {
-    setOptimisticReplies((prev) => [...prev, newReply]);
+    // Convert Discussion to NestedDiscussion
+    const nestedReply: NestedDiscussion = {
+      ...newReply,
+      replies: [],
+      depth: 0,
+    };
+    setOptimisticReplies((prev) => [...prev, nestedReply]);
   };
 
   const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-
-  const allReplies = [...optimisticReplies, ...comments];
 
   // Listen for keyboard events
   useEffect(() => {
@@ -294,7 +297,14 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
         blacklists: [],
       } as unknown as Discussion;
 
-      setOptimisticReplies(prev => [...prev, newReply]);
+      // Convert to NestedDiscussion for optimistic updates
+      const nestedNewReply: NestedDiscussion = {
+        ...newReply,
+        replies: [],
+        depth: 0,
+      };
+
+      setOptimisticReplies(prev => [...prev, nestedNewReply]);
 
       // Clear form
       setReplyContent('');
@@ -461,47 +471,21 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
               <Pressable onPress={handleClose} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
               </Pressable>
-              <Text style={styles.headerTitle}>Comments</Text>
+              <Text style={styles.headerTitle}>Reply</Text>
               <View style={styles.headerSpacer} />
             </View>
 
-            {/* Content */}
+            {/* Content - Just the reply box, no comments shown */}
             <ScrollView 
               ref={scrollViewRef}
               style={styles.content} 
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Comments */}
-              {isLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={theme.colors.green} />
-                  <Text style={styles.loadingText}>Loading comments...</Text>
-                </View>
-              ) : error ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>Error loading comments</Text>
-                </View>
-              ) : allReplies.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
-                </View>
-              ) : (
-                allReplies.map((reply, index) => (
-                  <View key={`${reply.author}/${reply.permlink}-${index}`} style={styles.replyContainer}>
-                    <ConversationReply 
-                      post={reply} 
-                      currentUsername={username}
-                      depth={reply.depth || 0}
-                      maxDepth={3}
-                      onReplySuccess={handleReplySuccess}
-                    />
-                    {index < allReplies.length - 1 && (
-                      <View style={styles.replySeparator} />
-                    )}
-                  </View>
-                ))
-              )}
+              {/* Show the post being replied to */}
+              <View style={styles.postPreview}>
+                <PostCard post={discussion} currentUsername={username} />
+              </View>
             </ScrollView>
 
             {/* Reply Section */}
@@ -527,7 +511,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   backdropPress: {
     flex: 1,
@@ -779,5 +763,17 @@ const styles = StyleSheet.create({
   loginPromptText: {
     color: theme.colors.muted,
     fontSize: theme.fontSizes.sm,
+  },
+  placeholderContainer: {
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  placeholderText: {
+    color: theme.colors.muted,
+    fontSize: theme.fontSizes.md,
+    textAlign: 'center',
+  },
+  postPreview: {
+    backgroundColor: theme.colors.card,
   },
 });

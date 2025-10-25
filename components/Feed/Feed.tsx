@@ -135,12 +135,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md, // Add horizontal padding back to header
     paddingTop: theme.spacing.xxs, // Add top padding to prevent text cutoff
   },
   headerText: {
-    fontSize: theme.fontSizes.xxxl,
+    fontSize: theme.fontSizes.xxl,
     fontWeight: 'bold',
     color: theme.colors.text,
     lineHeight: 40, // 32 + 8 for proper line height to prevent cutoff
