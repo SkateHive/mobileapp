@@ -8,7 +8,7 @@ import {
   Text,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
 import { useAuth } from '~/lib/auth-provider';
@@ -34,16 +34,11 @@ export default function VideosScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    loadVideos();
-  }, []);
-
   const loadVideos = async () => {
     try {
       setIsLoading(true);
-      const posts = await getFeed(1, 50); // Load more posts to get more videos
+      const posts = await getFeed(1, 50);
       
-      // Extract videos from posts
       const videoList: VideoPost[] = [];
       
       posts.forEach((post: Post) => {
@@ -68,6 +63,14 @@ export default function VideosScreen() {
     }
   };
 
+  // Refresh videos when tab comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadVideos();
+      setCurrentIndex(0);
+    }, [])
+  );
+
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index || 0);
@@ -85,7 +88,6 @@ export default function VideosScreen() {
       <View style={styles.videoContainer}>
         <VideoPlayer url={item.videoUrl} playing={isActive} contentFit="cover" />
         
-        {/* Username overlay */}
         <View style={styles.usernameContainer}>
           <Text style={styles.usernameText}>@{item.username}</Text>
         </View>
@@ -105,7 +107,6 @@ export default function VideosScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Back button */}
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => router.back()}
@@ -113,7 +114,6 @@ export default function VideosScreen() {
         <Ionicons name="arrow-back" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* Video list */}
       {videos.length > 0 ? (
         <FlatList
           ref={flatListRef}

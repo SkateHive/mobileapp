@@ -143,7 +143,7 @@ export default function TabLayout() {
             <Tabs.Screen
               name="create"
               options={{
-                href: null, // Hide from tab bar
+                href: null,
                 title: "Create",
               }}
             />
