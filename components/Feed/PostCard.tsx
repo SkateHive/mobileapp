@@ -361,21 +361,21 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                   <EnhancedMarkdownRenderer content={postContent} />
                 </View>
               )}
-
-              {/* Media */}
-              {media.length > 0 && (
-                <View style={styles.mediaContainer}>
-                  <MediaPreview
-                    media={media}
-                    onMediaPress={handleMediaPress}
-                    selectedMedia={selectedMedia}
-                    isModalVisible={isModalVisible}
-                    onCloseModal={() => setIsModalVisible(false)}
-                    isVisible={isVisible}
-                  />
-                </View>
-              )}
             </Pressable>
+
+            {/* Media - outside Pressable so clicks don't open conversation */}
+            {media.length > 0 && (
+              <View style={styles.mediaContainer}>
+                <MediaPreview
+                  media={media}
+                  onMediaPress={handleMediaPress}
+                  selectedMedia={selectedMedia}
+                  isModalVisible={isModalVisible}
+                  onCloseModal={() => setIsModalVisible(false)}
+                  isVisible={isVisible}
+                />
+              </View>
+            )}
 
             {/* Bottom bar */}
             <View style={styles.bottomBar}>

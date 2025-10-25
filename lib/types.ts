@@ -70,7 +70,7 @@ export interface Post {
 }
 
 export interface Media {
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'embed';
   url: string;
 }
 

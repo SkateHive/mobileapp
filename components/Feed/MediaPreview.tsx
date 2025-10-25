@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Image, Modal, Pressable, View, Dimensions, StyleSheet } from 'react-native';
 import { VideoPlayer } from './VideoPlayer';
 import { VideoWithAutoplay } from './VideoWithAutoplay';
+import { EmbedPlayer } from './EmbedPlayer';
 import type { Media } from '../../lib/types';
 import { FontAwesome } from '@expo/vector-icons';
 import { theme } from '../../lib/theme';
@@ -81,7 +82,8 @@ export function MediaPreview({
             style={[
               styles.mediaContainer,
               media.length === 1 ? styles.singleMedia : styles.multipleMedia,
-              { height: item.type === 'video' ? getVideoHeight() : getImageHeight(index) }
+              // Only set height for images and videos, embeds control their own height
+              item.type === 'embed' ? {} : { height: item.type === 'video' ? getVideoHeight() : getImageHeight(index) }
             ]}
           >
             {item.type === 'video' ? (
@@ -90,6 +92,8 @@ export function MediaPreview({
                 isVisible={isVisible}
                 style={styles.fullSize}
               />
+            ) : item.type === 'embed' ? (
+              <EmbedPlayer url={item.url} />
             ) : (
               <Pressable
                 onPress={() => onMediaPress(item)}

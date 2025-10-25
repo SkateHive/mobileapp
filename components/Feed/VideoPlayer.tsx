@@ -11,8 +11,6 @@ export const VideoPlayer = React.memo(({ url, playing = true }: VideoPlayerProps
     player.loop = true;
     player.muted = true; // Start muted for autoplay (better UX)
   });
-
-  // console.log("Playing video:", url);
   
   useEffect(() => {
     if (playing) {
