@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -138,21 +140,27 @@ export function FullConversationDrawer({ visible, onClose, discussion }: FullCon
             },
           ]}
         >
-          {/* Header with safe area padding */}
-          <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-              <Pressable onPress={handleClose} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-              </Pressable>
-              <Text style={styles.headerTitle}>Conversation</Text>
-              <View style={styles.headerSpacer} />
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
+          >
+            {/* Header with safe area padding */}
+            <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+              <View style={styles.header}>
+                <Pressable onPress={handleClose} style={styles.backButton}>
+                  <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+                </Pressable>
+                <Text style={styles.headerTitle}>Conversation</Text>
+                <View style={styles.headerSpacer} />
+              </View>
             </View>
-          </View>
 
             {/* Content */}
             <ScrollView 
               style={styles.content} 
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               {/* Original Post */}
               <View style={styles.mainPost}>
@@ -184,7 +192,7 @@ export function FullConversationDrawer({ visible, onClose, discussion }: FullCon
 
           {/* Reply Box at Bottom */}
           {username && username !== 'SPECTATOR' && (
-            <View style={styles.replySection}>
+            <View style={[styles.replySection, { paddingBottom: insets.bottom || theme.spacing.md }]}>
               <ReplyComposer
                 parentAuthor={discussion.author}
                 parentPermlink={discussion.permlink}
@@ -194,6 +202,7 @@ export function FullConversationDrawer({ visible, onClose, discussion }: FullCon
               />
             </View>
           )}
+          </KeyboardAvoidingView>
         </Animated.View>
       </View>
     </Modal>
@@ -219,6 +228,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: SCREEN_HEIGHT,
     backgroundColor: theme.colors.background,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   headerContainer: {
     backgroundColor: theme.colors.background,
@@ -312,6 +324,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.card,
-    paddingBottom: theme.spacing.md,
   },
 });
