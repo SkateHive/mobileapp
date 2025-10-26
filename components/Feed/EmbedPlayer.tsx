@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { theme } from '../../lib/theme';
@@ -11,8 +11,19 @@ export const EmbedPlayer = ({ url }: EmbedPlayerProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // For Odysee, load directly without iframe wrapper
-  if (url.includes('odysee.com')) {
+  // Auto-hide loading spinner after 3 seconds as fallback
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        setIsLoading(false);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  // For Odysee and YouTube, load directly without iframe wrapper
+  if (url.includes('odysee.com') || url.includes('youtube')) {
     return (
       <View style={styles.container}>
         <WebView
@@ -25,30 +36,16 @@ export const EmbedPlayer = ({ url }: EmbedPlayerProps) => {
           domStorageEnabled
           scrollEnabled={false}
           bounces={false}
+          originWhitelist={['*']}
+          mixedContentMode="always"
+          thirdPartyCookiesEnabled
+          sharedCookiesEnabled
           onLoadStart={() => setIsLoading(true)}
-          onLoadEnd={() => {
-            setIsLoading(false);
-          }}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            setError(nativeEvent.description || 'Unknown error');
-            setIsLoading(false);
-          }}
-          onHttpError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            setError(`HTTP ${nativeEvent.statusCode}`);
-            setIsLoading(false);
-          }}
+          onLoadEnd={() => setIsLoading(false)}
         />
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        )}
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Failed to load Odysee video</Text>
-            <Text style={styles.errorDetail}>{error}</Text>
           </View>
         )}
       </View>
@@ -114,30 +111,16 @@ export const EmbedPlayer = ({ url }: EmbedPlayerProps) => {
         domStorageEnabled
         scrollEnabled={false}
         bounces={false}
+        originWhitelist={['*']}
+        mixedContentMode="always"
+        thirdPartyCookiesEnabled
+        sharedCookiesEnabled
         onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => {
-          setIsLoading(false);
-        }}
-        onError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          setError(nativeEvent.description || 'Unknown error');
-          setIsLoading(false);
-        }}
-        onHttpError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          setError(`HTTP ${nativeEvent.statusCode}`);
-          setIsLoading(false);
-        }}
+        onLoadEnd={() => setIsLoading(false)}
       />
       {isLoading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      )}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load embed</Text>
-          <Text style={styles.errorDetail}>{error}</Text>
         </View>
       )}
     </View>

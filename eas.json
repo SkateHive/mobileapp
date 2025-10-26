@@ -13,11 +13,17 @@
     },
     "preview": {
       "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
       "ios": {
         "enterpriseProvisioning": "adhoc"
       }
     },
     "production": {
+      "android": {
+        "buildType": "apk"
+      },
       "ios": {
         "buildConfiguration": "Release"
       }

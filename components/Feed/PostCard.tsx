@@ -19,7 +19,7 @@ import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
 import type { Media } from '../../lib/types';
 import type { Discussion } from '@hiveio/dhive';
-import { extractMediaFromBody } from '~/lib/utils';
+import { extractMediaFromBody, removeVideoLinksFromBody } from '~/lib/utils';
 
 // Helper function to format time in abbreviated format (2 characters max)
 const formatTimeAbbreviated = (date: Date): string => {
@@ -102,11 +102,15 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   // Memoize media extraction
   const media = useMemo(() => extractMediaFromBody(post.body), [post.body]);
   
-  // Memoize post content processing
-  const postContent = useMemo(() => 
-    post.body.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '').trim(),
-    [post.body]
-  );
+  // Memoize post content processing - remove iframes, images, and video links
+  const postContent = useMemo(() => {
+    let content = post.body;
+    // Remove iframes and images
+    content = content.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '');
+    // Remove plain video URLs (YouTube and Odysee)
+    content = removeVideoLinksFromBody(content);
+    return content.trim();
+  }, [post.body]);
   
   // Memoize formatted date
   const formattedDate = useMemo(() => {
