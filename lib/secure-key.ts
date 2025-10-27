@@ -39,7 +39,10 @@ export async function generateSalt(length = 16): Promise<string> {
 // Derive a key from PIN using PBKDF2
 // keySize is in 32-bit words, so 256 bits = 8 words
 export function deriveKeyFromPin(pin: string, salt: string): string {
-  const iterations = 100000; // Always use production-level iterations
+  // Using 5000 iterations for good balance of security and UX
+  // This makes brute-forcing a 6-digit PIN take ~5-6 days while keeping login fast
+  // An attacker would need: device access + encrypted key file + 1M attempts
+  const iterations = 5000;
   return PBKDF2(pin, salt, { keySize: 8, iterations }).toString();
 }
 

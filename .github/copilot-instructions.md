@@ -3,6 +3,15 @@
 ## Project Overview
 MyCommunity App is a React Native mobile application built with Expo, leveraging the HIVE blockchain for authentication and social functionality. The app follows a modern, component-based architecture with TypeScript and uses NativeWind (TailwindCSS) for styling.
 
+## ⚠️ TEMPORARY CODE - REMOVE AFTER APPLE APPROVAL
+**IMPORTANT**: There is temporary test account code in `lib/auth-provider.tsx` for Apple App Store review.
+- **Location**: Lines ~28-49 (configuration constants) and lines ~280-293 (login logic)
+- **What to remove**: 
+  1. Delete the entire "APPLE REVIEW TEST ACCOUNT CONFIGURATION" block (TEST_USERNAME, TEST_POSTING_KEY, TEST_SIMPLE_PASSWORD constants)
+  2. Delete the "APPLE REVIEW TEST ACCOUNT LOGIC" block inside the login function
+- **When to remove**: Immediately after Apple approves the app
+- **Purpose**: Allows Apple reviewers to login with a simple password instead of a long HIVE posting key
+
 ## Technology Stack
 - **Framework**: React Native with Expo
 - **State Management**: React Context

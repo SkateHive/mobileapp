@@ -28,6 +28,29 @@ import {
   setUserRelationship
 } from './hive-utils';
 
+// ============================================================================
+// APPLE REVIEW TEST ACCOUNT CONFIGURATION
+// ============================================================================
+// This is a temporary solution for Apple App Store review process.
+// Apple reviewers need a simple password, but HIVE posting keys are too long.
+// 
+// INSTRUCTIONS:
+// 1. Fill in the TEST_USERNAME with the account username
+// 2. Fill in the TEST_POSTING_KEY with the actual HIVE posting key
+// 3. Fill in the TEST_SIMPLE_PASSWORD with a simple password for Apple reviewers
+// 
+// HOW IT WORKS:
+// - When someone logs in with TEST_USERNAME and TEST_SIMPLE_PASSWORD,
+//   the app will internally use TEST_POSTING_KEY for all blockchain operations
+// - The reviewer only needs to remember the simple password
+// ============================================================================
+
+const TEST_USERNAME: string = 'skatethread';
+const TEST_POSTING_KEY: string = '5KPCy8wGKukimMDSu64dA3gUB5Utj5Qm3Vm3yueCzm1MG4Lk3XB'; // posting key is exposed intentionally and will be changed later
+const TEST_SIMPLE_PASSWORD: string = '8wGKukim';
+
+// ============================================================================
+
 // Custom error types for authentication
 export class AuthError extends Error {
   constructor(message: string) {
@@ -249,7 +272,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!normalizedUsername || !postingKey) {
         throw new AuthError('Username and posting key are required');
       }
-      // await validate_posting_key(normalizedUsername, postingKey);
+
+      // ============================================================================
+      // APPLE REVIEW TEST ACCOUNT LOGIC
+      // ============================================================================
+      // Check if this is the Apple test account
+      if (TEST_USERNAME && normalizedUsername === TEST_USERNAME.toLowerCase()) {
+        // If they're using the simple password, replace it with the real posting key
+        if (TEST_SIMPLE_PASSWORD && postingKey === TEST_SIMPLE_PASSWORD) {
+          postingKey = TEST_POSTING_KEY;
+        }
+        // If they're using the posting key directly, that's fine too
+        // Continue with normal validation using the posting key
+      }
+      // ============================================================================
+
+      await validate_posting_key(normalizedUsername, postingKey);
 
       // Encrypt the key
       let encrypted = '';
@@ -259,6 +297,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!pin || pin.length !== 6) throw new AuthError('PIN must be 6 digits');
         salt = await generateSalt();
         iv = await generateSalt();
+        
+        // Small delay to allow UI to update with loading state before expensive operation
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const secret = deriveKeyFromPin(pin, salt);
         encrypted = encryptKey(postingKey, secret, iv);
       } else if (method === 'biometric') {
@@ -321,6 +363,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let decryptedKey = '';
       if (encryptedKey.method === 'pin') {
         if (!pin || pin.length !== 6) throw new AuthError('PIN must be 6 digits');
+        
+        // Small delay to allow UI to update with loading state before expensive operation
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const secret = deriveKeyFromPin(pin, encryptedKey.salt);
         decryptedKey = decryptKey(encryptedKey.encrypted, secret, encryptedKey.iv);
       } else if (encryptedKey.method === 'biometric') {

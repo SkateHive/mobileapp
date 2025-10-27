@@ -780,6 +780,11 @@ export async function fetchAllNotifications(
 
     const notifications: HiveNotification[] = await HiveClient.call('bridge', 'account_notifications', params);
     
+    // Handle null or empty response for new users with no notifications
+    if (!notifications || !Array.isArray(notifications)) {
+      return [];
+    }
+    
     // Get the last read date to determine which notifications are read
     const lastDate = await findLastNotificationsReset(username);
     
@@ -807,6 +812,12 @@ export async function fetchNewNotifications(username: string): Promise<HiveNotif
       account: username, 
       limit: 100 
     });
+    
+    // Handle null or empty response for new users with no notifications
+    if (!notifications || !Array.isArray(notifications)) {
+      return [];
+    }
+    
     const lastDate = await findLastNotificationsReset(username);
     
     if (lastDate) {
