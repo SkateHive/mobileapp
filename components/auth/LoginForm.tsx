@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, Linking } from "react-native";
 import { Text } from "../ui/text";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
@@ -298,6 +298,15 @@ export function LoginForm({
           )}
 
           <Pressable
+            onPress={() => Linking.openURL('https://signup.hive.io/')}
+            style={styles.createAccountLink}
+          >
+            <Text style={styles.createAccountText}>
+              Click here to create an account
+            </Text>
+          </Pressable>
+
+          <Pressable
             onPress={onSpectator}
             style={styles.spectatorButton}
           >
@@ -429,6 +438,18 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
     textAlign: 'center',
     paddingVertical: 4, // Small padding to ensure text isn't clipped
+  },
+  createAccountLink: {
+    marginTop: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createAccountText: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.regular,
+    textDecorationLine: 'underline',
   },
   message: {
     textAlign: 'center',
