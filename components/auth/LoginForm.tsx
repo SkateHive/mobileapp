@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, Linking } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { Text } from "../ui/text";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { StoredUsersView } from "./StoredUsersView";
+import { CreateAccountModal } from "./CreateAccountModal";
 import { theme } from "~/lib/theme";
 import { hasDeviceAuthentication } from '~/lib/secure-key';
 import type { EncryptionMethod, StoredUser } from '../../lib/types';
@@ -49,6 +50,7 @@ export function LoginForm({
     hasDevicePin: false,
     biometricTypes: [] as any[],
   });
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
 
   // Check device authentication capabilities on mount
   useEffect(() => {
@@ -298,7 +300,7 @@ export function LoginForm({
           )}
 
           <Pressable
-            onPress={() => Linking.openURL('https://signup.hive.io/')}
+            onPress={() => setShowCreateAccountModal(true)}
             style={styles.createAccountLink}
           >
             <Text style={styles.createAccountText}>
@@ -330,6 +332,11 @@ export function LoginForm({
           <Text style={styles.loadingText}>Authenticating...</Text>
         </View>
       )}
+
+      <CreateAccountModal
+        visible={showCreateAccountModal}
+        onClose={() => setShowCreateAccountModal(false)}
+      />
     </View>
   );
 }

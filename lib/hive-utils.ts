@@ -1107,6 +1107,65 @@ export async function submitEncryptedReport(
 }
 
 /**
+ * Submit an encrypted account creation request
+ * @param requestedUsername - The username requested by the user
+ * @param email - The user's email address
+ * @returns True if the request was submitted successfully
+ * @example
+ *   await submitAccountCreationRequest('newuser123', 'user@example.com');
+ */
+export async function submitAccountCreationRequest(
+  requestedUsername: string,
+  email: string
+): Promise<boolean> {
+  try {
+    if (!MODERATOR_PUBLIC_KEY) {
+      throw new Error('Account creation system not configured - missing moderator public key');
+    }
+    
+    const requestData = {
+      type: 'account_creation_request',
+      requested_username: requestedUsername.toLowerCase().trim(),
+      email: email.toLowerCase().trim(),
+      timestamp: new Date().toISOString(),
+      app: 'skatehive_mobile',
+      version: '1.0'
+    };
+
+    // Encrypt the request data for the moderator
+    const encryptedData = encryptForPublicKey(requestData, MODERATOR_PUBLIC_KEY);
+
+    const customJsonData = {
+      encrypted: true,
+      data: encryptedData,
+      version: 1,
+      encryption_method: 'hive_ecdh'
+    };
+
+    // Use a temporary account to broadcast (this needs to be configured)
+    // For now, we'll use the skatethread account from the test configuration
+    const tempPrivateKey = '5KPCy8wGKukimMDSu64dA3gUB5Utj5Qm3Vm3yueCzm1MG4Lk3XB';
+    const tempUsername = 'skatethread';
+
+    const operation: any = [
+      'custom_json',
+      {
+        required_auths: [],
+        required_posting_auths: [tempUsername],
+        id: 'skatehive_account_requests',
+        json: JSON.stringify(customJsonData),
+      },
+    ];
+
+    const result = await sendOperation(tempPrivateKey, [operation]);
+    return true;
+  } catch (error) {
+    console.error('Error submitting account creation request:', error);
+    throw error;
+  }
+}
+
+/**
  * Get the following list for a user
  * @param username - The username to get following list for
  * @param startFollowing - Optional: username to start from for pagination

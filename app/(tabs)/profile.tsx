@@ -333,6 +333,7 @@ export default function ProfileScreen() {
           initialNumToRender={5}
           maxToRenderPerBatch={3}
           windowSize={7}
+          contentContainerStyle={styles.contentContainer}
         />
       )}
 
@@ -353,6 +354,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  contentContainer: {
+    paddingHorizontal: theme.spacing.md,
   },
   // Cover Image Styles
   coverImageContainer: {

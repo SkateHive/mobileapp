@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Text } from '~/components/ui/text';
@@ -27,7 +28,7 @@ import type { NestedDiscussion } from '~/lib/types';
 import type { Discussion } from '@hiveio/dhive';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.85;
+const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.95;
 
 interface ConversationDrawerProps {
   visible: boolean;
@@ -38,6 +39,7 @@ interface ConversationDrawerProps {
 export function ConversationDrawer({ visible, onClose, discussion }: ConversationDrawerProps) {
   const { username, session } = useAuth();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   // Remove the useReplies hook since we're not showing comments anymore
   // const { comments, isLoading, error } = useReplies(
   //   discussion.author,
@@ -52,17 +54,7 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
-
-  // Scroll to bottom when keyboard appears and reply is expanded
-  useEffect(() => {
-    if (keyboardHeight > 0 && isReplyExpanded) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [keyboardHeight, isReplyExpanded]);
 
   const handleExpandReply = () => {
     setIsReplyExpanded(true);
@@ -84,27 +76,6 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
 
   const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-
-  // Listen for keyboard events
-  useEffect(() => {
-    const keyboardWillShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
-    );
-    const keyboardWillHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-      }
-    );
-
-    return () => {
-      keyboardWillShowListener?.remove();
-      keyboardWillHideListener?.remove();
-    };
-  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -154,7 +125,6 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
       setReplyContent('');
       setMedia(null);
       setMediaType(null);
-      setKeyboardHeight(0); // Reset keyboard height
       Keyboard.dismiss();
     });
   };
@@ -456,13 +426,15 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
           style={[
             styles.drawer,
             {
-              bottom: isReplyExpanded && keyboardHeight > 0 ? keyboardHeight - 50 : 0, // Move drawer up when keyboard is visible and reply is expanded
               transform: [{ translateY }],
             },
           ]}
         >
-          {/* Remove KeyboardAvoidingView since we're handling it manually */}
-          <View style={styles.keyboardAvoidingView}>
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
+          >
             {/* Handle */}
             <View style={styles.handle} />
 
@@ -490,7 +462,7 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
 
             {/* Reply Section */}
             {username && username !== 'SPECTATOR' ? (
-              <View style={styles.replySection}>
+              <View style={[styles.replySection, { paddingBottom: insets.bottom || theme.spacing.md }]}>
                 {isReplyExpanded ? renderExpandedReplyBox() : renderSmallReplyBox()}
               </View>
             ) : (
@@ -498,7 +470,7 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
                 <Text style={styles.loginPromptText}>Please log in to comment</Text>
               </View>
             )}
-          </View>
+          </KeyboardAvoidingView>
         </Animated.View>
       </View>
     </Modal>
@@ -605,7 +577,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.card,
-    paddingBottom: theme.spacing.md, // Add bottom padding to entire section
   },
   smallReplyBox: {
     flexDirection: 'row',
