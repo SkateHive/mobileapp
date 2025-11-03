@@ -8,6 +8,8 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "privacy": "public",
+    "privacyPolicyUrl": "https://skatehive.app/privacypolicy",
     "splash": {
       "image": "./assets/images/adaptive-icon.png",
       "resizeMode": "contain",
@@ -19,7 +21,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "icon": "./assets/images/icon-ios.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -54,14 +56,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera."
+          "cameraPermission": "SkateHive needs access to your camera to capture photos and videos of your skateboarding tricks and moments. This media will be uploaded to IPFS and shared on the Hive blockchain as part of your posts."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos.",
-          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos."
+          "photosPermission": "SkateHive needs access to your photo library to let you select existing photos and videos for your skateboarding posts. Selected media will be uploaded to IPFS and shared on the Hive blockchain.",
+          "savePhotosPermission": "SkateHive needs permission to save photos to your library."
         }
       ],
       "expo-font"
