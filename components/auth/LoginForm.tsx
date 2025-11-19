@@ -299,7 +299,7 @@ export function LoginForm({
           )}
 
           <Pressable
-            onPress={() => WebBrowser.openBrowserAsync('https://signup.hive.io/')}
+            onPress={() => WebBrowser.openBrowserAsync('https://hiveonboard.com/')}
             style={styles.createAccountLink}
           >
             <Text style={styles.createAccountText}>

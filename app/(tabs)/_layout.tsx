@@ -26,12 +26,14 @@ const TAB_ITEMS = [
     icon: "podium-outline",
     iconFamily: "Ionicons",
   },
-  {
-    name: "wallet",
-    title: "Wallet",
-    icon: "wallet-outline",
-    iconFamily: "Ionicons",
-  },
+  // Wallet tab temporarily disabled for App Store review
+  // Will be re-enabled in future update with enhanced functionality
+  // {
+  //   name: "wallet",
+  //   title: "Wallet",
+  //   icon: "wallet-outline",
+  //   iconFamily: "Ionicons",
+  // },
   {
     name: "notifications",
     title: "Notifications",
