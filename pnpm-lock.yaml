@@ -128,9 +128,6 @@ importers:
       react-native-markdown-display:
         specifier: ^7.0.2
         version: 7.0.2(react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
-      react-native-reanimated:
-        specifier: ~4.1.0
-        version: 4.1.0(@babel/core@7.26.10)(react-native-worklets@0.5.1(@babel/core@7.26.10)(react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       react-native-safe-area-context:
         specifier: ~5.6.1
         version: 5.6.1(react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
@@ -4394,6 +4391,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.26.10
       '@babel/helper-plugin-utils': 7.27.1
+    optional: true
 
   '@babel/plugin-transform-typescript@7.27.1(@babel/core@7.26.10)':
     dependencies:
@@ -7462,6 +7460,7 @@ snapshots:
       react-native-is-edge-to-edge: 1.2.1(react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       react-native-worklets: 0.5.1(@babel/core@7.26.10)(react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       semver: 7.7.2
+    optional: true
 
   react-native-safe-area-context@5.6.1(react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0):
     dependencies:
@@ -7525,6 +7524,7 @@ snapshots:
       semver: 7.7.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   react-native@0.81.4(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0):
     dependencies:
