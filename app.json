@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon-ios.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "privacy": "public",
     "privacyPolicyUrl": "https://skatehive.app/privacypolicy",
     "splash": {
@@ -21,7 +21,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
-      "buildNumber": "13",
+      "buildNumber": "14",
       "icon": "./assets/images/icon-ios.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
