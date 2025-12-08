@@ -51,10 +51,13 @@ export const VideoPlayer = React.memo(
     useEffect(() => {
       if (!showControls) return;
 
-      const subscription = player.addListener("mutedChange", (event: { muted: boolean }) => {
-        isUpdatingFromPlayer.current = true;
-        setIsMuted(event.muted);
-      });
+      const subscription = player.addListener(
+        "mutedChange",
+        (event: { muted: boolean }) => {
+          isUpdatingFromPlayer.current = true;
+          setIsMuted(event.muted);
+        }
+      );
 
       return () => {
         subscription?.remove();
@@ -76,13 +79,15 @@ export const VideoPlayer = React.memo(
 
         {/* Custom mute/unmute button when native controls are hidden */}
         {!showControls && (
-          <Pressable 
-            style={styles.muteButton} 
+          <Pressable
+            style={styles.muteButton}
             onPress={toggleMute}
             accessibilityRole="button"
             accessibilityLabel={isMuted ? "Unmute video" : "Mute video"}
             accessibilityState={{ selected: isMuted }}
-            accessibilityHint={isMuted ? "Double tap to unmute" : "Double tap to mute"}
+            accessibilityHint={
+              isMuted ? "Double tap to unmute" : "Double tap to mute"
+            }
           >
             <Ionicons
               name={isMuted ? "volume-mute" : "volume-high"}
