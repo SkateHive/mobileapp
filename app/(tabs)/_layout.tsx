@@ -76,8 +76,8 @@ export default function TabLayout() {
       backgroundColor: theme.colors.background,
       borderWidth: 3,
       borderColor: theme.colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       marginBottom: 20,
       shadowColor: theme.colors.primary,
       shadowOffset: { width: 0, height: 0 },
@@ -112,13 +112,13 @@ export default function TabLayout() {
                 name={tab.name}
                 options={{
                   title: tab.title,
-                  tabBarIcon: ({ color, focused }) => (
+                  tabBarIcon: ({ color, focused }) =>
                     tab.isCenter ? (
                       <View style={styles.centerButtonContainer}>
-                        <Ionicons 
-                          name="add" 
-                          size={32} 
-                          color={theme.colors.primary} 
+                        <Ionicons
+                          name="add"
+                          size={32}
+                          color={theme.colors.primary}
                         />
                       </View>
                     ) : (
@@ -127,8 +127,7 @@ export default function TabLayout() {
                         color={color}
                         iconFamily={tab.iconFamily}
                       />
-                    )
-                  ),
+                    ),
                   ...(tab.name === "profile" && {
                     href: {
                       pathname: "/(tabs)/profile",
@@ -138,7 +137,7 @@ export default function TabLayout() {
                 }}
               />
             ))}
-            
+
             {/* Hidden notifications tab - accessible from header */}
             <Tabs.Screen
               name="notifications"

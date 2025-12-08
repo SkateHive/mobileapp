@@ -1,16 +1,26 @@
-import React from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, ViewToken, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Text } from '../ui/text';
-import { PostCard } from './PostCard';
-import { ActivityIndicator } from 'react-native';
-import { useAuth } from '~/lib/auth-provider';
-import { useSnaps } from '~/lib/hooks/useSnaps';
-import { theme } from '~/lib/theme';
-import { ViewportTrackerProvider, useViewportTracker } from '~/lib/ViewportTracker';
-import { BadgedIcon } from '../ui/BadgedIcon';
-import { useNotificationContext } from '~/lib/notifications-context';
-import type { Discussion } from '@hiveio/dhive';
+import React from "react";
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  RefreshControl,
+  ViewToken,
+  Pressable,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Text } from "../ui/text";
+import { PostCard } from "./PostCard";
+import { ActivityIndicator } from "react-native";
+import { useAuth } from "~/lib/auth-provider";
+import { useSnaps } from "~/lib/hooks/useSnaps";
+import { theme } from "~/lib/theme";
+import {
+  ViewportTrackerProvider,
+  useViewportTracker,
+} from "~/lib/ViewportTracker";
+import { BadgedIcon } from "../ui/BadgedIcon";
+import { useNotificationContext } from "~/lib/notifications-context";
+import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
   refreshTrigger?: number;
@@ -40,66 +50,90 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const onViewableItemsChanged = React.useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const visiblePermlinks = viewableItems
-        .filter(item => item.isViewable && item.item)
-        .map(item => (item.item as Discussion).permlink);
+        .filter((item) => item.isViewable && item.item)
+        .map((item) => (item.item as Discussion).permlink);
       updateVisibleItems(visiblePermlinks);
     },
     [updateVisibleItems]
   );
 
   // Viewability config - item is considered viewable when 60% is visible
-  const viewabilityConfig = React.useMemo(() => ({
-    viewAreaCoveragePercentThreshold: 60,
-    minimumViewTime: 100,
-  }), []);
+  const viewabilityConfig = React.useMemo(
+    () => ({
+      viewAreaCoveragePercentThreshold: 60,
+      minimumViewTime: 100,
+    }),
+    []
+  );
 
   // Map blockchain comments (Discussion) to Post for PostCard compatibility
   const feedData: Discussion[] = comments as unknown as Discussion[];
-  
+
   // Filter out posts from muted and blacklisted users
   const filteredFeedData = React.useMemo(() => {
     if (!feedData || feedData.length === 0) return [];
-    
-    return feedData.filter(post => {
+
+    return feedData.filter((post) => {
       // Don't filter out the user's own posts
       if (post.author === username) return true;
-      
+
       // Filter out muted and blacklisted users
-      return !mutedList.includes(post.author) && !blacklistedList.includes(post.author);
+      return (
+        !mutedList.includes(post.author) &&
+        !blacklistedList.includes(post.author)
+      );
     });
   }, [feedData, mutedList, blacklistedList, username]);
 
-  const renderItem = React.useCallback(({ item }: { item: Discussion }) => (
-    <PostCard key={item.permlink} post={item} currentUsername={username || ''} />
-  ), [username]);
+  const renderItem = React.useCallback(
+    ({ item }: { item: Discussion }) => (
+      <PostCard
+        key={item.permlink}
+        post={item}
+        currentUsername={username || ""}
+      />
+    ),
+    [username]
+  );
 
-  const keyExtractor = React.useCallback((item: Discussion) => item.permlink, []);
+  const keyExtractor = React.useCallback(
+    (item: Discussion) => item.permlink,
+    []
+  );
 
-  const ItemSeparatorComponent = React.useCallback(() => (
-    <View style={styles.separator} />
-  ), []);
+  const ItemSeparatorComponent = React.useCallback(
+    () => <View style={styles.separator} />,
+    []
+  );
 
   const handleNotificationsPress = React.useCallback(() => {
-    router.push('/(tabs)/notifications');
+    router.push("/(tabs)/notifications");
   }, [router]);
 
-  const ListHeaderComponent = React.useCallback(() => (
-    <View style={styles.header}>
-      <Text style={styles.headerText}>Feed</Text>
-      <Pressable 
-        onPress={handleNotificationsPress}
-        style={styles.notificationButton}
-        accessibilityRole="button"
-        accessibilityLabel={badgeCount > 0 ? `Notifications, ${badgeCount} unread` : "Notifications"}
-      >
-        <BadgedIcon 
-          name="notifications-outline" 
-          color={theme.colors.text} 
-          badgeCount={badgeCount} 
-        />
-      </Pressable>
-    </View>
-  ), [handleNotificationsPress, badgeCount]);
+  const ListHeaderComponent = React.useCallback(
+    () => (
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Feed</Text>
+        <Pressable
+          onPress={handleNotificationsPress}
+          style={styles.notificationButton}
+          accessibilityRole="button"
+          accessibilityLabel={
+            badgeCount > 0
+              ? `Notifications, ${badgeCount} unread`
+              : "Notifications"
+          }
+        >
+          <BadgedIcon
+            name="notifications-outline"
+            color={theme.colors.text}
+            badgeCount={badgeCount}
+          />
+        </Pressable>
+      </View>
+    ),
+    [handleNotificationsPress, badgeCount]
+  );
 
   const ListFooterComponent = isLoading ? (
     <View style={styles.footer}>
@@ -123,8 +157,8 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         refreshControl={
-          <RefreshControl 
-            refreshing={isRefreshing} 
+          <RefreshControl
+            refreshing={isRefreshing}
             onRefresh={handleRefresh}
             tintColor={theme.colors.primary}
             colors={[theme.colors.primary]}
@@ -156,16 +190,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.xxs,
   },
   headerText: {
     fontSize: theme.fontSizes.xxl,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.text,
     lineHeight: 40,
     fontFamily: theme.fonts.bold,
