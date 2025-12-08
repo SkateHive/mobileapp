@@ -3,6 +3,7 @@ import { PrivateKey } from '@hiveio/dhive';
 import { Buffer } from 'buffer';
 import { sha256 } from 'js-sha256';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { prepareImageForUpload, isHeicImage } from './image-converter';
 
 interface ImageUploadResult {
   url: string;
@@ -11,6 +12,10 @@ interface ImageUploadResult {
 export interface ImageUploadOptions {
   username: string;
   privateKey: string;
+  /** Skip HEIC to JPEG conversion (default: false) */
+  skipConversion?: boolean;
+  /** JPEG quality for converted images (0-1, default: 0.8) */
+  conversionQuality?: number;
 }
 
 /**
@@ -48,6 +53,8 @@ async function createImageSignature(fileUri: string, privateKey: string): Promis
 
 /**
  * Upload image to Hive images service
+ * Automatically converts HEIC images to JPEG for cross-platform compatibility
+ * 
  * @param fileUri - Local file URI from Expo ImagePicker
  * @param fileName - Original file name
  * @param mimeType - MIME type of the image
@@ -64,17 +71,32 @@ export async function uploadImageToHive(
     // Prevent device from sleeping during upload
     await activateKeepAwakeAsync('image-upload');
     
-    // Create signature
-    const signature = await createImageSignature(fileUri, options.privateKey);
+    // Convert HEIC to JPEG if needed for cross-platform compatibility
+    let uploadUri = fileUri;
+    let uploadMimeType = mimeType;
+    let uploadFileName = fileName;
+
+    if (!options.skipConversion && isHeicImage(fileUri, mimeType)) {
+      const prepared = await prepareImageForUpload(fileUri, mimeType, {
+        quality: options.conversionQuality ?? 0.8,
+        forceConvert: true,
+      });
+      uploadUri = prepared.uri;
+      uploadMimeType = prepared.mimeType;
+      uploadFileName = prepared.fileName;
+    }
+    
+    // Create signature using the (potentially converted) image
+    const signature = await createImageSignature(uploadUri, options.privateKey);
 
     // Create FormData for upload
     const formData = new FormData();
 
-    // Add the image file
+    // Add the image file (using converted URI if HEIC was converted)
     const fileData = {
-      uri: fileUri,
-      type: mimeType,
-      name: fileName,
+      uri: uploadUri,
+      type: uploadMimeType,
+      name: uploadFileName,
     } as any;
 
     formData.append('file', fileData);
