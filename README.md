@@ -87,7 +87,7 @@ mycommunity-app/
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/r4topunk/mobileapp.git
+git clone https://github.com/SkateHive/mobileapp.git
 cd mobileapp
 ```
 
