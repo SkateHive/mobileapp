@@ -5,9 +5,10 @@ interface VideoPlayerProps {
   url: string;
   playing?: boolean;
   contentFit?: 'contain' | 'cover' | 'fill';
+  showControls?: boolean;
 }
 
-export const VideoPlayer = React.memo(({ url, playing = true, contentFit = 'contain' }: VideoPlayerProps) => {
+export const VideoPlayer = React.memo(({ url, playing = true, contentFit = 'contain', showControls = true }: VideoPlayerProps) => {
   const player = useVideoPlayer(url, player => {
     player.loop = true;
     player.muted = true; // Start muted for autoplay (better UX)
@@ -26,7 +27,7 @@ export const VideoPlayer = React.memo(({ url, playing = true, contentFit = 'cont
       style={{ width: '100%', height: '100%' }}
       contentFit={contentFit}
       player={player}
-      fullscreenOptions={{ enable: true }}
+      nativeControls={showControls}
     />
   );
 });
