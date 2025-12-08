@@ -5,7 +5,15 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useRef } from "react";
 import { theme } from "~/lib/theme";
 
-const TAB_ITEMS = [
+interface TabItem {
+  name: string;
+  title: string;
+  icon: string;
+  iconFamily: "Ionicons";
+  isCenter?: boolean;
+}
+
+const TAB_ITEMS: TabItem[] = [
   {
     name: "feed",
     title: "Feed",
@@ -37,7 +45,7 @@ const TAB_ITEMS = [
     icon: "person-outline",
     iconFamily: "Ionicons",
   },
-] as const;
+];
 
 export default function TabLayout() {
   const router = useRouter();
