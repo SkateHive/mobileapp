@@ -51,7 +51,9 @@ export default function VideosScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
   const [likedStates, setLikedStates] = useState<Record<string, boolean>>({});
-  const [voteCountStates, setVoteCountStates] = useState<Record<string, number>>({});
+  const [voteCountStates, setVoteCountStates] = useState<
+    Record<string, number>
+  >({});
   const flatListRef = useRef<FlatList>(null);
 
   const loadVideos = async () => {
@@ -110,15 +112,17 @@ export default function VideosScreen() {
       });
 
       setVideos(videoList);
-      
+
       // Initialize liked and vote count states based on active_votes
       const initialLiked: Record<string, boolean> = {};
       const initialVoteCounts: Record<string, number> = {};
       videoList.forEach((video) => {
         const key = `${video.author}-${video.permlink}`;
-        const hasVoted = username && video.active_votes?.some(
-          (v: any) => v.voter === username && v.weight > 0
-        );
+        const hasVoted =
+          username &&
+          video.active_votes?.some(
+            (v: any) => v.voter === username && v.weight > 0
+          );
         initialLiked[key] = !!hasVoted;
         initialVoteCounts[key] = video.votes;
       });
@@ -150,85 +154,93 @@ export default function VideosScreen() {
   }).current;
 
   // Handle vote on a video
-  const handleVote = useCallback(async (video: VideoPost) => {
-    const key = `${video.author}-${video.permlink}`;
-    
-    if (!session || !session.username || !session.decryptedKey) {
-      showToast("Please login first", "error");
-      return;
-    }
+  const handleVote = useCallback(
+    async (video: VideoPost) => {
+      const key = `${video.author}-${video.permlink}`;
 
-    if (session.username === "SPECTATOR") {
-      showToast("Please login first", "error");
-      return;
-    }
-
-    // Prevent double-tapping
-    if (votingStates[key]) return;
-
-    try {
-      setVotingStates((prev) => ({ ...prev, [key]: true }));
-      
-      // Haptic feedback
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      const isCurrentlyLiked = likedStates[key];
-      const previousVoteCount = voteCountStates[key] || video.votes;
-
-      // Optimistic update
-      setLikedStates((prev) => ({ ...prev, [key]: !isCurrentlyLiked }));
-      setVoteCountStates((prev) => ({
-        ...prev,
-        [key]: isCurrentlyLiked ? previousVoteCount - 1 : previousVoteCount + 1,
-      }));
-
-      // Submit vote to blockchain (100% weight for like, 0 for unlike)
-      await hiveVote(
-        session.decryptedKey,
-        session.username,
-        video.author,
-        video.permlink,
-        isCurrentlyLiked ? 0 : 10000 // 10000 = 100%
-      );
-
-      showToast(isCurrentlyLiked ? "Vote removed" : "Voted!", "success");
-    } catch (error) {
-      // Revert optimistic update on error
-      const isCurrentlyLiked = likedStates[key];
-      setLikedStates((prev) => ({ ...prev, [key]: !isCurrentlyLiked }));
-      setVoteCountStates((prev) => ({
-        ...prev,
-        [key]: voteCountStates[key] || video.votes,
-      }));
-
-      let errorMessage = "Failed to vote";
-      if (error instanceof Error) {
-        errorMessage = error.message;
+      if (!session || !session.username || !session.decryptedKey) {
+        showToast("Please login first", "error");
+        return;
       }
-      showToast(errorMessage, "error");
-    } finally {
-      setVotingStates((prev) => ({ ...prev, [key]: false }));
-    }
-  }, [session, votingStates, likedStates, voteCountStates, showToast]);
+
+      if (session.username === "SPECTATOR") {
+        showToast("Please login first", "error");
+        return;
+      }
+
+      // Prevent double-tapping
+      if (votingStates[key]) return;
+
+      try {
+        setVotingStates((prev) => ({ ...prev, [key]: true }));
+
+        // Haptic feedback
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        const isCurrentlyLiked = likedStates[key];
+        const previousVoteCount = voteCountStates[key] || video.votes;
+
+        // Optimistic update
+        setLikedStates((prev) => ({ ...prev, [key]: !isCurrentlyLiked }));
+        setVoteCountStates((prev) => ({
+          ...prev,
+          [key]: isCurrentlyLiked
+            ? previousVoteCount - 1
+            : previousVoteCount + 1,
+        }));
+
+        // Submit vote to blockchain (100% weight for like, 0 for unlike)
+        await hiveVote(
+          session.decryptedKey,
+          session.username,
+          video.author,
+          video.permlink,
+          isCurrentlyLiked ? 0 : 10000 // 10000 = 100%
+        );
+
+        showToast(isCurrentlyLiked ? "Vote removed" : "Voted!", "success");
+      } catch (error) {
+        // Revert optimistic update on error
+        const isCurrentlyLiked = likedStates[key];
+        setLikedStates((prev) => ({ ...prev, [key]: !isCurrentlyLiked }));
+        setVoteCountStates((prev) => ({
+          ...prev,
+          [key]: voteCountStates[key] || video.votes,
+        }));
+
+        let errorMessage = "Failed to vote";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        showToast(errorMessage, "error");
+      } finally {
+        setVotingStates((prev) => ({ ...prev, [key]: false }));
+      }
+    },
+    [session, votingStates, likedStates, voteCountStates, showToast]
+  );
 
   // Handle comment button - navigate to conversation
-  const handleComment = useCallback((video: VideoPost) => {
-    router.push({
-      pathname: "/conversation",
-      params: {
-        author: video.author,
-        permlink: video.permlink,
-      },
-    });
-  }, [router]);
+  const handleComment = useCallback(
+    (video: VideoPost) => {
+      router.push({
+        pathname: "/conversation",
+        params: {
+          author: video.author,
+          permlink: video.permlink,
+        },
+      });
+    },
+    [router]
+  );
 
   // Handle share button
   const handleShare = useCallback(async (video: VideoPost) => {
     try {
       const url = `https://skatehive.app/@${video.author}/${video.permlink}`;
       await Share.share({
-        message: video.title 
-          ? `${video.title}\n\n${url}` 
+        message: video.title
+          ? `${video.title}\n\n${url}`
           : `Check out this video by @${video.author}\n\n${url}`,
         url: url,
       });
@@ -283,8 +295,6 @@ export default function VideosScreen() {
             </Text>
           ) : null}
 
-
-
           {/* Tags */}
           {item.tags && item.tags.length > 0 && (
             <Text style={styles.tagsText} numberOfLines={1}>
@@ -295,28 +305,33 @@ export default function VideosScreen() {
 
         {/* Left side action buttons */}
         <View style={styles.leftActions}>
-          <Pressable 
-            style={styles.actionButton} 
+          <Pressable
+            style={styles.actionButton}
             onPress={() => handleVote(item)}
             disabled={isVoting}
           >
             {isVoting ? (
               <ActivityIndicator size="small" color={theme.colors.primary} />
             ) : (
-              <Ionicons 
-                name={isLiked ? "heart" : "heart-outline"} 
-                size={28} 
-                color={isLiked ? theme.colors.primary : "#fff"} 
+              <Ionicons
+                name={isLiked ? "heart" : "heart-outline"}
+                size={28}
+                color={isLiked ? theme.colors.primary : "#fff"}
               />
             )}
             {voteCount > 0 && (
-              <Text style={[styles.actionText, isLiked && { color: theme.colors.primary }]}>
+              <Text
+                style={[
+                  styles.actionText,
+                  isLiked && { color: theme.colors.primary },
+                ]}
+              >
                 {voteCount}
               </Text>
             )}
           </Pressable>
 
-          <Pressable 
+          <Pressable
             style={styles.actionButton}
             onPress={() => handleComment(item)}
           >
@@ -326,7 +341,7 @@ export default function VideosScreen() {
             )}
           </Pressable>
 
-          <Pressable 
+          <Pressable
             style={styles.actionButton}
             onPress={() => handleShare(item)}
           >
@@ -335,8 +350,14 @@ export default function VideosScreen() {
 
           {formatPayout(item.payout) ? (
             <View style={styles.payoutContainer}>
-              <Ionicons name="cash-outline" size={20} color={theme.colors.primary} />
-              <Text style={styles.payoutTextLarge}>{formatPayout(item.payout)}</Text>
+              <Ionicons
+                name="cash-outline"
+                size={20}
+                color={theme.colors.primary}
+              />
+              <Text style={styles.payoutTextLarge}>
+                {formatPayout(item.payout)}
+              </Text>
             </View>
           ) : null}
         </View>
