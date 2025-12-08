@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, ViewToken } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl, ViewToken, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Text } from '../ui/text';
 import { PostCard } from './PostCard';
 import { ActivityIndicator } from 'react-native';
@@ -7,6 +8,8 @@ import { useAuth } from '~/lib/auth-provider';
 import { useSnaps } from '~/lib/hooks/useSnaps';
 import { theme } from '~/lib/theme';
 import { ViewportTrackerProvider, useViewportTracker } from '~/lib/ViewportTracker';
+import { BadgedIcon } from '../ui/BadgedIcon';
+import { useNotificationContext } from '~/lib/notifications-context';
 import type { Discussion } from '@hiveio/dhive';
 
 interface FeedProps {
@@ -15,10 +18,12 @@ interface FeedProps {
 }
 
 function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
+  const router = useRouter();
   const { username, mutedList, blacklistedList } = useAuth();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
+  const { badgeCount } = useNotificationContext();
 
   // Handle pull-to-refresh
   const handleRefresh = React.useCallback(async () => {
@@ -74,11 +79,27 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     <View style={styles.separator} />
   ), []);
 
+  const handleNotificationsPress = React.useCallback(() => {
+    router.push('/(tabs)/notifications');
+  }, [router]);
+
   const ListHeaderComponent = React.useCallback(() => (
     <View style={styles.header}>
       <Text style={styles.headerText}>Feed</Text>
+      <Pressable 
+        onPress={handleNotificationsPress}
+        style={styles.notificationButton}
+        accessibilityRole="button"
+        accessibilityLabel={badgeCount > 0 ? `Notifications, ${badgeCount} unread` : "Notifications"}
+      >
+        <BadgedIcon 
+          name="notifications-outline" 
+          color={theme.colors.text} 
+          badgeCount={badgeCount} 
+        />
+      </Pressable>
     </View>
-  ), []);
+  ), [handleNotificationsPress, badgeCount]);
 
   const ListFooterComponent = isLoading ? (
     <View style={styles.footer}>
@@ -135,16 +156,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md, // Add horizontal padding back to header
-    paddingTop: theme.spacing.xxs, // Add top padding to prevent text cutoff
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.xxs,
   },
   headerText: {
     fontSize: theme.fontSizes.xxl,
     fontWeight: 'bold',
     color: theme.colors.text,
-    lineHeight: 40, // 32 + 8 for proper line height to prevent cutoff
+    lineHeight: 40,
     fontFamily: theme.fonts.bold,
+  },
+  notificationButton: {
+    padding: theme.spacing.xs,
   },
   separator: {
     height: 1,

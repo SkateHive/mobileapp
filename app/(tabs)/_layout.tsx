@@ -1,11 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
-import { StyleSheet, View, PanResponder, TouchableOpacity } from "react-native";
+import { StyleSheet, View, PanResponder } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useRef } from "react";
 import { theme } from "~/lib/theme";
-import { BadgedIcon } from "~/components/ui/BadgedIcon";
-import { useNotificationContext } from "~/lib/notifications-context";
 
 const TAB_ITEMS = [
   {
@@ -21,23 +19,16 @@ const TAB_ITEMS = [
     iconFamily: "Ionicons",
   },
   {
+    name: "create",
+    title: "Create",
+    icon: "add",
+    iconFamily: "Ionicons",
+    isCenter: true,
+  },
+  {
     name: "leaderboard",
     title: "Leaderboard",
     icon: "podium-outline",
-    iconFamily: "Ionicons",
-  },
-  // Wallet tab temporarily disabled for App Store review
-  // Will be re-enabled in future update with enhanced functionality
-  // {
-  //   name: "wallet",
-  //   title: "Wallet",
-  //   icon: "wallet-outline",
-  //   iconFamily: "Ionicons",
-  // },
-  {
-    name: "notifications",
-    title: "Notifications",
-    icon: "notifications-outline",
     iconFamily: "Ionicons",
   },
   {
@@ -50,7 +41,6 @@ const TAB_ITEMS = [
 
 export default function TabLayout() {
   const router = useRouter();
-  const { badgeCount } = useNotificationContext();
 
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
@@ -79,24 +69,21 @@ export default function TabLayout() {
     gestureContainer: {
       flex: 1,
     },
-    floatingButton: {
-      position: 'absolute',
-      bottom: 100,
-      right: 20,
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: '#000',
+    centerButtonContainer: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: theme.colors.background,
       borderWidth: 3,
       borderColor: theme.colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
-      elevation: 8,
+      marginBottom: 20,
       shadowColor: theme.colors.primary,
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.6,
-      shadowRadius: 12,
-      zIndex: 1000,
+      shadowOpacity: 0.5,
+      shadowRadius: 8,
+      elevation: 8,
     },
   });
 
@@ -109,8 +96,11 @@ export default function TabLayout() {
               headerShown: false,
               tabBarStyle: {
                 backgroundColor: theme.colors.background,
+                borderTopColor: theme.colors.border,
+                height: 60,
+                paddingBottom: 8,
               },
-              tabBarActiveTintColor: theme.colors.text,
+              tabBarActiveTintColor: theme.colors.primary,
               tabBarInactiveTintColor: theme.colors.gray,
               tabBarShowLabel: false,
               sceneStyle: { backgroundColor: theme.colors.background },
@@ -122,14 +112,22 @@ export default function TabLayout() {
                 name={tab.name}
                 options={{
                   title: tab.title,
-                  tabBarIcon: ({ color }) => (
-                    <TabBarIcon
-                      name={tab.icon}
-                      color={color}
-                      iconFamily={tab.iconFamily}
-                      showBadge={tab.name === "notifications"}
-                      badgeCount={tab.name === "notifications" ? badgeCount : 0}
-                    />
+                  tabBarIcon: ({ color, focused }) => (
+                    tab.isCenter ? (
+                      <View style={styles.centerButtonContainer}>
+                        <Ionicons 
+                          name="add" 
+                          size={32} 
+                          color={theme.colors.primary} 
+                        />
+                      </View>
+                    ) : (
+                      <TabBarIcon
+                        name={tab.icon}
+                        color={color}
+                        iconFamily={tab.iconFamily}
+                      />
+                    )
                   ),
                   ...(tab.name === "profile" && {
                     href: {
@@ -141,24 +139,15 @@ export default function TabLayout() {
               />
             ))}
             
-            {/* Hidden create tab - still accessible but not in tab bar */}
+            {/* Hidden notifications tab - accessible from header */}
             <Tabs.Screen
-              name="create"
+              name="notifications"
               options={{
                 href: null,
-                title: "Create",
+                title: "Notifications",
               }}
             />
           </Tabs>
-          
-          {/* Floating Create Button */}
-          <TouchableOpacity
-            style={styles.floatingButton}
-            onPress={() => router.push("/(tabs)/create")}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={40} color={theme.colors.primary} style={{ fontWeight: 'bold' }} />
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -169,14 +158,8 @@ function TabBarIcon(props: {
   name: string;
   color: string;
   iconFamily: "Ionicons";
-  showBadge?: boolean;
-  badgeCount?: number;
 }) {
-  const { name, color, showBadge = false, badgeCount = 0 } = props;
-
-  if (showBadge) {
-    return <BadgedIcon name={name} color={color} badgeCount={badgeCount} />;
-  }
+  const { name, color } = props;
 
   return (
     <Ionicons
