@@ -8,8 +8,6 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
-    "privacy": "public",
-    "privacyPolicyUrl": "https://skatehive.app/privacypolicy",
     "splash": {
       "image": "./assets/images/adaptive-icon.png",
       "resizeMode": "contain",
@@ -21,8 +19,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "icon": "./assets/images/icon-ios.png",
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": []
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication to protect your private keys."
@@ -40,7 +41,7 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
-      "package": "com.r4topunk.skatehiveapp",
+      "package": "com.skatehive.app",
       "versionCode": 1
     },
     "web": {
