@@ -1,5 +1,4 @@
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
 
 export interface ConvertedImage {
   uri: string;
@@ -41,13 +40,8 @@ export async function convertToJPEG(
   quality: number = 0.8
 ): Promise<ConvertedImage> {
   try {
-    // Verify file exists
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (!fileInfo.exists) {
-      throw new Error(`Image file not found: ${uri}`);
-    }
-
     // Convert to JPEG using ImageManipulator
+    // ImageManipulator will handle reading the file internally
     // Even for non-HEIC images, this ensures consistent JPEG output
     const result = await ImageManipulator.manipulateAsync(
       uri,
