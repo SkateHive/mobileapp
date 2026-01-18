@@ -36,7 +36,7 @@ import {
   getFeed, 
   getBalance,
   getRewards } from '../api';
-import { API_BASE_URL } from '../constants';
+import { API_BASE_URL, LEADERBOARD_API_URL } from '../constants';
 import type { Post } from '../types';
 
 interface ProfileData {
@@ -147,7 +147,7 @@ export function useLeaderboard() {
   return useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/leaderboard`);
+      const response = await fetch(LEADERBOARD_API_URL);
       if (!response.ok) {
         throw new Error('Failed to fetch leaderboard data');
       }
