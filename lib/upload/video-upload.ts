@@ -3,11 +3,18 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 interface VideoUploadResult {
   cid: string;
   gatewayUrl: string;
+  requestId?: string;
+  sourceApp?: string;
 }
 
 export interface VideoUploadOptions {
   creator: string;
   thumbnailUrl?: string;
+  // NEW: Optional fields for enhanced tracking (won't break older server versions)
+  userHP?: number;
+  appVersion?: string;
+  // Progress callback for UI updates (optional)
+  onProgress?: (progress: number, stage: string) => void;
 }
 
 interface TranscodeService {
@@ -92,6 +99,9 @@ export async function uploadVideoToWorker(
     // Get the dynamic transcoding URL from the status API
     const WORKER_API_URL = await getTranscodeUrl();
     
+    // Generate correlation ID for progress tracking
+    const correlationId = `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
+    
     // Create FormData for the upload
     const formData = new FormData();
     const fileData = {
@@ -101,6 +111,33 @@ export async function uploadVideoToWorker(
     } as any;
 
     formData.append('video', fileData);
+    
+    // REQUIRED: Creator username
+    formData.append('creator', options.creator);
+    
+    // SOURCE APP IDENTIFIER - Always send 'mobile' from mobile app
+    formData.append('source_app', 'mobile');
+    
+    // OPTIONAL: App version (for analytics)
+    if (options.appVersion) {
+      formData.append('app_version', options.appVersion);
+    }
+    
+    // OPTIONAL: User's Hive Power (for priority handling)
+    if (options.userHP !== undefined) {
+      formData.append('userHP', options.userHP.toString());
+    }
+    
+    // OPTIONAL: Thumbnail URL
+    if (options.thumbnailUrl) {
+      formData.append('thumbnail', options.thumbnailUrl);
+    }
+    
+    // OPTIONAL: Correlation ID for SSE progress tracking
+    formData.append('correlationId', correlationId);
+    
+    // OPTIONAL: Platform info
+    formData.append('platform', 'expo-react-native');
 
     const uploadResponse = await fetch(WORKER_API_URL, {
       method: 'POST',
