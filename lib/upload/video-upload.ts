@@ -51,25 +51,25 @@ interface TranscodeStatusResponse {
  */
 async function getTranscodeUrl(): Promise<string> {
   const STATUS_API_URL = 'https://api.skatehive.app/api/transcode/status';
-  
+
   try {
     const response = await fetch(STATUS_API_URL);
-    
+
     if (!response.ok) {
       throw new Error(`Status API request failed: ${response.status}`);
     }
-    
+
     const data: TranscodeStatusResponse = await response.json();
-    
+
     // Filter healthy services and sort by priority
     const healthyServices = data.services
       .filter(service => service.isHealthy)
       .sort((a, b) => a.priority - b.priority);
-    
+
     if (healthyServices.length === 0) {
       throw new Error('No healthy transcoding services available');
     }
-    
+
     // Return the transcoding URL of the highest priority healthy service
     return healthyServices[0].transcodeUrl;
   } catch (error) {
@@ -95,13 +95,13 @@ export async function uploadVideoToWorker(
   try {
     // Prevent device from sleeping during upload
     await activateKeepAwakeAsync('video-upload');
-    
+
     // Get the dynamic transcoding URL from the status API
     const WORKER_API_URL = await getTranscodeUrl();
-    
+
     // Generate correlation ID for progress tracking
     const correlationId = `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
-    
+
     // Create FormData for the upload
     const formData = new FormData();
     const fileData = {
@@ -111,31 +111,31 @@ export async function uploadVideoToWorker(
     } as any;
 
     formData.append('video', fileData);
-    
+
     // REQUIRED: Creator username
     formData.append('creator', options.creator);
-    
+
     // SOURCE APP IDENTIFIER - Always send 'mobile' from mobile app
     formData.append('source_app', 'mobile');
-    
+
     // OPTIONAL: App version (for analytics)
     if (options.appVersion) {
       formData.append('app_version', options.appVersion);
     }
-    
+
     // OPTIONAL: User's Hive Power (for priority handling)
     if (options.userHP !== undefined) {
       formData.append('userHP', options.userHP.toString());
     }
-    
+
     // OPTIONAL: Thumbnail URL
     if (options.thumbnailUrl) {
       formData.append('thumbnail', options.thumbnailUrl);
     }
-    
+
     // OPTIONAL: Correlation ID for SSE progress tracking
     formData.append('correlationId', correlationId);
-    
+
     // OPTIONAL: Platform info
     formData.append('platform', 'expo-react-native');
 
