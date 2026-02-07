@@ -1,4 +1,5 @@
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 
 export interface ConvertedImage {
   uri: string;
@@ -39,6 +40,12 @@ export async function convertToJPEG(
   uri: string,
   quality: number = 0.8
 ): Promise<ConvertedImage> {
+  // Verify file exists before attempting conversion (outside try to avoid double-wrapping error)
+  const fileInfo = await FileSystem.getInfoAsync(uri);
+  if (!fileInfo.exists) {
+    throw new Error(`Image file not found: ${uri}`);
+  }
+
   try {
     // Convert to JPEG using ImageManipulator
     // ImageManipulator will handle reading the file internally
