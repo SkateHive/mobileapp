@@ -381,81 +381,83 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               </View>
             )}
 
-            {/* Bottom bar */}
-            <View style={styles.bottomBar}>
-              {showSlider ? (
-                /* Voting slider mode - takes entire bottom bar */
-                <View style={styles.votingSliderContainer}>
-                  <VotingSlider
-                    value={voteWeight}
-                    onValueChange={setVoteWeight}
-                    minimumValue={1}
-                    maximumValue={100}
-                  />
-                  <View style={styles.sliderControls}>
-                    <Pressable
-                      style={styles.cancelVoteButton}
-                      onPress={() => setShowSlider(false)}
-                      disabled={isVoting}
-                    >
-                      <FontAwesome name="times" size={20} color={theme.colors.gray} />
-                    </Pressable>
-                    <Pressable
-                      style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
-                      onPress={() => handleVote(voteWeight)}
-                      disabled={isVoting}
-                    >
-                      {isVoting ? (
-                        <ActivityIndicator size="small" color={theme.colors.green} />
-                      ) : (
-                        <FontAwesome name="arrow-up" size={20} color={theme.colors.green} />
-                      )}
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                /* Normal bottom bar mode */
-                <>
-                  <Text style={[styles.payoutText, { color: parseFloat(calculateTotalValue()) > 0 ? theme.colors.green : theme.colors.gray }]}>
-                    ${calculateTotalValue()}
-                  </Text>
-                  
-                  <View style={styles.actionsContainer}>
-                    {/* Replies section - clickable to open conversation */}
-                    <Pressable onPress={handleConversationPress} style={styles.actionItem}>
-                      <FontAwesome name="comment-o" size={20} color={theme.colors.gray} />
-                      <Text style={styles.actionText}>{post.children}</Text>
-                    </Pressable>
-                    
-                    {/* Voting section */}
-                    <Pressable
-                      onPress={() => setShowSlider(true)}
-                      style={[styles.actionItem, isVoting && styles.disabledButton]}
-                      disabled={isVoting}
-                    >
-                      {isVoting ? (
-                        <ActivityIndicator 
-                          size="small" 
-                          color={isLiked ? theme.colors.green : theme.colors.gray}
-                        />
-                      ) : (
-                        <>
-                          <Text style={[styles.voteCount, { color: isLiked ? theme.colors.green : theme.colors.gray }]}>
-                            {voteCount}
-                          </Text>
-                          <FontAwesome
-                            name="arrow-up"
-                            size={20}
-                            color={isLiked ? theme.colors.green : theme.colors.gray}
-                          />
-                        </>
-                      )}
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </View>
           </View>
+        </View>
+
+        {/* Full-width action bar — outside mainLayout for better thumb reach */}
+        <View style={styles.bottomBar}>
+          {showSlider ? (
+            /* Voting slider mode - takes entire bottom bar */
+            <View style={styles.votingSliderContainer}>
+              <VotingSlider
+                value={voteWeight}
+                onValueChange={setVoteWeight}
+                minimumValue={1}
+                maximumValue={100}
+              />
+              <View style={styles.sliderControls}>
+                <Pressable
+                  style={styles.cancelVoteButton}
+                  onPress={() => setShowSlider(false)}
+                  disabled={isVoting}
+                >
+                  <FontAwesome name="times" size={22} color={theme.colors.gray} />
+                </Pressable>
+                <Pressable
+                  style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
+                  onPress={() => handleVote(voteWeight)}
+                  disabled={isVoting}
+                >
+                  {isVoting ? (
+                    <ActivityIndicator size="small" color={theme.colors.green} />
+                  ) : (
+                    <FontAwesome name="arrow-up" size={22} color={theme.colors.green} />
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            /* Normal bottom bar mode */
+            <>
+              <Text style={[styles.payoutText, { color: parseFloat(calculateTotalValue()) > 0 ? theme.colors.green : theme.colors.gray }]}>
+                ${calculateTotalValue()}
+              </Text>
+
+              <View style={styles.actionsContainer}>
+                {/* Replies section - clickable to open conversation */}
+                <Pressable onPress={handleConversationPress} style={styles.actionItem} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <FontAwesome name="comment-o" size={22} color={theme.colors.gray} />
+                  <Text style={styles.actionText}>{post.children}</Text>
+                </Pressable>
+
+                {/* Voting section */}
+                <Pressable
+                  onPress={() => setShowSlider(true)}
+                  style={[styles.actionItem, isVoting && styles.disabledButton]}
+                  disabled={isVoting}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                >
+                  {isVoting ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={isLiked ? theme.colors.green : theme.colors.gray}
+                    />
+                  ) : (
+                    <>
+                      <Text style={[styles.voteCount, { color: isLiked ? theme.colors.green : theme.colors.gray }]}>
+                        {voteCount}
+                      </Text>
+                      <FontAwesome
+                        name="arrow-up"
+                        size={22}
+                        color={isLiked ? theme.colors.green : theme.colors.gray}
+                      />
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </>
+          )}
         </View>
       </View>
 
@@ -660,8 +662,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.lightGray,
   },
   payoutText: {
     fontSize: theme.fontSizes.md, 
@@ -670,15 +674,16 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xxs,
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: 0,
-    borderRadius: theme.borderRadius.xs,
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(50, 205, 50, 0.06)',
   },
   actionText: {
     fontSize: theme.fontSizes.md,
@@ -704,32 +709,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 32,
+    height: 40,
     marginBottom: theme.spacing.xxs,
   },
   sliderControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xxs,
+    gap: theme.spacing.sm,
     marginLeft: theme.spacing.xs,
   },
   cancelVoteButton: {
-    padding: 2,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
   },
   confirmVoteButton: {
-    padding: 2,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
   },
   menuButton: {
-    padding: theme.spacing.xs,
+    padding: theme.spacing.sm,
     marginLeft: 'auto',
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalOverlay: {
     flex: 1,
