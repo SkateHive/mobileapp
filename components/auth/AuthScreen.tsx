@@ -47,7 +47,7 @@ export function AuthScreen() {
       await enterSpectatorMode();
 
       // Navigate and replace current route to prevent going back to login
-      router.replace('/(tabs)/feed');
+      router.replace('/(tabs)/videos');
     } catch (error) {
       console.error('Error entering spectator mode:', error);
       setMessage('Error entering spectator mode');
@@ -66,7 +66,7 @@ export function AuthScreen() {
       await login(username, password, method, pin);
 
       // Navigate and replace current route to prevent going back to login
-      router.replace('/(tabs)/feed');
+      router.replace('/(tabs)/videos');
     } catch (error: any) {
       // Handle specific error types
       if (error instanceof InvalidKeyFormatError ||
@@ -89,7 +89,7 @@ export function AuthScreen() {
       await loginStoredUser(selectedUsername, pin);
       
       // Navigate and replace current route to prevent going back to login
-      router.replace('/(tabs)/feed');
+      router.replace('/(tabs)/videos');
     } catch (error) {
       if (error instanceof InvalidKeyFormatError ||
           error instanceof AccountNotFoundError ||

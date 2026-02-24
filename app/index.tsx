@@ -34,7 +34,7 @@ export default function Index() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.push("/(tabs)/feed");
+      router.push("/(tabs)/videos");
     }
   }, [isAuthenticated]);
 

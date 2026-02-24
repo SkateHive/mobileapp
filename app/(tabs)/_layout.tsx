@@ -15,15 +15,15 @@ interface TabItem {
 
 const TAB_ITEMS: TabItem[] = [
   {
-    name: "feed",
-    title: "Feed",
+    name: "videos",
+    title: "Videos",
     icon: "home-outline",
     iconFamily: "Ionicons",
   },
   {
-    name: "videos",
-    title: "Videos",
-    icon: "film-outline",
+    name: "feed",
+    title: "Feed",
+    icon: "reader-outline",
     iconFamily: "Ionicons",
   },
   {
