@@ -1,17 +1,14 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { AuthScreen } from '~/components/auth/AuthScreen';
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
 
+// Login form is now embedded in the index screen.
+// This redirect ensures any navigation to /login goes to the right place.
 export default function LoginPage() {
-  return (
-    <View style={styles.container}>
-      <AuthScreen />
-    </View>
-  );
-}
+  const router = useRouter();
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
+  useEffect(() => {
+    router.replace('/');
+  }, [router]);
+
+  return null;
+}

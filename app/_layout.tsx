@@ -50,7 +50,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       // User is not authenticated but trying to access protected routes
       // Redirect to login
       // console.log('User logged out, redirecting to login...');
-      router.replace('/login');
+      router.replace('/');
     }
   }, [isAuthenticated, isLoading, segments, router]);
 

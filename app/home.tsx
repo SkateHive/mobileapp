@@ -13,7 +13,7 @@ export default function Home() {
       router.replace('/(tabs)/videos');
     } else {
       // Not authenticated, go to login
-      router.replace('/login');
+      router.replace('/');
     }
   }, [isAuthenticated, router]);
 

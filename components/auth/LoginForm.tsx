@@ -149,8 +149,6 @@ export function LoginForm({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
-
       {/* PIN input for quick login - show only this when active */}
       {showPinInput && quickLoginUser && quickLoginUser.method === 'pin' ? (
         <View style={styles.section}>
@@ -165,8 +163,8 @@ export function LoginForm({
             style={styles.input}
             placeholderTextColor={theme.colors.muted}
           />
-          <Button onPress={handleQuickPinSubmit} style={styles.button}>
-            <Text>Login</Text>
+          <Button onPress={handleQuickPinSubmit} style={[styles.button, styles.loginButton]}>
+            <Text style={styles.loginButtonText}>Login</Text>
           </Button>
           <Pressable onPress={handleCancelPinInput} style={styles.backLink}>
             <Text style={styles.backText}>← Back</Text>
@@ -174,10 +172,9 @@ export function LoginForm({
         </View>
       ) : (
         <>
-          {/* Show stored users if they exist and we're not showing new user form */}
+          {/* Stored users list */}
           {hasStoredUsers && !shouldShowNewUserForm && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Welcome Back</Text>
               <StoredUsersView
                 users={storedUsers}
                 onQuickLogin={handleQuickLogin}
@@ -186,8 +183,6 @@ export function LoginForm({
               {deletingUser && (
                 <Text style={styles.deletingText}>Deleting @{deletingUser}...</Text>
               )}
-              
-              {/* Add user link */}
               <Pressable onPress={handleAddUserPress} style={styles.addUserLink}>
                 <Text style={styles.addUserText}>+ Add a new user</Text>
               </Pressable>
@@ -197,10 +192,6 @@ export function LoginForm({
           {/* New user form */}
           {shouldShowNewUserForm && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                {hasStoredUsers ? 'Add New User' : 'Login with Hive'}
-              </Text>
-              
               <Input
                 placeholder="Hive Username"
                 value={username}
@@ -222,7 +213,7 @@ export function LoginForm({
                 textContentType="password"
               />
 
-              {/* Biometric/PIN Toggle - only show if device has biometric capabilities */}
+              {/* Biometric/PIN Toggle */}
               {(deviceAuth.hasBiometric || deviceAuth.hasDevicePin) && (
                 <View style={styles.authMethodContainer}>
                   <Text style={styles.authMethodLabel}>Authentication Method:</Text>
@@ -259,7 +250,6 @@ export function LoginForm({
                 </View>
               )}
 
-              {/* PIN input - always show when method is PIN */}
               {method === 'pin' && (
                 <Input
                   placeholder="Set 6-digit APP PIN"
@@ -273,7 +263,6 @@ export function LoginForm({
                 />
               )}
 
-              {/* Biometric info text */}
               {method === 'biometric' && (
                 <Text style={styles.biometricInfo}>
                   Your posting key will be secured with {deviceAuth.hasBiometric ? 'biometric authentication' : 'device PIN'}
@@ -289,7 +278,7 @@ export function LoginForm({
                   {isLoading ? 'Logging in...' : 'Login'}
                 </Text>
               </Button>
-              
+
               {hasStoredUsers && (
                 <Pressable onPress={handleBackToStoredUsers} style={styles.backLink}>
                   <Text style={styles.backText}>← Back to stored users</Text>
@@ -299,19 +288,17 @@ export function LoginForm({
           )}
 
           <Pressable
-            onPress={() => WebBrowser.openBrowserAsync('https://hive.io')}
-            style={styles.createAccountLink}
+            onPress={onSpectator}
+            style={styles.secondaryButton}
           >
-            <Text style={styles.createAccountText}>
-              More info on hive.io
-            </Text>
+            <Text style={styles.secondaryButtonText}>Enter as Spectator</Text>
           </Pressable>
 
           <Pressable
-            onPress={onSpectator}
-            style={styles.spectatorButton}
+            onPress={() => WebBrowser.openBrowserAsync('https://hive.io')}
+            style={styles.secondaryButton}
           >
-            <Text style={styles.spectatorButtonText}>Enter as Spectator</Text>
+            <Text style={styles.secondaryButtonText}>More info</Text>
           </Pressable>
         </>
       )}
@@ -325,7 +312,6 @@ export function LoginForm({
         </Text>
       ) : null}
 
-      {/* Simple loading indicator instead of full screen overlay */}
       {isLoading && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Authenticating...</Text>
@@ -340,27 +326,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     flexDirection: 'column',
-    gap: theme.spacing.xs,
-  },
-  title: {
-    fontSize: theme.fontSizes.xxxl,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.lg * 2,
-    fontFamily: theme.fonts.bold,
-    paddingTop: theme.spacing.sm, // Add padding to prevent cutoff
-    lineHeight: 40, // Ensure proper line height
+    gap: 2,
   },
   section: {
-    marginBottom: theme.spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: '600',
-    marginBottom: theme.spacing.sm,
-    color: theme.colors.text,
-    fontFamily: theme.fonts.bold,
+    marginBottom: theme.spacing.xs,
   },
   deletingText: {
     fontSize: theme.fontSizes.xs,
@@ -368,8 +337,8 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
   addUserLink: {
-    marginTop: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
   },
   addUserText: {
     fontSize: theme.fontSizes.md,
@@ -378,7 +347,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   backLink: {
-    marginBottom: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
     paddingVertical: theme.spacing.xs,
   },
   backText: {
@@ -397,65 +366,42 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     borderRadius: theme.spacing.sm,
     color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   button: {
-    marginTop: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
   },
   loginButton: {
     backgroundColor: theme.colors.primary,
-    marginTop: theme.spacing.sm,
-  },
-  buttonText: {
-    color: theme.colors.text,
-    fontWeight: '500',
-    fontSize: theme.fontSizes.md,
-    fontFamily: theme.fonts.regular,
-    textAlign: 'center',
-    lineHeight: 20, // Explicit line height to prevent clipping
   },
   loginButtonText: {
     color: theme.colors.background,
-    fontWeight: '500',
+    fontWeight: '600',
     fontSize: theme.fontSizes.md,
-    fontFamily: theme.fonts.regular,
+    fontFamily: theme.fonts.bold,
     textAlign: 'center',
-    lineHeight: 20, // Explicit line height to prevent clipping
+    lineHeight: 20,
   },
-  spectatorButton: {
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
+  secondaryButton: {
+    marginTop: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: theme.spacing.sm,
   },
-  spectatorButtonText: {
+  secondaryButtonText: {
     color: theme.colors.text,
     fontSize: theme.fontSizes.md,
     fontWeight: '500',
     fontFamily: theme.fonts.regular,
     textAlign: 'center',
-    paddingVertical: 4, // Small padding to ensure text isn't clipped
-  },
-  createAccountLink: {
-    marginTop: theme.spacing.sm,
-    paddingVertical: theme.spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createAccountText: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSizes.sm,
-    fontFamily: theme.fonts.regular,
-    textDecorationLine: 'underline',
   },
   message: {
     textAlign: 'center',
-    marginHorizontal: theme.spacing.lg * 2.5,
-    marginTop: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+    fontSize: theme.fontSizes.sm,
   },
   successMessage: {
     color: '#22c55e',
@@ -465,7 +411,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     alignItems: 'center',
-    marginTop: theme.spacing.md,
+    marginTop: theme.spacing.xs,
   },
   loadingText: {
     color: theme.colors.text,
@@ -473,7 +419,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
   },
   authMethodContainer: {
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   authMethodLabel: {
     fontSize: theme.fontSizes.sm,
@@ -509,7 +455,7 @@ const styles = StyleSheet.create({
   biometricInfo: {
     fontSize: theme.fontSizes.xs,
     color: theme.colors.muted,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
     textAlign: 'center',
     fontFamily: theme.fonts.regular,
   },
