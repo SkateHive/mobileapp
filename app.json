@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon-ios.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/adaptive-icon.png",
       "resizeMode": "contain",

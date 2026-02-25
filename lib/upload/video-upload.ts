@@ -10,11 +10,9 @@ interface VideoUploadResult {
 export interface VideoUploadOptions {
   creator: string;
   thumbnailUrl?: string;
-  // NEW: Optional fields for enhanced tracking (won't break older server versions)
+  // Optional fields for enhanced tracking (won't break older server versions)
   userHP?: number;
   appVersion?: string;
-  // Progress callback for UI updates (optional)
-  onProgress?: (progress: number, stage: string) => void;
 }
 
 interface TranscodeService {
