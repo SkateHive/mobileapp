@@ -1,16 +1,23 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack, useRouter, useSegments, useFocusEffect } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, FiraCode_400Regular, FiraCode_700Bold } from '@expo-google-fonts/fira-code';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
 import { ViewportTrackerProvider } from '~/lib/ViewportTracker';
 import { NotificationProvider } from '~/lib/notifications-context';
 import { theme } from '~/lib/theme';
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+});
 
 // Keep splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();
@@ -72,13 +79,6 @@ export default function RootLayout() {
   if (!fontsLoaded) {
     return null;
   }
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background, // Always black background
-    },
-  });
 
   return (
     <QueryClientProvider client={queryClient}>

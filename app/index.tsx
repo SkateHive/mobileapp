@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import React from "react";
@@ -24,6 +25,7 @@ import {
   InvalidKeyError,
   InvalidKeyFormatError,
 } from "~/lib/hive-utils";
+import { prefetchVideoFeed, warmUpVideoAssets } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 
 // Enable LayoutAnimation for Android
@@ -63,12 +65,19 @@ export default function Index() {
     enterSpectatorMode,
     deleteStoredUser,
   } = useAuth();
+  const queryClient = useQueryClient();
 
   const [deletingUser, setDeletingUser] = React.useState<string | null>(null);
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [isFormVisible, setIsFormVisible] = React.useState(false);
+
+  // Prefetch video feed + warm HTTP cache while user is on login screen
+  React.useEffect(() => {
+    prefetchVideoFeed(queryClient);
+    warmUpVideoAssets(queryClient);
+  }, [queryClient]);
 
   React.useEffect(() => {
     if (isAuthenticated) {

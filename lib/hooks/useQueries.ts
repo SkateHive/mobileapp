@@ -1,43 +1,129 @@
-import React, { useState } from 'react';
-// Paginated feed hook for infinite scroll
-export function useFeedPaginated(page: number, limit: number) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [posts, setPosts] = useState<Post[]>([]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    const fetchPage = async () => {
-      setIsLoading(true);
-      try {
-        const newPosts = await getFeed(page, limit);
-        if (!cancelled) {
-          setPosts(prev => {
-            // Deduplicate by permlink
-            const permlinks = new Set(prev.map(p => p.permlink));
-            const unique = newPosts.filter(p => !permlinks.has(p.permlink));
-            if (unique.length === 0) setHasMore(false);
-            return [...prev, ...unique];
-          });
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-    fetchPage();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
-  return { posts, isLoading, hasMore };
-}
-import { useQuery } from '@tanstack/react-query';
-import { 
-  getFeed, 
+import { useQuery, QueryClient } from '@tanstack/react-query';
+import {
+  getFeed,
   getBalance,
   getRewards } from '../api';
 import { API_BASE_URL, LEADERBOARD_API_URL } from '../constants';
+import { extractMediaFromBody } from '../utils';
 import type { Post } from '../types';
+
+// ============================================================================
+// VIDEO FEED — shared query for prefetch on login + use on videos tab
+// ============================================================================
+
+export interface VideoPost {
+  videoUrl: string;
+  username: string;
+  permlink: string;
+  author: string;
+  title: string;
+  body: string;
+  created: string;
+  votes: number;
+  payout: string;
+  replies: number;
+  thumbnailUrl?: string;
+  tags: string[];
+  json_metadata: any;
+  active_votes: any[];
+}
+
+const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
+const VIDEO_FEED_STALE_TIME = 1000 * 60 * 2; // 2 minutes
+
+async function fetchVideoFeed(): Promise<VideoPost[]> {
+  const posts = await getFeed(1, 50);
+  const videoList: VideoPost[] = [];
+
+  posts.forEach((post: Post) => {
+    const media = extractMediaFromBody(post.body);
+    const videoMedia = media.filter((m) => m.type === 'video');
+    const rawPost = post as any;
+
+    if (videoMedia.length > 0) {
+      let metadata: any = {};
+      try {
+        metadata = typeof rawPost.json_metadata === 'string'
+          ? JSON.parse(rawPost.json_metadata)
+          : rawPost.json_metadata;
+      } catch (e) {
+        metadata = {};
+      }
+
+      const imageMedia = media.filter((m) => m.type === 'image');
+
+      videoMedia.forEach((video) => {
+        const thumbnail = metadata?.image?.[0] || imageMedia[0]?.url;
+        videoList.push({
+          videoUrl: video.url,
+          username: post.author,
+          permlink: post.permlink,
+          author: post.author,
+          title: post.title || '',
+          body: post.body || '',
+          created: post.created || '',
+          votes: rawPost.net_votes || 0,
+          payout: rawPost.pending_payout_value || rawPost.total_payout_value || '0.000 HBD',
+          replies: rawPost.children || 0,
+          thumbnailUrl: thumbnail,
+          tags: metadata?.tags || [],
+          json_metadata: metadata,
+          active_votes: rawPost.active_votes || [],
+        });
+      });
+    }
+  });
+
+  return videoList;
+}
+
+export function useVideoFeed() {
+  return useQuery({
+    queryKey: VIDEO_FEED_QUERY_KEY,
+    queryFn: fetchVideoFeed,
+    staleTime: VIDEO_FEED_STALE_TIME,
+  });
+}
+
+export function prefetchVideoFeed(queryClient: QueryClient) {
+  queryClient.prefetchQuery({
+    queryKey: VIDEO_FEED_QUERY_KEY,
+    queryFn: fetchVideoFeed,
+    staleTime: VIDEO_FEED_STALE_TIME,
+  });
+}
+
+/**
+ * Prefetch thumbnails and avatars while user is on login screen.
+ * Warms image cache so the videos tab renders instantly.
+ */
+export async function warmUpVideoAssets(queryClient: QueryClient) {
+  const { Image } = require('react-native');
+
+  const data = await queryClient.ensureQueryData({
+    queryKey: VIDEO_FEED_QUERY_KEY,
+    queryFn: fetchVideoFeed,
+    staleTime: VIDEO_FEED_STALE_TIME,
+  });
+
+  if (!data || data.length === 0) return;
+
+  // Prefetch thumbnails for the first 5 videos
+  const thumbnailUrls = data
+    .slice(0, 5)
+    .map((v: VideoPost) => v.thumbnailUrl)
+    .filter(Boolean) as string[];
+
+  thumbnailUrls.forEach((url: string) => {
+    Image.prefetch(url).catch(() => {});
+  });
+
+  // Prefetch avatar images
+  const avatarUrls = [...new Set(data.slice(0, 5).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
+  avatarUrls.forEach((url: string) => {
+    Image.prefetch(url).catch(() => {});
+  });
+}
 
 interface ProfileData {
   name: string;
@@ -84,8 +170,6 @@ const SPECTATOR_PROFILE: ProfileData = {
     }
   }
 };
-
-// Deprecated: useFeed is not compatible with paginated API. Use useFeedPaginated instead for infinite scroll.
 
 export function useBalance(username: string | null) {
   return useQuery({

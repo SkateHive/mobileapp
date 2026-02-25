@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
 import { StyleSheet, View, PanResponder } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRef } from "react";
 import { theme } from "~/lib/theme";
 
@@ -47,6 +47,32 @@ const TAB_ITEMS: TabItem[] = [
   },
 ];
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  gestureContainer: {
+    flex: 1,
+  },
+  centerButtonContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.background,
+    borderWidth: 3,
+    borderColor: theme.colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+});
+
 export default function TabLayout() {
   const router = useRouter();
 
@@ -69,36 +95,9 @@ export default function TabLayout() {
     })
   ).current;
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    gestureContainer: {
-      flex: 1,
-    },
-    centerButtonContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: theme.colors.background,
-      borderWidth: 3,
-      borderColor: theme.colors.primary,
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 20,
-      shadowColor: theme.colors.primary,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.5,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-  });
-
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.gestureContainer} {...panResponder.panHandlers}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.gestureContainer} {...panResponder.panHandlers}>
           <Tabs
             screenOptions={{
               headerShown: false,
@@ -157,7 +156,6 @@ export default function TabLayout() {
           </Tabs>
         </View>
       </SafeAreaView>
-    </SafeAreaProvider>
   );
 }
 
