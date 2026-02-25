@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, Image, StyleSheet } from 'react-native';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,19 +33,13 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
                 style={styles.userButton}
               >
                 <View style={styles.userInfo}>
-                  <Ionicons
-                    name="person-circle-outline"
-                    size={24}
-                    color={theme.colors.text}
+                  <Image
+                    source={{ uri: `https://images.hive.blog/u/${user.username}/avatar` }}
+                    style={styles.avatar}
                   />
-                  <View style={styles.userDetails}>
-                    <Text style={styles.username}>
-                      {'@' + user.username}
-                    </Text>
-                    <Text style={styles.authMethod}>
-                      {user.method === 'biometric' ? '🔒 Biometric' : '🔢 PIN'}
-                    </Text>
-                  </View>
+                  <Text style={styles.username}>
+                    {user.username}
+                  </Text>
                 </View>
                 <Ionicons
                   name="arrow-forward-outline"
@@ -101,20 +95,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  userDetails: {
-    marginLeft: theme.spacing.sm,
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.border,
   },
   username: {
     fontSize: theme.fontSizes.lg,
     fontWeight: '500',
     color: theme.colors.text,
     fontFamily: theme.fonts.regular,
-  },
-  authMethod: {
-    fontSize: theme.fontSizes.xs,
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
-    marginTop: theme.spacing.xxs,
+    marginLeft: theme.spacing.sm,
   },
   deleteButton: {
     marginLeft: theme.spacing.sm,

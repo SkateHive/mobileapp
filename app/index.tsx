@@ -14,7 +14,6 @@ import {
   StyleSheet,
 } from "react-native";
 import { LoginForm } from "~/components/auth/LoginForm";
-import { Text } from "~/components/ui/text";
 import {
   AuthError,
   useAuth,
@@ -185,15 +184,15 @@ export default function Index() {
         </View>
       </Pressable>
 
-      {/* Faux gradient — stacked bands from transparent to opaque */}
-      <View style={styles.fadeContainer} pointerEvents="none">
-        <View style={[styles.fadeBand, { opacity: 0.0 }]} />
-        <View style={[styles.fadeBand, { opacity: 0.15 }]} />
-        <View style={[styles.fadeBand, { opacity: 0.35 }]} />
-        <View style={[styles.fadeBand, { opacity: 0.55 }]} />
-        <View style={[styles.fadeBand, { opacity: 0.75 }]} />
-        <View style={[styles.fadeBand, { opacity: 0.9 }]} />
-        <View style={[styles.fadeBand, { flex: 3, opacity: 1 }]} />
+      {/* Dark fade over video so form text is readable */}
+      <View style={styles.fadeOverlay} pointerEvents="none">
+        <View style={[styles.fadeBand, { opacity: 0 }]} />
+        <View style={[styles.fadeBand, { opacity: 0.08 }]} />
+        <View style={[styles.fadeBand, { opacity: 0.18 }]} />
+        <View style={[styles.fadeBand, { opacity: 0.32 }]} />
+        <View style={[styles.fadeBand, { opacity: 0.48 }]} />
+        <View style={[styles.fadeBand, { opacity: 0.62 }]} />
+        <View style={[styles.fadeBand, { flex: 2, opacity: 0.82 }]} />
       </View>
 
       <KeyboardAvoidingView
@@ -229,7 +228,6 @@ export default function Index() {
               deletingUser={deletingUser}
             />
           </View>
-          <Text style={styles.alphaText}>Alpha</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -259,12 +257,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 8,
   },
-  fadeContainer: {
+  fadeOverlay: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "65%",
+    height: "60%",
     flexDirection: "column",
   },
   fadeBand: {
@@ -289,10 +287,5 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 400,
     alignItems: "center",
-  },
-  alphaText: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.4)",
-    marginTop: 12,
   },
 });

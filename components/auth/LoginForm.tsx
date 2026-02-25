@@ -6,6 +6,7 @@ import { Text } from "../ui/text";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { StoredUsersView } from "./StoredUsersView";
+import { PinInput } from "../ui/PinInput";
 import { theme } from "~/lib/theme";
 import { hasDeviceAuthentication } from '~/lib/secure-key';
 import type { EncryptionMethod, StoredUser } from '../../lib/types';
@@ -151,21 +152,14 @@ export function LoginForm({
     <View style={styles.container}>
       {/* PIN input for quick login - show only this when active */}
       {showPinInput && quickLoginUser && quickLoginUser.method === 'pin' ? (
-        <View style={styles.section}>
-          <Text style={styles.pinPrompt}>Enter 6-digit PIN for @{quickLoginUser.username}</Text>
-          <Input
-            placeholder="PIN"
+        <View style={styles.pinSection}>
+          <Text style={styles.pinPrompt}>Enter PIN for @{quickLoginUser.username}</Text>
+          <PinInput
             value={quickPin}
             onChangeText={setQuickPin}
-            keyboardType="number-pad"
-            maxLength={6}
-            secureTextEntry
-            style={styles.input}
-            placeholderTextColor={theme.colors.muted}
+            onComplete={handleQuickPinSubmit}
+            autoFocus
           />
-          <Button onPress={handleQuickPinSubmit} style={[styles.button, styles.loginButton]}>
-            <Text style={styles.loginButtonText}>Login</Text>
-          </Button>
           <Pressable onPress={handleCancelPinInput} style={styles.backLink}>
             <Text style={styles.backText}>← Back</Text>
           </Pressable>
@@ -251,15 +245,9 @@ export function LoginForm({
               )}
 
               {method === 'pin' && (
-                <Input
-                  placeholder="Set 6-digit APP PIN"
+                <PinInput
                   value={pin}
                   onChangeText={setPin}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  secureTextEntry
-                  style={styles.input}
-                  placeholderTextColor={theme.colors.muted}
                 />
               )}
 
@@ -287,18 +275,20 @@ export function LoginForm({
             </View>
           )}
 
-          <Pressable
-            onPress={onSpectator}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>Enter as Spectator</Text>
-          </Pressable>
+          {!hasStoredUsers && (
+            <Pressable
+              onPress={onSpectator}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>Enter as Spectator</Text>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={() => WebBrowser.openBrowserAsync('https://hive.io')}
-            style={styles.secondaryButton}
+            style={styles.textLink}
           >
-            <Text style={styles.secondaryButtonText}>More info</Text>
+            <Text style={styles.textLinkText}>More info</Text>
           </Pressable>
         </>
       )}
@@ -330,6 +320,10 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: theme.spacing.xs,
+  },
+  pinSection: {
+    marginBottom: 80,
+    alignItems: 'center',
   },
   deletingText: {
     fontSize: theme.fontSizes.xs,
@@ -451,6 +445,17 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: theme.colors.background,
     fontFamily: theme.fonts.bold,
+  },
+  textLink: {
+    marginTop: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  textLinkText: {
+    color: theme.colors.muted,
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.regular,
+    textDecorationLine: 'underline',
   },
   biometricInfo: {
     fontSize: theme.fontSizes.xs,
