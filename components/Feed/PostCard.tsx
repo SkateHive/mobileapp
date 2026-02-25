@@ -13,8 +13,15 @@ import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
-import { ConversationDrawer } from './ConversationDrawer';
-import { FullConversationDrawer } from './FullConversationDrawer';
+// Lazy imports break the require cycle:
+// PostCard → ConversationDrawer → PostCard
+// PostCard → FullConversationDrawer → PostCard
+const ConversationDrawer = React.lazy(() =>
+  import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
+);
+const FullConversationDrawer = React.lazy(() =>
+  import('./FullConversationDrawer').then(m => ({ default: m.FullConversationDrawer }))
+);
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
 import type { Media } from '../../lib/types';
@@ -462,18 +469,26 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
       </View>
 
       {/* Conversation Drawer - Quick reply only */}
-      <ConversationDrawer
-        visible={isConversationDrawerVisible}
-        onClose={() => setIsConversationDrawerVisible(false)}
-        discussion={post}
-      />
+      {isConversationDrawerVisible && (
+        <React.Suspense fallback={null}>
+          <ConversationDrawer
+            visible={isConversationDrawerVisible}
+            onClose={() => setIsConversationDrawerVisible(false)}
+            discussion={post}
+          />
+        </React.Suspense>
+      )}
 
       {/* Full Conversation Drawer - Entire conversation thread */}
-      <FullConversationDrawer
-        visible={isFullConversationVisible}
-        onClose={() => setIsFullConversationVisible(false)}
-        discussion={post}
-      />
+      {isFullConversationVisible && (
+        <React.Suspense fallback={null}>
+          <FullConversationDrawer
+            visible={isFullConversationVisible}
+            onClose={() => setIsFullConversationVisible(false)}
+            discussion={post}
+          />
+        </React.Suspense>
+      )}
 
       {/* User Menu Modal */}
       <Modal
