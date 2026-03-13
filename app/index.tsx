@@ -81,7 +81,7 @@ export default function Index() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.replace("/(tabs)/videos");
+      router.push("/(tabs)/videos");
     }
   }, [isAuthenticated]);
 
@@ -116,22 +116,19 @@ export default function Index() {
       }
       await login(username, password, method, pin);
       router.replace("/(tabs)/videos");
-      } catch (error: any) {
-        if (
-          error instanceof InvalidKeyFormatError ||
-          error instanceof AccountNotFoundError ||
-          error instanceof InvalidKeyError ||
-          error instanceof AuthError ||
-          error instanceof HiveError
-        ) {
-          // Suppress biometric failure messages as requested
-          if (!error.message.includes('Biometric authentication')) {
-            setMessage(error.message);
-          }
-        } else {
-          setMessage("An unexpected error occurred");
-        }
+    } catch (error: any) {
+      if (
+        error instanceof InvalidKeyFormatError ||
+        error instanceof AccountNotFoundError ||
+        error instanceof InvalidKeyError ||
+        error instanceof AuthError ||
+        error instanceof HiveError
+      ) {
+        setMessage(error.message);
+      } else {
+        setMessage("An unexpected error occurred");
       }
+    }
   };
 
   const handleQuickLogin = async (
@@ -150,11 +147,7 @@ export default function Index() {
         error instanceof AuthError ||
         error instanceof HiveError
       ) {
-        // Suppress biometric failure messages as requested
-        const msg = (error as Error).message;
-        if (!msg.includes('Biometric authentication')) {
-          setMessage(msg);
-        }
+        setMessage((error as Error).message);
       } else {
         setMessage("Error with quick login");
       }
@@ -173,7 +166,7 @@ export default function Index() {
     <View style={styles.container}>
       <BackgroundVideo />
 
-      <Pressable onPress={handleInfoPress} style={styles.infoButton} accessibilityRole="button" accessibilityLabel="More Info">
+      <Pressable onPress={handleInfoPress} style={styles.infoButton}>
         <View style={styles.infoButtonContent}>
           <Ionicons
             name="information-circle-outline"
@@ -197,13 +190,11 @@ export default function Index() {
       <KeyboardAvoidingView
         style={styles.formWrapper}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        pointerEvents="box-none"
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          pointerEvents="box-none"
         >
           <View style={styles.spacer} />
           <View
@@ -240,17 +231,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 0,
+    zIndex: -1,
   },
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: theme.colors.background,
   },
   infoButton: {
     position: "absolute",
     top: 48,
     right: 24,
-    zIndex: 999,
+    zIndex: 10,
   },
   infoButtonContent: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
@@ -264,7 +255,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: "60%",
     flexDirection: "column",
-    zIndex: 1,
+    zIndex: 0,
   },
   fadeBand: {
     flex: 1,
@@ -272,7 +263,7 @@ const styles = StyleSheet.create({
   },
   formWrapper: {
     flex: 1,
-    zIndex: 2,
+    zIndex: 1,
   },
   scrollContent: {
     flexGrow: 1,
