@@ -18,12 +18,10 @@ import { CommentBottomSheet } from '../ui/CommentBottomSheet';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
 // Lazy imports break the require cycle:
 // PostCard → ConversationDrawer → PostCard
-// PostCard → FullConversationDrawer → PostCard
+// Lazy load heavy components
+// No longer loading FullConversationDrawer here — it's managed by the parent (Feed/Profile)
 const ConversationDrawer = React.lazy(() =>
   import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
-);
-const FullConversationDrawer = React.lazy(() =>
-  import('./FullConversationDrawer').then(m => ({ default: m.FullConversationDrawer }))
 );
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
@@ -57,10 +55,11 @@ const formatTimeAbbreviated = (date: Date): string => {
 interface PostCardProps {
   post: Discussion;
   currentUsername: string | null;
+  onOpenConversation?: (post: Discussion) => void;
 }
 
 
-export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
+export const PostCard = React.memo(({ post, currentUsername, onOpenConversation }: PostCardProps) => {
   const { isScrollLocked, setScrollLocked } = useScrollLock();
   const { session, followingList, updateUserRelationship } = useAuth();
   const [isFollowing, setIsFollowing] = useState(false);
@@ -73,7 +72,6 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
   const [isCommentSheetVisible, setIsCommentSheetVisible] = useState(false);
-  const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState('');
@@ -272,7 +270,9 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   };
 
   const handleBodyPress = () => {
-    setIsFullConversationVisible(true);
+    if (onOpenConversation) {
+      onOpenConversation(post);
+    }
   };
 
   const handleUserMenuPress = () => {
@@ -540,16 +540,6 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         }}
       />
 
-      {/* Full Conversation Drawer - Entire conversation thread */}
-      {isFullConversationVisible && (
-        <React.Suspense fallback={null}>
-          <FullConversationDrawer
-            visible={isFullConversationVisible}
-            onClose={() => setIsFullConversationVisible(false)}
-            discussion={post}
-          />
-        </React.Suspense>
-      )}
 
       {/* User Menu Modal */}
       <Modal

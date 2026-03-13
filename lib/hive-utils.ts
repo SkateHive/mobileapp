@@ -990,16 +990,36 @@ export async function getUserRelationshipList(
   limit: number = 1000
 ): Promise<string[]> {
   try {
-    // Use the traditional follow_api for getting full lists
-    const result = await HiveClient.call('follow_api', 'get_following', [
-      username,
-      startFollowing,
-      type,
-      limit,
-    ]);
+    const allUsernames: string[] = [];
+    let lastUsername = startFollowing;
+    const pageSize = Math.min(limit, 1000); // Hive API caps at 1000
 
-    // Extract usernames from the result
-    return result.map((item: any) => item.following);
+    // Paginate through all results
+    while (true) {
+      const result = await HiveClient.call('follow_api', 'get_following', [
+        username,
+        lastUsername,
+        type,
+        pageSize,
+      ]);
+
+      if (!result || result.length === 0) break;
+
+      const usernames: string[] = result.map((item: any) => item.following);
+
+      // If we provided a startFollowing, the first result is inclusive (skip it to avoid duplicates)
+      const newUsernames = lastUsername ? usernames.slice(1) : usernames;
+
+      if (newUsernames.length === 0) break;
+
+      allUsernames.push(...newUsernames);
+      lastUsername = usernames[usernames.length - 1];
+
+      // If we got fewer results than the page size, we've reached the end
+      if (result.length < pageSize) break;
+    }
+
+    return allUsernames;
   } catch (error) {
     console.error('Error fetching user relationship list:', error);
     return [];
