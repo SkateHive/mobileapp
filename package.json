@@ -1,7 +1,7 @@
 {
-  "name": "mycommunity-app",
+  "name": "skatehive-app",
   "main": "index.js",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "scripts": {
     "dev": "expo start -c",
     "dev:web": "expo start -c --web",
@@ -10,7 +10,7 @@
     "ios": "expo run:ios",
     "web": "expo start -c --web",
     "clean": "rm -rf .expo node_modules",
-    "build": "expo build",
+    "build": "eas build",
     "start": "expo start --dev-client"
   },
   "dependencies": {
