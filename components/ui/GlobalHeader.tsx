@@ -15,11 +15,12 @@ interface GlobalHeaderProps {
   onOpenMenu: () => void;
   title?: string;
   centerComponent?: React.ReactNode;
-  showSettings?: boolean;
 }
 
-export function GlobalHeader({ onOpenMenu, title = "Skatehive", centerComponent, showSettings }: GlobalHeaderProps) {
+export function GlobalHeader({ onOpenMenu, title = "Skatehive", centerComponent }: GlobalHeaderProps) {
   const router = useRouter();
+  const { username } = useAuth();
+  const { hiveAccount } = useHiveAccount(username || "");
   const { badgeCount } = useNotificationContext();
 
   const handleSearchPress = () => {
@@ -30,11 +31,40 @@ export function GlobalHeader({ onOpenMenu, title = "Skatehive", centerComponent,
     router.push("/(tabs)/notifications" as any);
   };
 
+  const renderAvatar = () => {
+    if (!username || username === "SPECTATOR") {
+      return (
+        <View style={styles.defaultAvatar}>
+          <Ionicons name="person" size={20} color={theme.colors.text} />
+        </View>
+      );
+    }
+
+    const profileImage = hiveAccount?.metadata?.profile?.profile_image;
+    const hiveAvatarUrl = `https://images.hive.blog/u/${username}/avatar/small`;
+
+    if (profileImage) {
+      return <Image source={{ uri: profileImage }} style={styles.avatar} transition={200} />;
+    }
+
+    return <Image source={{ uri: hiveAvatarUrl }} style={styles.avatar} transition={200} />;
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Left: Notifications */}
-        <View style={styles.leftAction}>
+        {/* Left: Avatar / Menu Trigger */}
+        <Pressable onPress={onOpenMenu} style={styles.leftAction} accessibilityRole="button" accessibilityLabel="Open Menu">
+          {renderAvatar()}
+        </Pressable>
+
+        {/* Center: Title, Logo or Custom Component */}
+        <View style={styles.centerContent}>
+          {centerComponent || <Text style={styles.titleText}>{title}</Text>}
+        </View>
+
+        {/* Right: Notifications & Search */}
+        <View style={styles.rightActions}>
           <Pressable 
             onPress={handleNotificationsPress} 
             style={styles.iconButton} 
@@ -43,34 +73,9 @@ export function GlobalHeader({ onOpenMenu, title = "Skatehive", centerComponent,
           >
             <BadgedIcon name="notifications-outline" size={24} color={theme.colors.text} badgeCount={badgeCount} />
           </Pressable>
-        </View>
-
-        {/* Center: Title, Logo or Custom Component */}
-        <View style={styles.centerContent}>
-          {centerComponent || <Text style={styles.titleText}>{title}</Text>}
-        </View>
-
-        {/* Right: Search or Settings */}
-        <View style={styles.rightActions}>
-          {showSettings ? (
-            <Pressable 
-              onPress={onOpenMenu} 
-              style={styles.iconButton} 
-              accessibilityRole="button" 
-              accessibilityLabel="Settings"
-            >
-              <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
-            </Pressable>
-          ) : (
-            <Pressable 
-              onPress={handleSearchPress} 
-              style={styles.iconButton} 
-              accessibilityRole="button" 
-              accessibilityLabel="Search"
-            >
-              <Ionicons name="search" size={24} color={theme.colors.text} />
-            </Pressable>
-          )}
+          <Pressable onPress={handleSearchPress} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Search">
+            <Ionicons name="search" size={24} color={theme.colors.text} />
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>

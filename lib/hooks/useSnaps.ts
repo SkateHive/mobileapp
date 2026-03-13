@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG, getDiscussions } from '../hive-utils';
 import { Discussion } from '@hiveio/dhive';
 import { FeedFilterType } from '../FeedFilterContext';
@@ -12,14 +12,15 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
   const lastContainerRef = useRef<LastContainerInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [comments, setComments] = useState<ExtendedComment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [fetchTrigger, setFetchTrigger] = useState(0);
 
   // Clear comments when filter changes
   useEffect(() => {
     setComments([]);
+    setCurrentPage(1);
     setHasMore(true);
     lastContainerRef.current = null;
     fetchedPermlinksRef.current = new Set();
@@ -35,13 +36,13 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
           : commentItem.json_metadata;
         const tags = metadata.tags || [];
         return tags.includes(targetTag);
-      } catch {
+      } catch (error) {
         return false;
       }
     });
   }
 
-  // Fetch comments with progressive loading
+  // Fetch comments with progressive loading (show posts as found)
   async function getMoreSnaps(): Promise<ExtendedComment[]> {
     // MOCKED: For now, we only show the Curated feed regardless of filter
     const effectiveFilter = 'Curated';
@@ -75,12 +76,12 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
           for (const resultItem of result) {
             if (allPermlinks.has(resultItem.permlink)) continue;
             
-            const replies = await getContentReplies({
+            const comments = await getContentReplies({
               author: SNAPS_CONTAINER_AUTHOR,
               permlink: resultItem.permlink,
             });
             
-            const filteredComments = filterCommentsByTag(replies, tag);
+            const filteredComments = filterCommentsByTag(comments, tag);
             
             allPermlinks.add(resultItem.permlink);
             filteredComments.forEach(c => allPermlinks.add(c.permlink));
@@ -129,46 +130,51 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
     }
   }
 
-  // Single effect for all fetching
+  // Fetch posts when currentPage changes
   useEffect(() => {
-    let cancelled = false;
-
     const fetchPosts = async () => {
       setIsLoading(true);
       try {
         const newSnaps = await getMoreSnaps();
-        if (cancelled) return;
-
         setComments((prevPosts) => {
           const existingPermlinks = new Set(prevPosts.map((post) => post.permlink));
           const uniqueSnaps = newSnaps.filter((snap) => !existingPermlinks.has(snap.permlink));
+          // If no new unique snaps, set hasMore to false
           if (uniqueSnaps.length === 0) setHasMore(false);
           return [...prevPosts, ...uniqueSnaps];
         });
-      } catch {
-        if (!cancelled) setHasMore(false);
+      } catch (err) {
+        // Swallow error silently
       } finally {
-        if (!cancelled) setIsLoading(false);
+        setIsLoading(false);
       }
     };
-
     fetchPosts();
-    return () => { cancelled = true; };
-  }, [fetchTrigger]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
-  const loadNextPage = useCallback(() => {
+  // Load the next page
+  const loadNextPage = () => {
     if (!isLoading && hasMore) {
-      setFetchTrigger((t) => t + 1);
+      setCurrentPage((prevPage) => prevPage + 1);
     }
-  }, [isLoading, hasMore]);
+  };
 
-  const refresh = useCallback(() => {
+  // Refresh function to reset and reload
+  const refresh = async () => {
     lastContainerRef.current = null;
     fetchedPermlinksRef.current = new Set();
     setComments([]);
+    setCurrentPage(1);
     setHasMore(true);
-    setFetchTrigger((t) => t + 1);
-  }, []);
+    
+    // Wait a bit for state to settle then trigger a refetch
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 100);
+    });
+  };
 
-  return { comments, isLoading, loadNextPage, hasMore, refresh };
+  return { comments, isLoading, loadNextPage, hasMore, currentPage, refresh };
 }

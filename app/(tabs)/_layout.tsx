@@ -9,9 +9,6 @@ import { SideMenu } from "~/components/ui/SideMenu";
 import { FeedFilterProvider, useFeedFilter } from "~/lib/FeedFilterContext";
 import { Pressable, Text as RNText, Modal } from "react-native";
 import { Text } from "~/components/ui/text";
-import { useAuth } from "~/lib/auth-provider";
-import useHiveAccount from "~/lib/hooks/useHiveAccount";
-import { Image } from "expo-image";
 
 interface TabItem {
   name: string;
@@ -79,17 +76,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  avatarContainer: {
-    marginBottom: -10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
 });
 
 function FeedHeaderTitle() {
@@ -152,16 +138,6 @@ export default function TabLayout() {
   const router = useRouter();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const segments = useSegments();
-  const { username } = useAuth();
-  const { hiveAccount } = useHiveAccount(username || "");
-
-  const currentTab = segments[segments.length - 1];
-  const isVideosTab = currentTab === "videos";
-  const isProfileTab = currentTab === "profile";
-  
-  const userAvatarUrl = username && username !== "SPECTATOR" 
-    ? (hiveAccount?.metadata?.profile?.profile_image || `https://images.hive.blog/u/${username}/avatar/small`)
-    : null;
   
   // Determine header title based on active tab
   const getHeaderTitle = () => {
@@ -205,14 +181,11 @@ export default function TabLayout() {
   return (
     <FeedFilterProvider>
       <View style={styles.container}>
-        {!isVideosTab && (
-          <GlobalHeader 
-            onOpenMenu={() => setIsMenuVisible(true)} 
-            title={getHeaderTitle()}
-            centerComponent={currentTab === "feed" ? <FeedHeaderTitle /> : undefined}
-            showSettings={isProfileTab}
-          />
-        )}
+        <GlobalHeader 
+          onOpenMenu={() => setIsMenuVisible(true)} 
+          title={getHeaderTitle()}
+          centerComponent={segments[segments.length - 1] === "feed" ? <FeedHeaderTitle /> : undefined}
+        />
         <View style={styles.gestureContainer} {...panResponder.panHandlers}>
           <Tabs
             screenOptions={{
@@ -234,9 +207,8 @@ export default function TabLayout() {
                 key={tab.name}
                 name={tab.name}
                 options={{
-                  unmountOnBlur: tab.name === 'videos' || tab.name === 'feed',
                   title: tab.title,
-                  tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) =>
+                  tabBarIcon: ({ color, focused }) =>
                     tab.isCenter ? (
                       <View style={styles.centerButtonContainer}>
                         <Ionicons
@@ -250,7 +222,6 @@ export default function TabLayout() {
                         name={tab.icon}
                         color={color}
                         iconFamily={tab.iconFamily}
-                        avatarUrl={tab.name === "profile" ? userAvatarUrl : undefined}
                       />
                     ),
                   ...(tab.name === "profile" && {
@@ -259,7 +230,7 @@ export default function TabLayout() {
                       params: {},
                     },
                   }),
-                } as any}
+                }}
               />
             ))}
 
@@ -292,21 +263,8 @@ function TabBarIcon(props: {
   name: string;
   color: string;
   iconFamily: "Ionicons";
-  avatarUrl?: string | null;
 }) {
-  const { name, color, avatarUrl } = props;
-
-  if (avatarUrl) {
-    return (
-      <View style={styles.avatarContainer}>
-        <Image 
-          source={{ uri: avatarUrl }} 
-          style={[styles.tabAvatar, { borderColor: color === theme.colors.primary ? theme.colors.primary : 'transparent' }]} 
-          transition={200}
-        />
-      </View>
-    );
-  }
+  const { name, color } = props;
 
   return (
     <Ionicons

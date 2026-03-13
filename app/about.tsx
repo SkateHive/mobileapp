@@ -21,40 +21,41 @@ export default function AboutScreen() {
               color={theme.colors.text}
             />
           </Pressable>
-          <Text style={styles.headerTitle}>Skatehive Revolution</Text>
+          <Text style={styles.headerTitle}>Skatehive Community</Text>
         </View>
 
         {/* Content */}
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          <Section title="🛹 What is Skatehive?">
-            <Bullet text="Skatehive is the portal to a decentralized skate culture. Built on the Hive blockchain, it's where skaters own their content and their community." />
+          <Section title="🌍 What is Skatehive?">
+            <Bullet text="It's a worldwide crew of skaters, creators, and weirdos doing it our way." />
+            <Bullet text="Built on DIY, decentralization, and zero corporate bullsh*t." />
+            <Bullet text="No bosses, no brands calling shots — this is 100% skater-owned, skater-run." />
           </Section>
 
-          <Section title="💎 True Ownership">
-            <Bullet text="Every clip, photo, and story you post is yours. No corporate middleman can delete your history or sell your data." />
-            <Bullet text="Your account is your identity. You own the keys, you own the vibe." />
+          <Section title="📼 Tech Revolution in Skateboarding">
+            <Bullet text="From VX tapes to IG clips — tech's always been part of the ride." />
+            <Bullet text="Skatehive is the next chapter: community-powered + crypto rewards = freedom." />
           </Section>
 
-          <Section title="🌐 Decentralization">
-            <Bullet text="No bosses, no algorithms, no censorship. Skatehive is powered by a global network of nodes, not a boardroom." />
-            <Bullet text="DIY at its purest: community-driven moderation and development." />
+          <Section title="🚀 Why It Rips">
+            <Bullet text="Post-to-earn: film a trick, drop a story, share your vibe — get rewarded." />
+            <Bullet text="Infinity Mag: our own never-ending skate mag. No ads. No fluff." />
+            <Bullet text="Decentralized sponsorships: repping your crew, getting love from the people." />
           </Section>
 
-          <Section title="💰 Earn Rewards">
-            <Bullet text="Post-to-Earn: The community votes on what rips, and you get rewarded in crypto (HIVE/HBD) for your contributions." />
-            <Bullet text="Your engagement adds value to the ecosystem, and you get a piece of the pie." />
+          <Section title="🧰 Open-Source = Total Freedom">
+            <Bullet text="Anyone can fork this sh*t — skateshops, collectives, your homie with a laptop." />
+            <Bullet text="Your content echoes across the skateverse. Powered by blockchain, owned by you." />
           </Section>
 
-          <Section title="🛠️ Built by the Homies">
-            <Bullet text="@xvlad - Founder & Visionary" />
-            <Bullet text="@vaipraonde - Lead Dev & Code Shredder" />
-            <Bullet text="@r4topunk - Blockchain Wizard" />
-            <Bullet text="@mengao - Community Architect" />
-            <Bullet text="@webgnar - Creative Director" />
+          <Section title="🤝 Community-First, Always">
+            <Bullet text="Likes, posts, comments — every move adds value to *our* world." />
+            <Bullet text="We set the tone. No AI deciding what's cool. No engagement farms." />
           </Section>
 
-          <Section title="📖 Open Source">
-            <Bullet text="This app is 100% open-source. Anyone can contribute, fork, or build the next iteration of skate media." />
+          <Section title="🛹 Our Mission">
+            <Bullet text="Put skate media back in skaters' hands. Forever." />
+            <Bullet text="Grow a real-deal global skate culture — raw, connected, and free AF." />
           </Section>
 
           <View style={styles.buttonContainer}>
@@ -62,7 +63,7 @@ export default function AboutScreen() {
               onPress={() => WebBrowser.openBrowserAsync('https://docs.skatehive.app/docs/')}
               style={[styles.actionButton, styles.primaryActionButton]}
             >
-              <Text style={styles.actionButtonText}>Read the Docs</Text>
+              <Text style={styles.actionButtonText}>More Info</Text>
             </Pressable>
             <Pressable
               onPress={() => router.back()}
