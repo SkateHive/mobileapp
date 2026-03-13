@@ -29,54 +29,55 @@ export function useVoteValue(username: string | null): VoteValueHookReturn {
       return;
     }
 
+    let cancelled = false;
+
     const fetchAccountData = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Get account data
         const [account] = await HiveClient.database.getAccounts([username]);
-        if (!account) {
-          throw new Error('Account not found');
-        }
+        if (cancelled) return;
+        if (!account) throw new Error('Account not found');
 
-        // Calculate Hive Power from vesting shares
         const vestingShares = parseFloat(account.vesting_shares.toString().split(' ')[0]);
         const hp = await convertVestToHive(vestingShares);
+        if (cancelled) return;
+
         setHivePower(hp);
-
-        // Get voting power
         setVotingPower(account.voting_power || 10000);
-
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to fetch account data');
         setHivePower(0);
         setVotingPower(10000);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchAccountData();
+    return () => { cancelled = true; };
   }, [username]);
 
   // Fetch reward fund and feed history for vote calculation
   useEffect(() => {
+    let cancelled = false;
     const fetchBlockchainData = async () => {
       try {
-        // Get reward fund
         const fund = await HiveClient.database.call('get_reward_fund', ['post']);
-        setRewardFund(fund);
-
-        // Get feed history for price conversion
         const history = await HiveClient.database.call('get_feed_history', []);
-        setFeedHistory(history);
-      } catch (err) {
+        if (!cancelled) {
+          setRewardFund(fund);
+          setFeedHistory(history);
+        }
+      } catch {
         // Silently fail - vote calculation will return 0
       }
     };
 
     fetchBlockchainData();
+    return () => { cancelled = true; };
   }, []);
 
   // Calculate vote value based on percentage

@@ -138,6 +138,7 @@ export async function updateProfile(
       account: username,
       json_metadata: '',
       posting_json_metadata: json,
+      extensions: [],
     },
   ];
   return sendOperation(privateKey, [operation]);

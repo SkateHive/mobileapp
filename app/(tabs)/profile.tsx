@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   View,
   ScrollView,
@@ -8,6 +8,9 @@ import {
   RefreshControl,
   StyleSheet,
   FlatList,
+  Modal,
+  Dimensions,
+  Animated,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,24 +20,110 @@ import { ProfileSpectatorInfo } from "~/components/SpectatorMode/ProfileSpectato
 import { PostCard } from "~/components/Feed/PostCard";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { FollowersModal } from "~/components/Profile/FollowersModal";
+import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from '~/lib/hooks/useUserComments';
 import { useScrollLock } from '~/lib/ScrollLockContext';
 import { FullConversationDrawer } from '~/components/Feed/FullConversationDrawer';
 import type { Discussion } from '@hiveio/dhive';
+import { extractMediaFromBody } from "~/lib/utils";
+import { GridVideoTile } from "~/components/Profile/GridVideoTile";
+
+const GRID_COLS = 3;
+const GRID_GAP = 2;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+// Skeleton grid shown while posts load
+const SkeletonTile = React.memo(({ size, delay }: { size: number; delay: number }) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.6, duration: 800, delay, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  return <Animated.View style={{ width: size, height: size, backgroundColor: theme.colors.secondaryCard, opacity }} />;
+});
+
+const GridSkeleton = ({ tileSize }: { tileSize: number }) => (
+  <View style={skeletonStyles.container}>
+    {Array.from({ length: 12 }).map((_, i) => (
+      <SkeletonTile key={i} size={tileSize} delay={(i % 3) * 150} />
+    ))}
+  </View>
+);
+
+const skeletonStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+  },
+});
+
+// Map common country names/codes to flag emojis
+function countryToFlag(location: string): string {
+  const loc = location.trim().toUpperCase();
+  const map: Record<string, string> = {
+    BR: '🇧🇷', BRAZIL: '🇧🇷', BRASIL: '🇧🇷',
+    US: '🇺🇸', USA: '🇺🇸', 'UNITED STATES': '🇺🇸',
+    UK: '🇬🇧', GB: '🇬🇧', 'UNITED KINGDOM': '🇬🇧', ENGLAND: '🇬🇧',
+    DE: '🇩🇪', GERMANY: '🇩🇪', DEUTSCHLAND: '🇩🇪',
+    FR: '🇫🇷', FRANCE: '🇫🇷',
+    ES: '🇪🇸', SPAIN: '🇪🇸', ESPAÑA: '🇪🇸',
+    PT: '🇵🇹', PORTUGAL: '🇵🇹',
+    MX: '🇲🇽', MEXICO: '🇲🇽', MÉXICO: '🇲🇽',
+    CA: '🇨🇦', CANADA: '🇨🇦',
+    AR: '🇦🇷', ARGENTINA: '🇦🇷',
+    AU: '🇦🇺', AUSTRALIA: '🇦🇺',
+    JP: '🇯🇵', JAPAN: '🇯🇵',
+    NL: '🇳🇱', NETHERLANDS: '🇳🇱',
+    IT: '🇮🇹', ITALY: '🇮🇹', ITALIA: '🇮🇹',
+    CL: '🇨🇱', CHILE: '🇨🇱',
+    CO: '🇨🇴', COLOMBIA: '🇨🇴',
+    PE: '🇵🇪', PERU: '🇵🇪',
+    VE: '🇻🇪', VENEZUELA: '🇻🇪',
+    SE: '🇸🇪', SWEDEN: '🇸🇪',
+    NO: '🇳🇴', NORWAY: '🇳🇴',
+    CR: '🇨🇷', 'COSTA RICA': '🇨🇷',
+    ZA: '🇿🇦', 'SOUTH AFRICA': '🇿🇦',
+    IN: '🇮🇳', INDIA: '🇮🇳',
+    PH: '🇵🇭', PHILIPPINES: '🇵🇭',
+  };
+  // Try exact match first, then check if location contains a known key
+  if (map[loc]) return map[loc];
+  for (const [key, flag] of Object.entries(map)) {
+    if (loc.includes(key)) return flag;
+  }
+  return '🌍';
+}
 
 export default function ProfileScreen() {
   const { username: currentUsername, logout } = useAuth();
   const { isScrollLocked } = useScrollLock();
   const params = useLocalSearchParams();
-  const [message, setMessage] = useState("");
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
   const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
+  const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
 
-  // Use the URL param username if available, otherwise use current user's username
+  // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
+  useEffect(() => {
+    setFollowersModalVisible(false);
+    setEditProfileVisible(false);
+    setSettingsMenuVisible(false);
+    setProfileTab('grid');
+  }, [profileUsername]);
 
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
   const {
@@ -45,13 +134,136 @@ export default function ProfileScreen() {
     refresh: refreshPosts,
   } = useUserComments(profileUsername);
 
+  // Get thumbnail for a post — checks multiple sources
+  const getPostThumbnail = useCallback((post: any): string | null => {
+    let metadata: any = {};
+    try {
+      metadata = typeof post.json_metadata === 'string'
+        ? JSON.parse(post.json_metadata)
+        : (post.json_metadata || {});
+    } catch {}
+
+    // 1. Try json_metadata.image (most reliable, set by posting apps)
+    if (metadata?.image) {
+      const imgs = Array.isArray(metadata.image) ? metadata.image : [metadata.image];
+      if (imgs[0]) return imgs[0];
+    }
+
+    // 2. Try 3speak / video app thumbnail from json_metadata.video
+    if (metadata?.video?.info?.snaphash) {
+      return `https://threespeakvideo.b-cdn.net/${metadata.video.info.snaphash}/thumbnails/default.png`;
+    }
+    if (metadata?.video?.info?.thumbnail) {
+      return metadata.video.info.thumbnail;
+    }
+
+    // 3. Parse body for markdown images
+    const media = extractMediaFromBody(post.body);
+    const img = media.find((m: any) => m.type === 'image');
+    if (img) return img.url;
+
+    // 4. Extract YouTube thumbnail from embed URLs in body
+    const ytMatch = post.body?.match(
+      /(?:youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+    );
+    if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+
+    // 5. Try direct image URLs in body (not in markdown syntax)
+    const directUrl = post.body?.match(
+      /(https?:\/\/[^\s)"']+\.(?:png|jpe?g|gif|webp))(?=$|\s|[)"'])/i
+    );
+    if (directUrl) return directUrl[1];
+
+    return null;
+  }, []);
+
+  // Check if a post has any media (image or video)
+  const postHasMedia = useCallback((post: any): boolean => {
+    // Check json_metadata.image
+    try {
+      const metadata = typeof post.json_metadata === 'string'
+        ? JSON.parse(post.json_metadata)
+        : post.json_metadata;
+      if (metadata?.image?.length > 0) return true;
+    } catch {}
+
+    // Check body for media
+    const media = extractMediaFromBody(post.body);
+    if (media.length > 0) return true;
+
+    // Check for direct image/video URLs
+    const hasDirectMedia = /(https?:\/\/[^\s)"']+\.(?:png|jpe?g|gif|webp|mp4|mov|m4v|m3u8))(?=$|\s|[)"'])/i
+      .test(post.body || '');
+    return hasDirectMedia;
+  }, []);
+
+  // Filter posts to only those with media for the grid view
+  const gridPosts = useMemo(() =>
+    userPosts.filter(postHasMedia),
+    [userPosts, postHasMedia]
+  );
+
+  // Auto-load more when grid doesn't have enough items to fill the screen
+  // A 3-col grid needs ~15 items (5 rows) to be scrollable
+  const MIN_GRID_ITEMS = 15;
+  useEffect(() => {
+    if (
+      profileTab === 'grid' &&
+      !isLoadingPosts &&
+      hasMore &&
+      gridPosts.length < MIN_GRID_ITEMS &&
+      userPosts.length > 0
+    ) {
+      loadNextPage();
+    }
+  }, [profileTab, isLoadingPosts, hasMore, gridPosts.length, userPosts.length, loadNextPage]);
+
+  // Render grid item
+  const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+
+  const renderGridItem = useCallback(({ item }: { item: any }) => {
+    const media = extractMediaFromBody(item.body);
+    const videoMedia = media.find((m: any) => m.type === 'video');
+
+    // Video posts autoplay muted when in view
+    if (videoMedia) {
+      return (
+        <GridVideoTile
+          videoUrl={videoMedia.url}
+          size={tileSize}
+          onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+        />
+      );
+    }
+
+    // Image/embed posts show thumbnail
+    const thumb = getPostThumbnail(item);
+    return (
+      <Pressable
+        style={[styles.gridTile, { width: tileSize, height: tileSize }]}
+        onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+      >
+        {thumb ? (
+          <Image
+            source={{ uri: thumb }}
+            style={styles.gridImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.gridPlaceholder}>
+            <Ionicons name="image-outline" size={28} color={theme.colors.muted} />
+          </View>
+        )}
+      </Pressable>
+    );
+  }, [tileSize, getPostThumbnail]);
+
   const handleLogout = async () => {
     try {
       await logout();
       router.push("/");
     } catch (error) {
       console.error("Error logging out:", error);
-      setMessage("Error logging out");
     }
   };
 
@@ -161,106 +373,67 @@ export default function ProfileScreen() {
   // Render the profile header section
   const renderProfileHeader = () => (
     <View>
-      {/* Cover Image */}
-      <View style={styles.coverImageContainer}>
-        {hiveAccount?.metadata?.profile?.cover_image ? (
-          <Image
-            source={{ uri: hiveAccount.metadata.profile.cover_image }}
-            style={styles.coverImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.defaultCoverImage} />
-        )}
-      </View>
-
-      {/* Profile Section - Overlapping the cover */}
+      {/* Profile Section */}
       <View style={styles.profileSection}>
-        {/* Top-right logout button (only for owner) */}
-        {!params.username && (
-          <Pressable onPress={handleLogout} style={styles.logoutButton}>
-            <View style={styles.logoutButtonContent}>
-              <Text style={styles.logoutButtonText}>Logout</Text>
-              <Ionicons name="exit-outline" size={16} color={theme.colors.text} />
-            </View>
-          </Pressable>
-        )}
-
-        {/* Profile Picture and Name Section */}
         <View style={styles.profileHeaderRow}>
           <View style={styles.profileImageContainer}>
             {renderProfileImage()}
           </View>
-          
-          {/* Name and Username beside profile pic */}
+
           <View style={styles.nameSection}>
-            <Text style={styles.profileName}>
-              {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
-            </Text>
+            {/* Name row with gear icon */}
+            <View style={styles.nameRow}>
+              <Text style={styles.profileName} numberOfLines={1}>
+                {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
+              </Text>
+              {!params.username && (
+                <Pressable
+                  onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
+                  hitSlop={12}
+                  style={styles.gearIcon}
+                >
+                  <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Username */}
             <Text style={styles.username}>@{profileUsername}</Text>
-          </View>
-        </View>
 
-        {/* Profile Info */}
-        <View style={styles.profileInfo}>
-
-          {/* Bio */}
-          {hiveAccount?.metadata?.profile?.about && (
-            <Text style={styles.aboutText}>
-              {hiveAccount.metadata.profile.about}
-            </Text>
-          )}
-
-          {/* Location and Website */}
-          <View style={styles.metaInfo}>
-            {hiveAccount?.metadata?.profile?.location && (
-              <View style={styles.metaItem}>
-                <Text style={styles.metaIcon}>📍</Text>
-                <Text style={styles.metaText}>{hiveAccount.metadata.profile.location}</Text>
-              </View>
-            )}
-            {hiveAccount?.metadata?.profile?.website && (
-              <View style={styles.metaItem}>
-                <Text style={styles.metaIcon}>🌐</Text>
-                <Text style={styles.metaText}>{hiveAccount.metadata.profile.website}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            {profileUsername === "SPECTATOR" ? (
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                <Text style={styles.statLabel}>Following</Text>
-              </View>
-            ) : (
-              <Pressable style={styles.statItem} onPress={handleFollowingPress}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                <Text style={styles.statLabel}>Following</Text>
-              </Pressable>
-            )}
-            {profileUsername === "SPECTATOR" ? (
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </View>
-            ) : (
-              <Pressable style={styles.statItem} onPress={handleFollowersPress}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </Pressable>
-            )}
-            {/* Show muted count only for the logged-in user's own profile */}
-            {profileUsername === currentUsername && profileUsername !== "SPECTATOR" && (
-              <Pressable style={styles.statItem} onPress={handleMutedPress}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.muted || "0"}</Text>
-                <Text style={styles.statLabel}>Muted</Text>
-              </Pressable>
-            )}
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{vp.toFixed(0)}%</Text>
-              <Text style={styles.statLabel}>VP</Text>
+            {/* Stats + flag inline */}
+            <View style={styles.statsRow}>
+              {profileUsername === "SPECTATOR" ? (
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </View>
+              ) : (
+                <Pressable style={styles.statItem} onPress={handleFollowingPress}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </Pressable>
+              )}
+              {profileUsername === "SPECTATOR" ? (
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </View>
+              ) : (
+                <Pressable style={styles.statItem} onPress={handleFollowersPress}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </Pressable>
+              )}
+              {hiveAccount?.metadata?.profile?.location && (
+                <View style={styles.statItem}>
+                  <Text style={styles.locationFlag}>
+                    {countryToFlag(hiveAccount.metadata.profile.location)}
+                  </Text>
+                  <Text style={styles.statLabel}>
+                    {hiveAccount.metadata.profile.location}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -268,9 +441,32 @@ export default function ProfileScreen() {
 
       {/* Show Create Account CTA only for SPECTATOR */}
       {profileUsername === "SPECTATOR" && <ProfileSpectatorInfo />}
-      
-      {/* Add spacing before posts section */}
-      {profileUsername !== "SPECTATOR" && <View style={styles.postsSpacing} />}
+
+      {/* Tab Switcher */}
+      {profileUsername !== "SPECTATOR" && (
+        <View style={styles.tabBar}>
+          <Pressable
+            style={[styles.tab, profileTab === 'grid' && styles.tabActive]}
+            onPress={() => setProfileTab('grid')}
+          >
+            <Ionicons
+              name="grid-outline"
+              size={20}
+              color={profileTab === 'grid' ? theme.colors.primary : theme.colors.muted}
+            />
+          </Pressable>
+          <Pressable
+            style={[styles.tab, profileTab === 'posts' && styles.tabActive]}
+            onPress={() => setProfileTab('posts')}
+          >
+            <Ionicons
+              name="list-outline"
+              size={20}
+              color={profileTab === 'posts' ? theme.colors.primary : theme.colors.muted}
+            />
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 
@@ -315,8 +511,42 @@ export default function ProfileScreen() {
         >
           {renderProfileHeader()}
         </ScrollView>
+      ) : profileTab === 'grid' ? (
+        <FlatList
+          key="grid"
+          data={gridPosts}
+          renderItem={renderGridItem}
+          keyExtractor={(item) => item.permlink}
+          numColumns={GRID_COLS}
+          columnWrapperStyle={{ gap: GRID_GAP }}
+          ListHeaderComponent={renderProfileHeader}
+          ListFooterComponent={
+            isLoadingPosts ? (
+              <GridSkeleton tileSize={tileSize} />
+            ) : null
+          }
+          ListEmptyComponent={
+            !isLoadingPosts ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.noPostsText}>No posts yet</Text>
+              </View>
+            ) : null
+          }
+          onEndReached={hasMore ? loadNextPage : undefined}
+          onEndReachedThreshold={0.8}
+          refreshControl={
+            <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          initialNumToRender={12}
+          maxToRenderPerBatch={9}
+          windowSize={7}
+          contentContainerStyle={{ gap: GRID_GAP }}
+        />
       ) : (
         <FlatList
+          key="posts"
           data={userPosts}
           renderItem={renderPostItem}
           keyExtractor={(item) => item.permlink}
@@ -363,6 +593,50 @@ export default function ProfileScreen() {
           discussion={conversationPost}
         />
       )}
+
+      {/* Edit Profile Modal */}
+      {!params.username && (
+        <EditProfileModal
+          visible={editProfileVisible}
+          onClose={() => setEditProfileVisible(false)}
+          currentProfile={hiveAccount?.metadata?.profile || {}}
+          onSaved={handleRefresh}
+        />
+      )}
+
+      {/* Settings Dialog */}
+      <Modal
+        visible={settingsMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSettingsMenuVisible(false)}
+      >
+        <Pressable style={styles.dialogOverlay} onPress={() => setSettingsMenuVisible(false)}>
+          <View style={styles.dialogBox}>
+            <Pressable
+              style={styles.dialogItem}
+              onPress={() => {
+                setSettingsMenuVisible(false);
+                setEditProfileVisible(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+              <Text style={styles.dialogItemText}>Edit Profile</Text>
+            </Pressable>
+            <View style={styles.dialogDivider} />
+            <Pressable
+              style={styles.dialogItem}
+              onPress={() => {
+                setSettingsMenuVisible(false);
+                handleLogout();
+              }}
+            >
+              <Ionicons name="log-out-outline" size={20} color={theme.colors.danger} />
+              <Text style={[styles.dialogItemText, { color: theme.colors.danger }]}>Logout</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -375,62 +649,64 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
   },
-  // Cover Image Styles
-  coverImageContainer: {
-    height: 120,
-    width: '100%',
-    backgroundColor: theme.colors.card,
-  },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-  },
-  defaultCoverImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
   // Profile Section Styles
   profileSection: {
-    position: 'relative',
     paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
-    marginTop: -12, // Overlap the cover image
   },
   profileHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center', // Center align items vertically
+    alignItems: 'flex-start',
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
   },
   profileImageContainer: {
     // No need for alignSelf since it's in a row now
   },
-  logoutButton: {
-    position: 'absolute',
-    top: theme.spacing.sm,
-    right: theme.spacing.sm,
-    zIndex: 10,
-  },
-  logoutButtonContent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: theme.borderRadius.full,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  logoutButtonText: {
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
-  },
-  profileInfo: {
-    gap: theme.spacing.sm,
-  },
   nameSection: {
     flex: 1,
-    gap: theme.spacing.xxs,
+    gap: theme.spacing.xs,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  locationFlag: {
+    fontSize: 18,
+  },
+  gearIcon: {
+    padding: theme.spacing.xs,
+  },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialogBox: {
+    backgroundColor: theme.colors.secondaryCard,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    width: 220,
+    overflow: 'hidden',
+  },
+  dialogItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  dialogItemText: {
+    color: theme.colors.text,
+    fontFamily: theme.fonts.regular,
+    fontSize: theme.fontSizes.md,
+  },
+  dialogDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.border,
   },
   profileName: {
     fontSize: theme.fontSizes.xl,
@@ -443,33 +719,11 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
   },
-  aboutText: {
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
-    fontSize: theme.fontSizes.sm,
-    lineHeight: theme.fontSizes.sm * 1.4,
-  },
-  metaInfo: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.md,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  metaIcon: {
-    fontSize: theme.fontSizes.xs,
-  },
-  metaText: {
-    fontSize: theme.fontSizes.xs,
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
-  },
   statsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: theme.spacing.lg,
+    marginTop: theme.spacing.xs,
   },
   statItem: {
     alignItems: 'flex-start',
@@ -484,26 +738,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
     fontSize: theme.fontSizes.xs,
     marginTop: theme.spacing.xxs,
-  },
-  // Legacy styles for backward compatibility
-  exitButton: {
-    position: 'absolute',
-    top: theme.spacing.lg,
-    right: theme.spacing.lg,
-    zIndex: 10,
-  },
-  exitButtonContent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: theme.borderRadius.full,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  exitButtonText: {
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
   },
   spectatorAvatar: {
     width: 96,
@@ -577,8 +811,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  postsSpacing: {
-    height: theme.spacing.lg,
+  // Tab bar
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm + 2,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: theme.colors.primary,
+  },
+  // Grid
+  gridTile: {
+    overflow: 'hidden',
+    backgroundColor: theme.colors.secondaryCard,
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  gridPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.secondaryCard,
+  },
+  gridVideoIcon: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorContainer: {
     flex: 1,
