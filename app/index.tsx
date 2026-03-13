@@ -81,7 +81,7 @@ export default function Index() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.push("/(tabs)/videos");
+      router.replace("/(tabs)/videos");
     }
   }, [isAuthenticated]);
 
@@ -116,19 +116,22 @@ export default function Index() {
       }
       await login(username, password, method, pin);
       router.replace("/(tabs)/videos");
-    } catch (error: any) {
-      if (
-        error instanceof InvalidKeyFormatError ||
-        error instanceof AccountNotFoundError ||
-        error instanceof InvalidKeyError ||
-        error instanceof AuthError ||
-        error instanceof HiveError
-      ) {
-        setMessage(error.message);
-      } else {
-        setMessage("An unexpected error occurred");
+      } catch (error: any) {
+        if (
+          error instanceof InvalidKeyFormatError ||
+          error instanceof AccountNotFoundError ||
+          error instanceof InvalidKeyError ||
+          error instanceof AuthError ||
+          error instanceof HiveError
+        ) {
+          // Suppress biometric failure messages as requested
+          if (!error.message.includes('Biometric authentication')) {
+            setMessage(error.message);
+          }
+        } else {
+          setMessage("An unexpected error occurred");
+        }
       }
-    }
   };
 
   const handleQuickLogin = async (
@@ -147,7 +150,11 @@ export default function Index() {
         error instanceof AuthError ||
         error instanceof HiveError
       ) {
-        setMessage((error as Error).message);
+        // Suppress biometric failure messages as requested
+        const msg = (error as Error).message;
+        if (!msg.includes('Biometric authentication')) {
+          setMessage(msg);
+        }
       } else {
         setMessage("Error with quick login");
       }
@@ -231,17 +238,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: -1,
+    zIndex: 0,
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#000000",
   },
   infoButton: {
     position: "absolute",
     top: 48,
     right: 24,
-    zIndex: 10,
+    zIndex: 2,
   },
   infoButtonContent: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
@@ -255,7 +262,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: "60%",
     flexDirection: "column",
-    zIndex: 0,
+    zIndex: 1,
   },
   fadeBand: {
     flex: 1,
@@ -263,7 +270,7 @@ const styles = StyleSheet.create({
   },
   formWrapper: {
     flex: 1,
-    zIndex: 1,
+    zIndex: 2,
   },
   scrollContent: {
     flexGrow: 1,

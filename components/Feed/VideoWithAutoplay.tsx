@@ -36,10 +36,12 @@ export function VideoWithAutoplay({
   return (
     <View ref={ref} style={[styles.container, style]}>
       <Pressable style={styles.pressable} onPress={handlePress}>
-        <VideoPlayer 
-          url={url} 
-          playing={shouldPlay}
-        />
+        {isInView && (
+          <VideoPlayer 
+            url={url} 
+            playing={shouldPlay}
+          />
+        )}
         
         {/* Show play button overlay only if interaction is required and video hasn't been interacted with */}
         {requireInteraction && !hasInteracted && (

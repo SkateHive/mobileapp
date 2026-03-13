@@ -256,7 +256,7 @@ export function LoginForm({
                 disabled={isLoading}
               >
                 <Text style={styles.loginButtonText}>
-                  {isLoading ? 'Logging in...' : 'Login'}
+                  Login
                 </Text>
               </Button>
 
@@ -293,11 +293,8 @@ export function LoginForm({
         </Text>
       ) : null}
 
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Authenticating...</Text>
-        </View>
-      )}
+ 
+      {/* Suppressed "Authenticating..." text as requested */}
     </View>
   );
 }

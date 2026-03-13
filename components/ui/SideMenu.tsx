@@ -168,7 +168,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
-            <Text style={styles.username}>@{username}</Text>
+            <Text style={styles.username}>@{username || 'Guest'}</Text>
             <Pressable onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={theme.colors.text} />
             </Pressable>
@@ -176,11 +176,11 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           
           <ScrollView style={styles.menuItems} showsVerticalScrollIndicator={false}>
             {/* Account Switcher */}
-            {storedUsers.filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== username).length > 0 && (
+            {storedUsers.filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== (username || "")).length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Switch Account</Text>
                 {storedUsers
-                  .filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== username)
+                  .filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== (username || ""))
                   .map((user, index) => (
                     <Pressable 
                       key={`switch-${user.username}-${index}`} 

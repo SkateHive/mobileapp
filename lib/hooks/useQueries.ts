@@ -108,9 +108,9 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
 
   if (!data || data.length === 0) return;
 
-  // Prefetch thumbnails for the first 5 videos
+  // Prefetch thumbnails for the first 2 videos
   const thumbnailUrls = data
-    .slice(0, 5)
+    .slice(0, 2)
     .map((v: VideoPost) => v.thumbnailUrl)
     .filter(Boolean) as string[];
 
@@ -119,7 +119,7 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
   });
 
   // Prefetch avatar images
-  const avatarUrls = [...new Set(data.slice(0, 5).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
+  const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
   avatarUrls.forEach((url: string) => {
     Image.prefetch(url).catch(() => {});
   });
