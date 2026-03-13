@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
+import { useAppSettings } from "~/lib/AppSettingsContext";
 import { theme } from "~/lib/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -17,6 +18,7 @@ interface SideMenuProps {
 export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   const router = useRouter();
   const { username, logout, storedUsers, loginStoredUser, deleteStoredUser } = useAuth();
+  const { settings, updateSettings } = useAppSettings();
   
   // Animation value for sliding in/out
   const slideAnim = React.useRef(new Animated.Value(-SCREEN_WIDTH * 0.75)).current;
@@ -129,6 +131,11 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   const appearanceItems = [
     { title: "Theme", icon: "color-palette-outline" as const, onPress: () => { onClose(); } },
     { title: "Language", icon: "language-outline" as const, onPress: () => { onClose(); } },
+    { 
+      title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons", 
+      icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const, 
+      onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); } 
+    },
     { title: "Feeds", icon: "list-outline" as const, onPress: () => { onClose(); } },
     { title: "Explore", icon: "compass-outline" as const, onPress: () => { onClose(); } },
   ];

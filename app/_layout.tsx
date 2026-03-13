@@ -11,6 +11,7 @@ import { ActivityWrapper } from '~/lib/ActivityWrapper';
 import { ViewportTrackerProvider } from '~/lib/ViewportTracker';
 import { NotificationProvider } from '~/lib/notifications-context';
 import { ScrollLockProvider } from '~/lib/ScrollLockContext';
+import { AppSettingsProvider } from '~/lib/AppSettingsContext';
 import { theme } from '~/lib/theme';
 
 const styles = StyleSheet.create({
@@ -84,6 +85,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <AppSettingsProvider>
         <ScrollLockProvider>
           <NavigationGuard>
             <NotificationProvider>
@@ -141,6 +143,7 @@ export default function RootLayout() {
             </NotificationProvider>
           </NavigationGuard>
         </ScrollLockProvider>
+        </AppSettingsProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

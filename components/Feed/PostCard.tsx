@@ -13,6 +13,8 @@ import { useVoteValue } from '~/lib/hooks/useVoteValue';
 import { useViewportTracker } from '~/lib/ViewportTracker';
 import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
+import { VotePresetButtons } from '../ui/VotePresetButtons';
+import { useAppSettings } from '~/lib/AppSettingsContext';
 import { MediaPreview } from './MediaPreview';
 import { CommentBottomSheet } from '../ui/CommentBottomSheet';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
@@ -62,6 +64,7 @@ interface PostCardProps {
 export const PostCard = React.memo(({ post, currentUsername, onOpenConversation }: PostCardProps) => {
   const { isScrollLocked, setScrollLocked } = useScrollLock();
   const { session, followingList, updateUserRelationship } = useAuth();
+  const { settings } = useAppSettings();
   const [isFollowing, setIsFollowing] = useState(false);
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
@@ -244,6 +247,7 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation 
     } finally {
       setIsVoting(false);
       setShowSlider(false);
+      setScrollLocked(false);
     }
   };
 
@@ -448,14 +452,23 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation 
         {/* Full-width action bar — outside mainLayout for better thumb reach */}
         <View style={styles.bottomBar}>
           {showSlider ? (
-            /* Voting slider mode - takes entire bottom bar */
+            /* Voting mode - takes entire bottom bar */
             <View style={styles.votingSliderContainer}>
-              <VotingSlider
-                value={voteWeight}
-                onValueChange={setVoteWeight}
-                minimumValue={1}
-                maximumValue={100}
-              />
+              {settings.useVoteSlider ? (
+                /* Slider mode */
+                <VotingSlider
+                  value={voteWeight}
+                  onValueChange={setVoteWeight}
+                  minimumValue={1}
+                  maximumValue={100}
+                />
+              ) : (
+                /* Preset buttons mode */
+                <VotePresetButtons
+                  onSelect={(weight) => handleVote(weight)}
+                  disabled={isVoting}
+                />
+              )}
               <View style={styles.sliderControls}>
                 <Pressable
                   style={styles.cancelVoteButton}
@@ -467,17 +480,19 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation 
                 >
                   <FontAwesome name="times" size={22} color={theme.colors.gray} />
                 </Pressable>
-                <Pressable
-                  style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
-                  onPress={() => handleVote(voteWeight)}
-                  disabled={isVoting}
-                >
-                  {isVoting ? (
-                    <ActivityIndicator size="small" color={theme.colors.green} />
-                  ) : (
-                    <Ionicons name="thumbs-up" size={22} color={theme.colors.green} />
-                  )}
-                </Pressable>
+                {settings.useVoteSlider && (
+                  <Pressable
+                    style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
+                    onPress={() => handleVote(voteWeight)}
+                    disabled={isVoting}
+                  >
+                    {isVoting ? (
+                      <ActivityIndicator size="small" color={theme.colors.green} />
+                    ) : (
+                      <Ionicons name="thumbs-up" size={22} color={theme.colors.green} />
+                    )}
+                  </Pressable>
+                )}
               </View>
             </View>
           ) : (
