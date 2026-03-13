@@ -96,9 +96,6 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
     <View style={styles.container}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.headerContainer}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="podium-outline" size={48} color={theme.colors.primary} />
-          </View>
           <Text style={styles.title}>Leaderboard</Text>
         </View>
 
@@ -221,16 +218,6 @@ const styles = StyleSheet.create({
   headerContainer: {
     alignItems: 'center',
     marginBottom: theme.spacing.md,
-  },
-  iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: theme.colors.border,
   },
   title: {
     fontSize: theme.fontSizes.xxxl,
