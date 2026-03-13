@@ -44,11 +44,13 @@ const BackgroundVideo = () => {
   );
 
   return (
-    <View style={styles.videoContainer}>
+    <View style={styles.videoContainer} pointerEvents="none">
       <VideoView
         style={{ width: "100%", height: "100%" }}
         contentFit="cover"
         player={player}
+        nativeControls={false}
+        pointerEvents="none"
       />
     </View>
   );
@@ -229,6 +231,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: -1,
   },
   container: {
     flex: 1,
@@ -252,6 +255,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: "60%",
     flexDirection: "column",
+    zIndex: 0,
   },
   fadeBand: {
     flex: 1,
@@ -259,6 +263,7 @@ const styles = StyleSheet.create({
   },
   formWrapper: {
     flex: 1,
+    zIndex: 1,
   },
   scrollContent: {
     flexGrow: 1,
