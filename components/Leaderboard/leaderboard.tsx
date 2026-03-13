@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { View, Image, ScrollView, StyleSheet } from "react-native";
+import { View, ScrollView, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { Text } from "~/components/ui/text";
 import { Ionicons } from "@expo/vector-icons";
 import { Crown } from "lucide-react-native";
@@ -95,9 +96,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.title}>Leaderboard</Text>
-        </View>
+        {/* Header Removed for more space */}
 
         <View style={styles.listContainer}>
           {topSkaters.map((skater: LeaderboardUserInfo, index: number) => (
@@ -168,6 +167,7 @@ const LeaderboardItem = ({
             uri: `https://images.hive.blog/u/${skater.hive_author}/avatar/small`,
           }}
           style={styles.avatar}
+          transition={200}
         />
         {isTop && skater.position === 1 && (
           <View style={styles.crownContainer}>
@@ -216,17 +216,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
   },
   headerContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  title: {
-    fontSize: theme.fontSizes.xxxl,
-    fontWeight: 'bold',
-    marginTop: theme.spacing.sm,
-    color: theme.colors.text,
-    fontFamily: theme.fonts.bold,
-    paddingTop: theme.spacing.sm, // Add padding to prevent cutoff
-    lineHeight: 40, // Ensure proper line height
+    display: 'none',
   },
   listContainer: {
     paddingHorizontal: theme.spacing.md,

@@ -112,8 +112,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     { title: "Google", icon: "logo-google" as const, onPress: () => { onClose(); } },
     { title: "Telegram", icon: "paper-plane-outline" as const, onPress: () => { onClose(); } },
     { title: "Email", icon: "mail-outline" as const, onPress: () => { onClose(); } },
-    { title: "Edit Profile", icon: "create-outline" as const, onPress: () => { onClose(); } },
-    { title: "Remove account from device", icon: "trash-outline" as const, onPress: handleDeleteAccount },
+    { title: "Edit Profile", icon: "create-outline" as const, onPress: () => { onClose(); router.push({ pathname: "/(tabs)/profile", params: { username } }); } },
+    { title: "Remove from device", icon: "trash-outline" as const, onPress: handleDeleteAccount },
   ];
 
   const walletItems = [
@@ -134,7 +134,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   ];
 
   const aboutItems = [
-    { title: "About SkateHive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
+    { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
     { title: "Support", icon: "help-circle-outline" as const, onPress: () => { onClose(); } },
     { title: "Privacy Policy", icon: "shield-checkmark-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
     { title: "Terms of Service", icon: "document-text-outline" as const, onPress: () => { onClose(); router.push("/about"); } },

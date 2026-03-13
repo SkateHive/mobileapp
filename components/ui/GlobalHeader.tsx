@@ -1,5 +1,6 @@
 import React from "react";
-import { View, StyleSheet, Pressable, Image } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "~/components/ui/text";
@@ -13,7 +14,7 @@ interface GlobalHeaderProps {
   title?: string;
 }
 
-export function GlobalHeader({ onOpenMenu, title = "SkateHive" }: GlobalHeaderProps) {
+export function GlobalHeader({ onOpenMenu, title = "Skatehive" }: GlobalHeaderProps) {
   const router = useRouter();
   const { username } = useAuth();
   const { hiveAccount } = useHiveAccount(username || "");
@@ -35,10 +36,10 @@ export function GlobalHeader({ onOpenMenu, title = "SkateHive" }: GlobalHeaderPr
     const hiveAvatarUrl = `https://images.hive.blog/u/${username}/avatar/small`;
 
     if (profileImage) {
-      return <Image source={{ uri: profileImage }} style={styles.avatar} />;
+      return <Image source={{ uri: profileImage }} style={styles.avatar} transition={200} />;
     }
 
-    return <Image source={{ uri: hiveAvatarUrl }} style={styles.avatar} />;
+    return <Image source={{ uri: hiveAvatarUrl }} style={styles.avatar} transition={200} />;
   };
 
   return (

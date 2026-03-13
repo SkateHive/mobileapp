@@ -276,7 +276,7 @@ export function LoginForm({
           </Pressable>
 
           <Pressable
-            onPress={() => WebBrowser.openBrowserAsync('https://hive.io')}
+            onPress={() => WebBrowser.openBrowserAsync('https://docs.skatehive.app/docs/')}
             style={styles.textLink}
           >
             <Text style={styles.textLinkText}>More info</Text>

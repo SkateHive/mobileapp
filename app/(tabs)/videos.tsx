@@ -339,7 +339,7 @@ export default function VideosScreen() {
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          removeClippedSubviews={false} // Prevent jumping when items are unclipped
+          removeClippedSubviews={true} // Re-enabled to help with memory/OOM crashes
           maxToRenderPerBatch={3}
           windowSize={5}
           initialNumToRender={2}

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs, useRouter, useSegments } from "expo-router";
 import { StyleSheet, View, PanResponder } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRef, useState } from "react";
@@ -18,7 +18,7 @@ interface TabItem {
 const TAB_ITEMS: TabItem[] = [
   {
     name: "videos",
-    title: "Videos",
+    title: "Skatehive",
     icon: "home-outline",
     iconFamily: "Ionicons",
   },
@@ -78,6 +78,27 @@ const styles = StyleSheet.create({
 export default function TabLayout() {
   const router = useRouter();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const segments = useSegments();
+  
+  // Determine header title based on active tab
+  const getHeaderTitle = () => {
+    const currentTab = segments[segments.length - 1];
+    
+    switch (currentTab) {
+      case "videos":
+        return "Skatehive";
+      case "feed":
+        return "Feed";
+      case "create":
+        return "Skatehive Create";
+      case "leaderboard":
+        return "Leaderboard";
+      case "profile":
+        return "Profile";
+      default:
+        return "Skatehive";
+    }
+  };
 
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
@@ -100,7 +121,10 @@ export default function TabLayout() {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader onOpenMenu={() => setIsMenuVisible(true)} />
+      <GlobalHeader 
+        onOpenMenu={() => setIsMenuVisible(true)} 
+        title={getHeaderTitle()}
+      />
       <View style={styles.gestureContainer} {...panResponder.panHandlers}>
           <Tabs
             screenOptions={{

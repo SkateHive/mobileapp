@@ -12,7 +12,7 @@ export default function SearchScreen() {
         <View style={styles.searchBar}>
           <Ionicons name="search" size={20} color={theme.colors.muted} />
           <TextInput
-            placeholder="Search SkateHive..."
+            placeholder="Search Skatehive..."
             placeholderTextColor={theme.colors.muted}
             style={styles.input}
             autoFocus

@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
@@ -113,7 +114,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const ListHeaderComponent = React.useCallback(
     () => (
       <View style={styles.header}>
-        <Text style={styles.headerText}>Feed</Text>
+        <Pressable style={styles.dropdownTrigger}>
+          <Text style={styles.headerText}>Recent</Text>
+          <Ionicons name="chevron-down" size={20} color={theme.colors.text} style={styles.chevron} />
+        </Pressable>
         <Pressable
           onPress={handleNotificationsPress}
           style={styles.notificationButton}
@@ -166,7 +170,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
             titleColor={theme.colors.text}
           />
         }
-        removeClippedSubviews={false} // Important: prevents scroll jumps on fast scrolls
+        removeClippedSubviews={true} // Re-enabled to help with memory/OOM crashes
         initialNumToRender={5}
         maxToRenderPerBatch={5}
         windowSize={11}
@@ -206,6 +210,14 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     padding: theme.spacing.xs,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chevron: {
+    marginLeft: theme.spacing.xs,
+    marginTop: 4,
   },
   separator: {
     height: 1,

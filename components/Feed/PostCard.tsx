@@ -2,7 +2,8 @@ import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
@@ -343,6 +344,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                 source={{ uri: `https://images.hive.blog/u/${post.author}/avatar/small` }}
                 style={styles.profileImage}
                 alt={`${post.author}'s avatar`}
+                transition={200}
               />
             </Pressable>
           </View>
