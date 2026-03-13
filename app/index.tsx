@@ -66,7 +66,6 @@ export default function Index() {
   } = useAuth();
   const queryClient = useQueryClient();
 
-  const [deletingUser, setDeletingUser] = React.useState<string | null>(null);
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [message, setMessage] = React.useState("");
@@ -95,16 +94,7 @@ export default function Index() {
     router.push("/about");
   };
 
-  const handleDeleteUser = async (username: string) => {
-    setDeletingUser(username);
-    try {
-      await deleteStoredUser(username);
-    } catch (error) {
-      console.error("Error deleting user:", error);
-    } finally {
-      setDeletingUser(null);
-    }
-  };
+
 
   const handleSpectator = async () => {
     try {
@@ -224,8 +214,6 @@ export default function Index() {
               onSpectator={handleSpectator}
               storedUsers={storedUsers}
               onQuickLogin={handleQuickLogin}
-              onDeleteUser={handleDeleteUser}
-              deletingUser={deletingUser}
             />
           </View>
         </ScrollView>

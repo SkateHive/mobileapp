@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable, Dimensions, Animated, Easing, ScrollView } from "react-native";
+import { View, StyleSheet, Pressable, Dimensions, Animated, Easing, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -16,7 +16,7 @@ interface SideMenuProps {
 
 export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   const router = useRouter();
-  const { username, logout } = useAuth();
+  const { username, logout, storedUsers, loginStoredUser, deleteStoredUser } = useAuth();
   
   // Animation value for sliding in/out
   const slideAnim = React.useRef(new Animated.Value(-SCREEN_WIDTH * 0.75)).current;
@@ -62,6 +62,48 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     router.replace("/");
   };
 
+  const handleSwitchAccount = async (targetUsername: string) => {
+    try {
+      onClose();
+      // Since we don't have the PIN here, we might need to redirect to login 
+      // but for now let's just logout and let them pick from the login screen
+      // or if it's already the current user, do nothing
+      if (targetUsername === username) return;
+      
+      await logout();
+      router.replace("/");
+    } catch (error) {
+      console.error("Error switching account:", error);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (!username || username === 'SPECTATOR') return;
+
+    Alert.alert(
+      "Remove Account",
+      `Are you sure you want to remove @${username} from this device? You will need your posting key to log in again.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Remove", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              onClose();
+              await deleteStoredUser(username);
+              // After deletion, we should be logged out and sent to login screen
+              router.replace("/");
+            } catch (error) {
+              console.error("Error deleting account:", error);
+              Alert.alert("Error", "Failed to remove account.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const accountItems = [
     { title: "Sign in with Twitter (X)", icon: "logo-twitter" as const, onPress: () => { onClose(); } },
     { title: "Farcaster", icon: "cube-outline" as const, onPress: () => { onClose(); } },
@@ -71,6 +113,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     { title: "Telegram", icon: "paper-plane-outline" as const, onPress: () => { onClose(); } },
     { title: "Email", icon: "mail-outline" as const, onPress: () => { onClose(); } },
     { title: "Edit Profile", icon: "create-outline" as const, onPress: () => { onClose(); } },
+    { title: "Remove account from device", icon: "trash-outline" as const, onPress: handleDeleteAccount },
   ];
 
   const walletItems = [
@@ -91,10 +134,10 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   ];
 
   const aboutItems = [
-    { title: "About SkateHive", icon: "information-circle-outline" as const, onPress: () => { onClose(); } },
+    { title: "About SkateHive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
     { title: "Support", icon: "help-circle-outline" as const, onPress: () => { onClose(); } },
-    { title: "Privacy Policy", icon: "shield-checkmark-outline" as const, onPress: () => { onClose(); } },
-    { title: "Terms of Service", icon: "document-text-outline" as const, onPress: () => { onClose(); } },
+    { title: "Privacy Policy", icon: "shield-checkmark-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
+    { title: "Terms of Service", icon: "document-text-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
   ];
 
   const renderSection = (title: string, items: { title: string, icon: any, onPress: () => void }[]) => (
@@ -132,6 +175,25 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           </View>
           
           <ScrollView style={styles.menuItems} showsVerticalScrollIndicator={false}>
+            {/* Account Switcher */}
+            {storedUsers.filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== username).length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Switch Account</Text>
+                {storedUsers
+                  .filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== username)
+                  .map((user, index) => (
+                    <Pressable 
+                      key={`switch-${user.username}-${index}`} 
+                      style={styles.menuItem} 
+                      onPress={() => handleSwitchAccount(user.username)}
+                    >
+                      <Ionicons name="person-circle-outline" size={22} color={theme.colors.text} />
+                      <Text style={styles.menuItemText}>@{user.username}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+
             {renderSection("ACCOUNT", accountItems)}
             {renderSection("WALLET", walletItems)}
             {renderSection("SERVICE", serviceItems)}

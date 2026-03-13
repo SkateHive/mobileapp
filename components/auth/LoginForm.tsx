@@ -21,8 +21,6 @@ interface LoginFormProps {
   onSpectator: () => Promise<void>;
   storedUsers?: StoredUser[];
   onQuickLogin?: (username: string, method: EncryptionMethod, pin?: string) => Promise<void>;
-  onDeleteUser?: (username: string) => void;
-  deletingUser?: string | null;
 }
 
 export function LoginForm({
@@ -35,8 +33,6 @@ export function LoginForm({
   onSpectator,
   storedUsers = [],
   onQuickLogin,
-  onDeleteUser,
-  deletingUser,
 }: LoginFormProps) {
   const [method, setMethod] = useState<EncryptionMethod>('pin');
   const [pin, setPin] = useState('');
@@ -172,11 +168,8 @@ export function LoginForm({
               <StoredUsersView
                 users={storedUsers}
                 onQuickLogin={handleQuickLogin}
-                onDeleteUser={onDeleteUser}
               />
-              {deletingUser && (
-                <Text style={styles.deletingText}>Deleting @{deletingUser}...</Text>
-              )}
+
               <Pressable onPress={handleAddUserPress} style={styles.addUserLink}>
                 <Text style={styles.addUserText}>+ Add a new user</Text>
               </Pressable>
@@ -275,14 +268,12 @@ export function LoginForm({
             </View>
           )}
 
-          {!hasStoredUsers && (
-            <Pressable
-              onPress={onSpectator}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonText}>Enter as Spectator</Text>
-            </Pressable>
-          )}
+          <Pressable
+            onPress={onSpectator}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>Enter as Spectator</Text>
+          </Pressable>
 
           <Pressable
             onPress={() => WebBrowser.openBrowserAsync('https://hive.io')}
