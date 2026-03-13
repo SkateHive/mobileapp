@@ -1,6 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
-import { Image } from "expo-image";
+import { View, StyleSheet, Pressable, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "~/components/ui/text";
@@ -8,70 +7,57 @@ import { theme } from "~/lib/theme";
 import { useAuth } from "~/lib/auth-provider";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNotificationContext } from "~/lib/notifications-context";
-import { BadgedIcon } from "./BadgedIcon";
 
 interface GlobalHeaderProps {
   onOpenMenu: () => void;
   title?: string;
-  centerComponent?: React.ReactNode;
-  showSettings?: boolean;
 }
 
-export function GlobalHeader({ onOpenMenu, title = "Skatehive", centerComponent, showSettings }: GlobalHeaderProps) {
+export function GlobalHeader({ onOpenMenu, title = "SkateHive" }: GlobalHeaderProps) {
   const router = useRouter();
-  const { badgeCount } = useNotificationContext();
+  const { username } = useAuth();
+  const { hiveAccount } = useHiveAccount(username || "");
 
   const handleSearchPress = () => {
     router.push("/(tabs)/search" as any);
   };
 
-  const handleNotificationsPress = () => {
-    router.push("/(tabs)/notifications" as any);
+  const renderAvatar = () => {
+    if (!username || username === "SPECTATOR") {
+      return (
+        <View style={styles.defaultAvatar}>
+          <Ionicons name="person" size={20} color={theme.colors.text} />
+        </View>
+      );
+    }
+
+    const profileImage = hiveAccount?.metadata?.profile?.profile_image;
+    const hiveAvatarUrl = `https://images.hive.blog/u/${username}/avatar/small`;
+
+    if (profileImage) {
+      return <Image source={{ uri: profileImage }} style={styles.avatar} />;
+    }
+
+    return <Image source={{ uri: hiveAvatarUrl }} style={styles.avatar} />;
   };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Left: Notifications */}
-        <View style={styles.leftAction}>
-          <Pressable 
-            onPress={handleNotificationsPress} 
-            style={styles.iconButton} 
-            accessibilityRole="button" 
-            accessibilityLabel={badgeCount > 0 ? `Notifications, ${badgeCount} unread` : "Notifications"}
-          >
-            <BadgedIcon name="notifications-outline" size={24} color={theme.colors.text} badgeCount={badgeCount} />
-          </Pressable>
-        </View>
+        {/* Left: Avatar / Menu Trigger */}
+        <Pressable onPress={onOpenMenu} style={styles.leftAction} accessibilityRole="button" accessibilityLabel="Open Menu">
+          {renderAvatar()}
+        </Pressable>
 
-        {/* Center: Title, Logo or Custom Component */}
+        {/* Center: Title or Logo */}
         <View style={styles.centerContent}>
-          {centerComponent || <Text style={styles.titleText}>{title}</Text>}
+          <Text style={styles.titleText}>{title}</Text>
         </View>
 
-        {/* Right: Search or Settings */}
-        <View style={styles.rightActions}>
-          {showSettings ? (
-            <Pressable 
-              onPress={onOpenMenu} 
-              style={styles.iconButton} 
-              accessibilityRole="button" 
-              accessibilityLabel="Settings"
-            >
-              <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
-            </Pressable>
-          ) : (
-            <Pressable 
-              onPress={handleSearchPress} 
-              style={styles.iconButton} 
-              accessibilityRole="button" 
-              accessibilityLabel="Search"
-            >
-              <Ionicons name="search" size={24} color={theme.colors.text} />
-            </Pressable>
-          )}
-        </View>
+        {/* Right: Search */}
+        <Pressable onPress={handleSearchPress} style={styles.rightAction} accessibilityRole="button" accessibilityLabel="Search">
+          <Ionicons name="search" size={24} color={theme.colors.text} />
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -91,29 +77,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
   },
   leftAction: {
-    width: 48, // Consistent width for alignment
-    height: 48,
-    justifyContent: "center",
+    width: 40,
     alignItems: "flex-start",
   },
   centerContent: {
     flex: 1,
-    height: 48,
-    justifyContent: "center",
     alignItems: "center",
   },
-  rightActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    minWidth: 80,
-    gap: 4, // Tighter gap for better alignment
-  },
-  iconButton: {
+  rightAction: {
     width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
+    alignItems: "flex-end",
   },
   titleText: {
     fontSize: theme.fontSizes.lg,
