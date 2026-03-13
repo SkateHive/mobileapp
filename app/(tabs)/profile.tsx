@@ -8,6 +8,7 @@ import {
   RefreshControl,
   StyleSheet,
   FlatList,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,15 +18,54 @@ import { ProfileSpectatorInfo } from "~/components/SpectatorMode/ProfileSpectato
 import { PostCard } from "~/components/Feed/PostCard";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { FollowersModal } from "~/components/Profile/FollowersModal";
+import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
 
+// Map common country names/codes to flag emojis
+function countryToFlag(location: string): string {
+  const loc = location.trim().toUpperCase();
+  const map: Record<string, string> = {
+    BR: '🇧🇷', BRAZIL: '🇧🇷', BRASIL: '🇧🇷',
+    US: '🇺🇸', USA: '🇺🇸', 'UNITED STATES': '🇺🇸',
+    UK: '🇬🇧', GB: '🇬🇧', 'UNITED KINGDOM': '🇬🇧', ENGLAND: '🇬🇧',
+    DE: '🇩🇪', GERMANY: '🇩🇪', DEUTSCHLAND: '🇩🇪',
+    FR: '🇫🇷', FRANCE: '🇫🇷',
+    ES: '🇪🇸', SPAIN: '🇪🇸', ESPAÑA: '🇪🇸',
+    PT: '🇵🇹', PORTUGAL: '🇵🇹',
+    MX: '🇲🇽', MEXICO: '🇲🇽', MÉXICO: '🇲🇽',
+    CA: '🇨🇦', CANADA: '🇨🇦',
+    AR: '🇦🇷', ARGENTINA: '🇦🇷',
+    AU: '🇦🇺', AUSTRALIA: '🇦🇺',
+    JP: '🇯🇵', JAPAN: '🇯🇵',
+    NL: '🇳🇱', NETHERLANDS: '🇳🇱',
+    IT: '🇮🇹', ITALY: '🇮🇹', ITALIA: '🇮🇹',
+    CL: '🇨🇱', CHILE: '🇨🇱',
+    CO: '🇨🇴', COLOMBIA: '🇨🇴',
+    PE: '🇵🇪', PERU: '🇵🇪',
+    VE: '🇻🇪', VENEZUELA: '🇻🇪',
+    SE: '🇸🇪', SWEDEN: '🇸🇪',
+    NO: '🇳🇴', NORWAY: '🇳🇴',
+    CR: '🇨🇷', 'COSTA RICA': '🇨🇷',
+    ZA: '🇿🇦', 'SOUTH AFRICA': '🇿🇦',
+    IN: '🇮🇳', INDIA: '🇮🇳',
+    PH: '🇵🇭', PHILIPPINES: '🇵🇭',
+  };
+  // Try exact match first, then check if location contains a known key
+  if (map[loc]) return map[loc];
+  for (const [key, flag] of Object.entries(map)) {
+    if (loc.includes(key)) return flag;
+  }
+  return '🌍';
+}
+
 export default function ProfileScreen() {
   const { username: currentUsername, logout } = useAuth();
   const params = useLocalSearchParams();
-  const [message, setMessage] = useState("");
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
 
   // Use the URL param username if available, otherwise use current user's username
@@ -46,7 +86,6 @@ export default function ProfileScreen() {
       router.push("/");
     } catch (error) {
       console.error("Error logging out:", error);
-      setMessage("Error logging out");
     }
   };
 
@@ -156,106 +195,67 @@ export default function ProfileScreen() {
   // Render the profile header section
   const renderProfileHeader = () => (
     <View>
-      {/* Cover Image */}
-      <View style={styles.coverImageContainer}>
-        {hiveAccount?.metadata?.profile?.cover_image ? (
-          <Image
-            source={{ uri: hiveAccount.metadata.profile.cover_image }}
-            style={styles.coverImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.defaultCoverImage} />
-        )}
-      </View>
-
-      {/* Profile Section - Overlapping the cover */}
+      {/* Profile Section */}
       <View style={styles.profileSection}>
-        {/* Top-right logout button (only for owner) */}
-        {!params.username && (
-          <Pressable onPress={handleLogout} style={styles.logoutButton}>
-            <View style={styles.logoutButtonContent}>
-              <Text style={styles.logoutButtonText}>Logout</Text>
-              <Ionicons name="exit-outline" size={16} color={theme.colors.text} />
-            </View>
-          </Pressable>
-        )}
-
-        {/* Profile Picture and Name Section */}
         <View style={styles.profileHeaderRow}>
           <View style={styles.profileImageContainer}>
             {renderProfileImage()}
           </View>
-          
-          {/* Name and Username beside profile pic */}
+
           <View style={styles.nameSection}>
-            <Text style={styles.profileName}>
-              {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
-            </Text>
+            {/* Name row with gear icon */}
+            <View style={styles.nameRow}>
+              <Text style={styles.profileName} numberOfLines={1}>
+                {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
+              </Text>
+              {!params.username && (
+                <Pressable
+                  onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
+                  hitSlop={12}
+                  style={styles.gearIcon}
+                >
+                  <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Username */}
             <Text style={styles.username}>@{profileUsername}</Text>
-          </View>
-        </View>
 
-        {/* Profile Info */}
-        <View style={styles.profileInfo}>
-
-          {/* Bio */}
-          {hiveAccount?.metadata?.profile?.about && (
-            <Text style={styles.aboutText}>
-              {hiveAccount.metadata.profile.about}
-            </Text>
-          )}
-
-          {/* Location and Website */}
-          <View style={styles.metaInfo}>
-            {hiveAccount?.metadata?.profile?.location && (
-              <View style={styles.metaItem}>
-                <Text style={styles.metaIcon}>📍</Text>
-                <Text style={styles.metaText}>{hiveAccount.metadata.profile.location}</Text>
-              </View>
-            )}
-            {hiveAccount?.metadata?.profile?.website && (
-              <View style={styles.metaItem}>
-                <Text style={styles.metaIcon}>🌐</Text>
-                <Text style={styles.metaText}>{hiveAccount.metadata.profile.website}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            {profileUsername === "SPECTATOR" ? (
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                <Text style={styles.statLabel}>Following</Text>
-              </View>
-            ) : (
-              <Pressable style={styles.statItem} onPress={handleFollowingPress}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                <Text style={styles.statLabel}>Following</Text>
-              </Pressable>
-            )}
-            {profileUsername === "SPECTATOR" ? (
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </View>
-            ) : (
-              <Pressable style={styles.statItem} onPress={handleFollowersPress}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </Pressable>
-            )}
-            {/* Show muted count only for the logged-in user's own profile */}
-            {profileUsername === currentUsername && profileUsername !== "SPECTATOR" && (
-              <Pressable style={styles.statItem} onPress={handleMutedPress}>
-                <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.muted || "0"}</Text>
-                <Text style={styles.statLabel}>Muted</Text>
-              </Pressable>
-            )}
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{vp.toFixed(0)}%</Text>
-              <Text style={styles.statLabel}>VP</Text>
+            {/* Stats + flag inline */}
+            <View style={styles.statsRow}>
+              {profileUsername === "SPECTATOR" ? (
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </View>
+              ) : (
+                <Pressable style={styles.statItem} onPress={handleFollowingPress}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </Pressable>
+              )}
+              {profileUsername === "SPECTATOR" ? (
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </View>
+              ) : (
+                <Pressable style={styles.statItem} onPress={handleFollowersPress}>
+                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </Pressable>
+              )}
+              {hiveAccount?.metadata?.profile?.location && (
+                <View style={styles.statItem}>
+                  <Text style={styles.locationFlag}>
+                    {countryToFlag(hiveAccount.metadata.profile.location)}
+                  </Text>
+                  <Text style={styles.statLabel}>
+                    {hiveAccount.metadata.profile.location}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -346,6 +346,50 @@ export default function ProfileScreen() {
           type={modalType}
         />
       )}
+
+      {/* Edit Profile Modal */}
+      {!params.username && (
+        <EditProfileModal
+          visible={editProfileVisible}
+          onClose={() => setEditProfileVisible(false)}
+          currentProfile={hiveAccount?.metadata?.profile || {}}
+          onSaved={handleRefresh}
+        />
+      )}
+
+      {/* Settings Dialog */}
+      <Modal
+        visible={settingsMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSettingsMenuVisible(false)}
+      >
+        <Pressable style={styles.dialogOverlay} onPress={() => setSettingsMenuVisible(false)}>
+          <View style={styles.dialogBox}>
+            <Pressable
+              style={styles.dialogItem}
+              onPress={() => {
+                setSettingsMenuVisible(false);
+                setEditProfileVisible(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+              <Text style={styles.dialogItemText}>Edit Profile</Text>
+            </Pressable>
+            <View style={styles.dialogDivider} />
+            <Pressable
+              style={styles.dialogItem}
+              onPress={() => {
+                setSettingsMenuVisible(false);
+                handleLogout();
+              }}
+            >
+              <Ionicons name="log-out-outline" size={20} color={theme.colors.danger} />
+              <Text style={[styles.dialogItemText, { color: theme.colors.danger }]}>Logout</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -358,62 +402,64 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
   },
-  // Cover Image Styles
-  coverImageContainer: {
-    height: 120,
-    width: '100%',
-    backgroundColor: theme.colors.card,
-  },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-  },
-  defaultCoverImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
   // Profile Section Styles
   profileSection: {
-    position: 'relative',
     paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
-    marginTop: -12, // Overlap the cover image
   },
   profileHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center', // Center align items vertically
+    alignItems: 'flex-start',
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
   },
   profileImageContainer: {
     // No need for alignSelf since it's in a row now
   },
-  logoutButton: {
-    position: 'absolute',
-    top: theme.spacing.sm,
-    right: theme.spacing.sm,
-    zIndex: 10,
-  },
-  logoutButtonContent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: theme.borderRadius.full,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  logoutButtonText: {
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
-  },
-  profileInfo: {
-    gap: theme.spacing.sm,
-  },
   nameSection: {
     flex: 1,
-    gap: theme.spacing.xxs,
+    gap: theme.spacing.xs,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  locationFlag: {
+    fontSize: 18,
+  },
+  gearIcon: {
+    padding: theme.spacing.xs,
+  },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialogBox: {
+    backgroundColor: theme.colors.secondaryCard,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    width: 220,
+    overflow: 'hidden',
+  },
+  dialogItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  dialogItemText: {
+    color: theme.colors.text,
+    fontFamily: theme.fonts.regular,
+    fontSize: theme.fontSizes.md,
+  },
+  dialogDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.border,
   },
   profileName: {
     fontSize: theme.fontSizes.xl,
@@ -426,33 +472,11 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
   },
-  aboutText: {
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
-    fontSize: theme.fontSizes.sm,
-    lineHeight: theme.fontSizes.sm * 1.4,
-  },
-  metaInfo: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.md,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  metaIcon: {
-    fontSize: theme.fontSizes.xs,
-  },
-  metaText: {
-    fontSize: theme.fontSizes.xs,
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
-  },
   statsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: theme.spacing.lg,
+    marginTop: theme.spacing.xs,
   },
   statItem: {
     alignItems: 'flex-start',
@@ -467,26 +491,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
     fontSize: theme.fontSizes.xs,
     marginTop: theme.spacing.xxs,
-  },
-  // Legacy styles for backward compatibility
-  exitButton: {
-    position: 'absolute',
-    top: theme.spacing.lg,
-    right: theme.spacing.lg,
-    zIndex: 10,
-  },
-  exitButtonContent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: theme.borderRadius.full,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  exitButtonText: {
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
   },
   spectatorAvatar: {
     width: 96,
