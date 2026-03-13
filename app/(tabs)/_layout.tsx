@@ -1,9 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs, useRouter, useSegments } from "expo-router";
 import { StyleSheet, View, PanResponder } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { useRef } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRef, useState } from "react";
 import { theme } from "~/lib/theme";
+import { GlobalHeader } from "~/components/ui/GlobalHeader";
+import { SideMenu } from "~/components/ui/SideMenu";
+import { FeedFilterProvider, useFeedFilter } from "~/lib/FeedFilterContext";
+import { Pressable, Text as RNText, Modal } from "react-native";
+import { Text } from "~/components/ui/text";
 
 interface TabItem {
   name: string;
@@ -15,15 +20,15 @@ interface TabItem {
 
 const TAB_ITEMS: TabItem[] = [
   {
-    name: "feed",
-    title: "Feed",
+    name: "videos",
+    title: "Skatehive",
     icon: "home-outline",
     iconFamily: "Ionicons",
   },
   {
-    name: "videos",
-    title: "Videos",
-    icon: "film-outline",
+    name: "feed",
+    title: "Feed",
+    icon: "reader-outline",
     iconFamily: "Ionicons",
   },
   {
@@ -47,8 +52,112 @@ const TAB_ITEMS: TabItem[] = [
   },
 ];
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  gestureContainer: {
+    flex: 1,
+  },
+  centerButtonContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.background,
+    borderWidth: 3,
+    borderColor: theme.colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+});
+
+function FeedHeaderTitle() {
+  const { filter, setFilter } = useFeedFilter();
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const filters: ('Recent' | 'Following' | 'Curated' | 'Trending')[] = ['Recent', 'Following', 'Curated', 'Trending'];
+
+  return (
+    <View>
+      <Pressable onPress={() => setShowDropdown(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ fontSize: theme.fontSizes.lg, fontFamily: theme.fonts.bold, color: theme.colors.text }}>
+          {filter}
+        </Text>
+        <Ionicons name="chevron-down" size={18} color={theme.colors.text} style={{ marginLeft: 4 }} />
+      </Pressable>
+
+      <Modal
+        visible={showDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDropdown(false)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => setShowDropdown(false)}
+        >
+          <View style={{ backgroundColor: theme.colors.secondaryCard, borderRadius: 12, padding: 8, width: 200, borderWidth: 1, borderColor: theme.colors.border }}>
+            {filters.map((f) => (
+              <Pressable
+                key={f}
+                onPress={() => {
+                  setFilter(f);
+                  setShowDropdown(false);
+                }}
+                style={{
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  backgroundColor: filter === f ? 'rgba(50, 205, 50, 0.1)' : 'transparent',
+                  borderRadius: 8,
+                  marginBottom: 4,
+                }}
+              >
+                <Text style={{ 
+                  color: filter === f ? theme.colors.primary : theme.colors.text,
+                  fontFamily: filter === f ? theme.fonts.bold : theme.fonts.regular 
+                }}>
+                  {f}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
 export default function TabLayout() {
   const router = useRouter();
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const segments = useSegments();
+  
+  // Determine header title based on active tab
+  const getHeaderTitle = () => {
+    const currentTab = segments[segments.length - 1];
+    
+    switch (currentTab) {
+      case "videos":
+        return "Skatehive";
+      case "feed":
+        return "Feed";
+      case "create":
+        return "Skatehive Create";
+      case "leaderboard":
+        return "Leaderboard";
+      case "profile":
+        return "Profile";
+      default:
+        return "Skatehive";
+    }
+  };
 
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
@@ -69,35 +178,14 @@ export default function TabLayout() {
     })
   ).current;
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    gestureContainer: {
-      flex: 1,
-    },
-    centerButtonContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: theme.colors.background,
-      borderWidth: 3,
-      borderColor: theme.colors.primary,
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 20,
-      shadowColor: theme.colors.primary,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.5,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-  });
-
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container} edges={["top"]}>
+    <FeedFilterProvider>
+      <View style={styles.container}>
+        <GlobalHeader 
+          onOpenMenu={() => setIsMenuVisible(true)} 
+          title={getHeaderTitle()}
+          centerComponent={segments[segments.length - 1] === "feed" ? <FeedHeaderTitle /> : undefined}
+        />
         <View style={styles.gestureContainer} {...panResponder.panHandlers}>
           <Tabs
             screenOptions={{
@@ -154,10 +242,20 @@ export default function TabLayout() {
                 title: "Notifications",
               }}
             />
+            
+            {/* Hidden search tab - accessible from header */}
+            <Tabs.Screen
+              name="search"
+              options={{
+                href: null,
+                title: "Search",
+              }}
+            />
           </Tabs>
         </View>
-      </SafeAreaView>
-    </SafeAreaProvider>
+        <SideMenu isVisible={isMenuVisible} onClose={() => setIsMenuVisible(false)} />
+      </View>
+    </FeedFilterProvider>
   );
 }
 

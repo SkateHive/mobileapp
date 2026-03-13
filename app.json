@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "SkateHive",
+    "name": "Skatehive",
     "slug": "skatehive-app",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon-ios.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/adaptive-icon.png",
       "resizeMode": "contain",
@@ -41,6 +41,7 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
+      "largeHeap": true,
       "package": "com.skatehive.app",
       "versionCode": 1
     },
@@ -57,17 +58,18 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "SkateHive needs access to your camera to capture photos and videos of your skateboarding tricks and moments. This media will be uploaded to IPFS and shared on the Hive blockchain as part of your posts."
+          "cameraPermission": "Skatehive needs access to your camera to capture photos and videos of your skateboarding tricks and moments. This media will be uploaded to IPFS and shared on the Hive blockchain as part of your posts."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "SkateHive needs access to your photo library to let you select existing photos and videos for your skateboarding posts. Selected media will be uploaded to IPFS and shared on the Hive blockchain.",
-          "savePhotosPermission": "SkateHive needs permission to save photos to your library."
+          "photosPermission": "Skatehive needs access to your photo library to let you select existing photos and videos for your skateboarding posts. Selected media will be uploaded to IPFS and shared on the Hive blockchain.",
+          "savePhotosPermission": "Skatehive needs permission to save photos to your library."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

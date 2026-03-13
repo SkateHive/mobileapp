@@ -18,6 +18,7 @@ import { PostCard } from './PostCard';
 import { ReplyComposer } from '~/components/ui/ReplyComposer';
 import { useReplies } from '~/lib/hooks/useReplies';
 import { useAuth } from '~/lib/auth-provider';
+import { useScrollLock } from '~/lib/ScrollLockContext';
 import { theme } from '~/lib/theme';
 import type { Discussion } from '@hiveio/dhive';
 import type { NestedDiscussion } from '~/lib/types';
@@ -32,6 +33,7 @@ interface FullConversationDrawerProps {
 
 export function FullConversationDrawer({ visible, onClose, discussion }: FullConversationDrawerProps) {
   const { username } = useAuth();
+  const { isScrollLocked } = useScrollLock();
   const insets = useSafeAreaInsets();
   const { comments, isLoading, error } = useReplies(
     discussion.author,
@@ -161,6 +163,7 @@ export function FullConversationDrawer({ visible, onClose, discussion }: FullCon
               style={styles.content} 
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={!isScrollLocked}
             >
               {/* Original Post */}
               <View style={styles.mainPost}>

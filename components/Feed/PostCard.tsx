@@ -1,20 +1,30 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
+import { useScrollLock } from '~/lib/ScrollLockContext';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
 import { useViewportTracker } from '~/lib/ViewportTracker';
 import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
+import { VotePresetButtons } from '../ui/VotePresetButtons';
+import { useAppSettings } from '~/lib/AppSettingsContext';
 import { MediaPreview } from './MediaPreview';
+import { CommentBottomSheet } from '../ui/CommentBottomSheet';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
-import { ConversationDrawer } from './ConversationDrawer';
-import { FullConversationDrawer } from './FullConversationDrawer';
+// Lazy imports break the require cycle:
+// PostCard → ConversationDrawer → PostCard
+// Lazy load heavy components
+// No longer loading FullConversationDrawer here — it's managed by the parent (Feed/Profile)
+const ConversationDrawer = React.lazy(() =>
+  import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
+);
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
 import type { Media } from '../../lib/types';
@@ -47,11 +57,15 @@ const formatTimeAbbreviated = (date: Date): string => {
 interface PostCardProps {
   post: Discussion;
   currentUsername: string | null;
+  onOpenConversation?: (post: Discussion) => void;
 }
 
 
-export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
+export const PostCard = React.memo(({ post, currentUsername, onOpenConversation }: PostCardProps) => {
+  const { isScrollLocked, setScrollLocked } = useScrollLock();
   const { session, followingList, updateUserRelationship } = useAuth();
+  const { settings } = useAppSettings();
+  const [isFollowing, setIsFollowing] = useState(false);
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -60,8 +74,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [showSlider, setShowSlider] = useState(false);
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
-  const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
-  const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
+  const [isCommentSheetVisible, setIsCommentSheetVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState('');
@@ -124,15 +137,46 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   // Check if user has already voted on this post
   useEffect(() => {
     if (currentUsername && Array.isArray(post.active_votes)) {
-      const hasVoted = post.active_votes.some((vote: any) => vote.voter === currentUsername && vote.weight > 0);
+      const hasVoted = post.active_votes.some((vote: any) => 
+        vote.voter.toLowerCase() === currentUsername.toLowerCase() && vote.weight > 0
+      );
       setIsLiked(hasVoted);
     }
   }, [post.active_votes, currentUsername]);
+
+  // Sync following status
+  useEffect(() => {
+    if (followingList && post.author) {
+      const following = followingList.some(u => u.toLowerCase() === post.author.toLowerCase());
+      setIsFollowing(following);
+    }
+  }, [followingList, post.author]);
 
   const handleMediaPress = useCallback((media: Media) => {
     setSelectedMedia(media);
     setIsModalVisible(true);
   }, []);
+
+  const handleFollow = async () => {
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsFollowing(true);
+      const success = await updateUserRelationship(post.author, 'blog');
+      if (success) {
+        showToast(`Following @${post.author}`, 'success');
+      } else {
+        showToast('Failed to follow user', 'error');
+      }
+    } catch (error) {
+      showToast('Error following user', 'error');
+    } finally {
+      setIsFollowing(false);
+    }
+  };
 
   const handleVote = async (customWeight?: number) => {
     try {
@@ -203,6 +247,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
     } finally {
       setIsVoting(false);
       setShowSlider(false);
+      setScrollLocked(false);
     }
   };
 
@@ -225,11 +270,13 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   };
 
   const handleConversationPress = () => {
-    setIsConversationDrawerVisible(true);
+    setIsCommentSheetVisible(true);
   };
 
   const handleBodyPress = () => {
-    setIsFullConversationVisible(true);
+    if (onOpenConversation) {
+      onOpenConversation(post);
+    }
   };
 
   const handleUserMenuPress = () => {
@@ -335,6 +382,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                 source={{ uri: `https://images.hive.blog/u/${post.author}/avatar/small` }}
                 style={styles.profileImage}
                 alt={`${post.author}'s avatar`}
+                transition={200}
               />
             </Pressable>
           </View>
@@ -349,11 +397,28 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               <Text style={styles.dateText}>
                 {formattedDate}
               </Text>
+
+              {/* Follow Button */}
+              {currentUsername && 
+               post.author.toLowerCase() !== currentUsername.toLowerCase() && 
+               !isFollowing && (
+                <Pressable 
+                  onPress={handleFollow} 
+                  style={styles.followButton}
+                  disabled={isFollowing}
+                >
+                  {isFollowing ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <Text style={styles.followButtonText}>Follow</Text>
+                  )}
+                </Pressable>
+              )}
               
               {/* Three dots menu - only show if not viewing own post */}
               {currentUsername && post.author !== currentUsername && (
                 <Pressable onPress={handleUserMenuPress} style={styles.menuButton}>
-                  <FontAwesome name="ellipsis-h" size={16} color={theme.colors.text} />
+                  <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.text} />
                 </Pressable>
               )}
             </View>
@@ -381,97 +446,115 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               </View>
             )}
 
-            {/* Bottom bar */}
-            <View style={styles.bottomBar}>
-              {showSlider ? (
-                /* Voting slider mode - takes entire bottom bar */
-                <View style={styles.votingSliderContainer}>
-                  <VotingSlider
-                    value={voteWeight}
-                    onValueChange={setVoteWeight}
-                    minimumValue={1}
-                    maximumValue={100}
-                  />
-                  <View style={styles.sliderControls}>
-                    <Pressable
-                      style={styles.cancelVoteButton}
-                      onPress={() => setShowSlider(false)}
-                      disabled={isVoting}
-                    >
-                      <FontAwesome name="times" size={20} color={theme.colors.gray} />
-                    </Pressable>
-                    <Pressable
-                      style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
-                      onPress={() => handleVote(voteWeight)}
-                      disabled={isVoting}
-                    >
-                      {isVoting ? (
-                        <ActivityIndicator size="small" color={theme.colors.green} />
-                      ) : (
-                        <FontAwesome name="arrow-up" size={20} color={theme.colors.green} />
-                      )}
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                /* Normal bottom bar mode */
-                <>
-                  <Text style={[styles.payoutText, { color: parseFloat(calculateTotalValue()) > 0 ? theme.colors.green : theme.colors.gray }]}>
-                    ${calculateTotalValue()}
-                  </Text>
-                  
-                  <View style={styles.actionsContainer}>
-                    {/* Replies section - clickable to open conversation */}
-                    <Pressable onPress={handleConversationPress} style={styles.actionItem}>
-                      <FontAwesome name="comment-o" size={20} color={theme.colors.gray} />
-                      <Text style={styles.actionText}>{post.children}</Text>
-                    </Pressable>
-                    
-                    {/* Voting section */}
-                    <Pressable
-                      onPress={() => setShowSlider(true)}
-                      style={[styles.actionItem, isVoting && styles.disabledButton]}
-                      disabled={isVoting}
-                    >
-                      {isVoting ? (
-                        <ActivityIndicator 
-                          size="small" 
-                          color={isLiked ? theme.colors.green : theme.colors.gray}
-                        />
-                      ) : (
-                        <>
-                          <Text style={[styles.voteCount, { color: isLiked ? theme.colors.green : theme.colors.gray }]}>
-                            {voteCount}
-                          </Text>
-                          <FontAwesome
-                            name="arrow-up"
-                            size={20}
-                            color={isLiked ? theme.colors.green : theme.colors.gray}
-                          />
-                        </>
-                      )}
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </View>
           </View>
+        </View>
+
+        {/* Full-width action bar — outside mainLayout for better thumb reach */}
+        <View style={styles.bottomBar}>
+          {showSlider ? (
+            /* Voting mode - takes entire bottom bar */
+            <View style={styles.votingSliderContainer}>
+              {settings.useVoteSlider ? (
+                /* Slider mode */
+                <VotingSlider
+                  value={voteWeight}
+                  onValueChange={setVoteWeight}
+                  minimumValue={1}
+                  maximumValue={100}
+                />
+              ) : (
+                /* Preset buttons mode */
+                <VotePresetButtons
+                  onSelect={(weight) => handleVote(weight)}
+                  disabled={isVoting}
+                />
+              )}
+              <View style={styles.sliderControls}>
+                <Pressable
+                  style={styles.cancelVoteButton}
+                  onPress={() => {
+                    setShowSlider(false);
+                    setScrollLocked(false);
+                  }}
+                  disabled={isVoting}
+                >
+                  <FontAwesome name="times" size={22} color={theme.colors.gray} />
+                </Pressable>
+                {settings.useVoteSlider && (
+                  <Pressable
+                    style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
+                    onPress={() => handleVote(voteWeight)}
+                    disabled={isVoting}
+                  >
+                    {isVoting ? (
+                      <ActivityIndicator size="small" color={theme.colors.green} />
+                    ) : (
+                      <Ionicons name="thumbs-up" size={22} color={theme.colors.green} />
+                    )}
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          ) : (
+            /* Normal bottom bar mode */
+            <>
+              <Text style={[styles.payoutText, { color: parseFloat(calculateTotalValue()) > 0 ? theme.colors.green : theme.colors.gray }]}>
+                ${calculateTotalValue()}
+              </Text>
+
+              <View style={styles.actionsContainer}>
+                {/* Replies section - clickable to open conversation */}
+                <Pressable onPress={handleConversationPress} style={styles.actionItem} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Ionicons name="chatbubble-outline" size={22} color={theme.colors.gray} />
+                  <Text style={styles.actionText}>{post.children}</Text>
+                </Pressable>
+
+                {/* Voting section */}
+                <Pressable
+                  onPress={() => {
+                    setShowSlider(true);
+                    setScrollLocked(true);
+                  }}
+                  style={[styles.actionItem, isVoting && styles.disabledButton]}
+                  disabled={isVoting}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                >
+                  {isVoting ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={isLiked ? theme.colors.green : theme.colors.gray}
+                    />
+                  ) : (
+                    <>
+                      <Text style={[styles.voteCount, { color: isLiked ? theme.colors.green : theme.colors.gray }]}>
+                        {voteCount}
+                      </Text>
+                      <Ionicons
+                        name={isLiked ? "thumbs-up" : "thumbs-up-outline"}
+                        size={22}
+                        color={isLiked ? theme.colors.green : theme.colors.gray}
+                      />
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </>
+          )}
         </View>
       </View>
 
-      {/* Conversation Drawer - Quick reply only */}
-      <ConversationDrawer
-        visible={isConversationDrawerVisible}
-        onClose={() => setIsConversationDrawerVisible(false)}
-        discussion={post}
+      {/* Comment Bottom Sheet for quick reply */}
+      <CommentBottomSheet
+        isVisible={isCommentSheetVisible}
+        onClose={() => setIsCommentSheetVisible(false)}
+        parentAuthor={post.author}
+        parentPermlink={post.permlink}
+        onReplySuccess={(reply) => {
+          // Could optionally update post children count here optimistically
+          // setPostChildrenCount(prev => prev + 1);
+        }}
       />
 
-      {/* Full Conversation Drawer - Entire conversation thread */}
-      <FullConversationDrawer
-        visible={isFullConversationVisible}
-        onClose={() => setIsFullConversationVisible(false)}
-        discussion={post}
-      />
 
       {/* User Menu Modal */}
       <Modal
@@ -660,8 +743,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.lightGray,
   },
   payoutText: {
     fontSize: theme.fontSizes.md, 
@@ -670,15 +755,16 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xxs,
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: 0,
-    borderRadius: theme.borderRadius.xs,
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(50, 205, 50, 0.06)',
   },
   actionText: {
     fontSize: theme.fontSizes.md,
@@ -704,32 +790,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 32,
+    height: 40,
     marginBottom: theme.spacing.xxs,
   },
   sliderControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xxs,
+    gap: theme.spacing.sm,
     marginLeft: theme.spacing.xs,
   },
   cancelVoteButton: {
-    padding: 2,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
   },
   confirmVoteButton: {
-    padding: 2,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
   },
   menuButton: {
-    padding: theme.spacing.xs,
+    padding: theme.spacing.sm,
     marginLeft: 'auto',
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followButton: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(50, 205, 50, 0.1)',
+    marginHorizontal: theme.spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 70,
+  },
+  followButtonText: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.green,
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
   },
   modalOverlay: {
     flex: 1,

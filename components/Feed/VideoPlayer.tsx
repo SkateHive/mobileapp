@@ -9,6 +9,7 @@ interface VideoPlayerProps {
   contentFit?: "contain" | "cover" | "fill";
   showControls?: boolean;
   initialMuted?: boolean;
+  onPlaybackStarted?: () => void;
 }
 
 export const VideoPlayer = React.memo(
@@ -18,9 +19,13 @@ export const VideoPlayer = React.memo(
     contentFit = "contain",
     showControls = true,
     initialMuted = true,
+    onPlaybackStarted,
   }: VideoPlayerProps) => {
     const [isMuted, setIsMuted] = useState(initialMuted);
     const isUpdatingFromPlayer = useRef(false);
+    const hasNotifiedPlayback = useRef(false);
+    const onPlaybackStartedRef = useRef(onPlaybackStarted);
+    onPlaybackStartedRef.current = onPlaybackStarted;
 
     const player = useVideoPlayer(url, (player) => {
       player.loop = true;
@@ -29,7 +34,19 @@ export const VideoPlayer = React.memo(
     // Set initial muted state after player is created
     useEffect(() => {
       player.muted = initialMuted;
-    }, []);
+    }, [player, initialMuted]);
+
+    // Notify parent when video starts playing
+    useEffect(() => {
+      if (!playing || hasNotifiedPlayback.current) return;
+      const subscription = player.addListener('playingChange', (event: { isPlaying: boolean }) => {
+        if (event.isPlaying && !hasNotifiedPlayback.current) {
+          hasNotifiedPlayback.current = true;
+          onPlaybackStartedRef.current?.();
+        }
+      });
+      return () => { subscription?.remove(); };
+    }, [playing, player]);
 
     useEffect(() => {
       if (playing) {

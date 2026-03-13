@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, Image, StyleSheet } from 'react-native';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,10 +9,9 @@ import type { StoredUser } from '../../lib/types';
 interface StoredUsersViewProps {
   users: StoredUser[];
   onQuickLogin: (user: StoredUser) => void;
-  onDeleteUser?: (username: string) => void;
 }
 
-export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUsersViewProps) {
+export function StoredUsersView({ users, onQuickLogin }: StoredUsersViewProps) {
   return (
     <View style={styles.container}>
       <ScrollView
@@ -21,10 +20,10 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
         bounces={false}
       >
         {users
-          .filter(user => user.username !== "SPECTATOR")
-          .map((user) => (
+          .filter(user => user.username && user.username.trim() !== "" && user.username !== "SPECTATOR")
+          .map((user, index) => (
             <View
-              key={user.username}
+              key={`stored-user-${user.username}-${index}`}
               style={styles.userRow}
             >
               <Button
@@ -33,19 +32,13 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
                 style={styles.userButton}
               >
                 <View style={styles.userInfo}>
-                  <Ionicons
-                    name="person-circle-outline"
-                    size={24}
-                    color={theme.colors.text}
+                  <Image
+                    source={{ uri: `https://images.hive.blog/u/${user.username}/avatar` }}
+                    style={styles.avatar}
                   />
-                  <View style={styles.userDetails}>
-                    <Text style={styles.username}>
-                      {'@' + user.username}
-                    </Text>
-                    <Text style={styles.authMethod}>
-                      {user.method === 'biometric' ? '🔒 Biometric' : '🔢 PIN'}
-                    </Text>
-                  </View>
+                  <Text style={styles.username}>
+                    @{user.username}
+                  </Text>
                 </View>
                 <Ionicons
                   name="arrow-forward-outline"
@@ -53,20 +46,6 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
                   color={theme.colors.muted}
                 />
               </Button>
-              {onDeleteUser && (
-                <Pressable
-                  onPress={() => onDeleteUser(user.username)}
-                  style={styles.deleteButton}
-                  accessibilityLabel={`Delete @${user.username}`}
-                  hitSlop={8}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={22}
-                    color={theme.colors.danger}
-                  />
-                </Pressable>
-              )}
             </View>
           ))}
       </ScrollView>
@@ -101,20 +80,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  userDetails: {
-    marginLeft: theme.spacing.sm,
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.border,
   },
   username: {
     fontSize: theme.fontSizes.lg,
     fontWeight: '500',
     color: theme.colors.text,
     fontFamily: theme.fonts.regular,
-  },
-  authMethod: {
-    fontSize: theme.fontSizes.xs,
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
-    marginTop: theme.spacing.xxs,
+    marginLeft: theme.spacing.sm,
   },
   deleteButton: {
     marginLeft: theme.spacing.sm,

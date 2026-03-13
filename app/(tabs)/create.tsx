@@ -2,7 +2,6 @@ import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
-  Image,
   Keyboard,
   Pressable,
   TextInput,
@@ -13,6 +12,7 @@ import {
   Alert,
   StyleSheet,
 } from "react-native";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { Button } from "~/components/ui/button";
@@ -331,8 +331,7 @@ export default function CreatePost() {
       ) : (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView style={styles.container}>
-            {/* Header */}
-            <Text style={styles.headerText}>Create</Text>
+            {/* Header Removed for more space */}
 
             <View style={styles.card}>
               {/* Content Input */}
@@ -400,7 +399,7 @@ export default function CreatePost() {
               <View style={styles.mediaPreviewContainer}>
                 <View style={styles.mediaCard}>
                   {mediaType === "image" ? (
-                    <Image source={{ uri: media }} style={styles.mediaImage} />
+                    <Image source={{ uri: media }} style={styles.mediaImage} transition={200} />
                   ) : mediaType === "video" ? (
                     hasVideoInteraction ? (
                       <VideoPlayer url={media} playing={isVideoPlaying} />
@@ -454,13 +453,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   headerText: {
-    fontSize: theme.fontSizes.xxxl,
-    fontFamily: theme.fonts.bold,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.md,
-    marginTop: theme.spacing.xxl,
-    marginBottom: theme.spacing.sm,
-    paddingTop: theme.spacing.md,
+    display: 'none',
   },
   card: {
     backgroundColor: theme.colors.card,

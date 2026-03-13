@@ -225,6 +225,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let users: StoredUser[] = [];
       if (keys) {
         users = JSON.parse(keys);
+        // Clean up invalid entries on load
+        const cleanedUsers = users.filter(u => u.username && u.username.trim() !== "");
+        if (cleanedUsers.length !== users.length) {
+          users = cleanedUsers;
+          await SecureStore.setItemAsync(STORED_USERS_KEY, JSON.stringify(users));
+        }
       }
       setStoredUsers(users);
     } catch (error) {
@@ -248,6 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Update stored users list in SecureStore
   const updateStoredUsers = async (user: StoredUser) => {
+    if (!user.username || user.username === 'SPECTATOR') return;
     try {
       let users = [...storedUsers];
       users = users.filter(u => u.username !== user.username);

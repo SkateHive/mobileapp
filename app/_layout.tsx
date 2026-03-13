@@ -1,16 +1,25 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack, useRouter, useSegments, useFocusEffect } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, FiraCode_400Regular, FiraCode_700Bold } from '@expo-google-fonts/fira-code';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
 import { ViewportTrackerProvider } from '~/lib/ViewportTracker';
 import { NotificationProvider } from '~/lib/notifications-context';
+import { ScrollLockProvider } from '~/lib/ScrollLockContext';
+import { AppSettingsProvider } from '~/lib/AppSettingsContext';
 import { theme } from '~/lib/theme';
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+});
 
 // Keep splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();
@@ -50,7 +59,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       // User is not authenticated but trying to access protected routes
       // Redirect to login
       // console.log('User logged out, redirecting to login...');
-      router.replace('/login');
+      router.replace('/');
     }
   }, [isAuthenticated, isLoading, segments, router]);
 
@@ -73,71 +82,68 @@ export default function RootLayout() {
     return null;
   }
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background, // Always black background
-    },
-  });
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <NavigationGuard>
-          <NotificationProvider>
-            <ToastProvider>
-              <ViewportTrackerProvider>
-                <SafeAreaProvider>
-                  <ActivityWrapper>
-                    <View style={styles.container}>
-                      <Stack
-                        screenOptions={{
-                          headerShown: false,
-                          animation: 'none',
-                          contentStyle: { backgroundColor: theme.colors.background },
-                        }}
-                        initialRouteName="index"
-                      >
-                        <Stack.Screen 
-                          name="index" 
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="login"
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="about"
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="conversation"
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="(tabs)"
-                          options={{
+        <AppSettingsProvider>
+        <ScrollLockProvider>
+          <NavigationGuard>
+            <NotificationProvider>
+              <ToastProvider>
+                <ViewportTrackerProvider>
+                  <SafeAreaProvider>
+                    <ActivityWrapper>
+                      <View style={styles.container}>
+                        <Stack
+                          screenOptions={{
+                            headerShown: false,
                             animation: 'none',
                             contentStyle: { backgroundColor: theme.colors.background },
-                            gestureEnabled: false,
                           }}
-                        />
-                      </Stack>
-                    </View>
-                  </ActivityWrapper>
-                </SafeAreaProvider>
-              </ViewportTrackerProvider>
-            </ToastProvider>
-          </NotificationProvider>
-        </NavigationGuard>
+                          initialRouteName="index"
+                        >
+                          <Stack.Screen 
+                            name="index" 
+                            options={{
+                              contentStyle: { backgroundColor: theme.colors.background },
+                            }}
+                          />
+                          <Stack.Screen 
+                            name="login"
+                            options={{
+                              contentStyle: { backgroundColor: theme.colors.background },
+                            }}
+                          />
+                          <Stack.Screen 
+                            name="about"
+                            options={{
+                              contentStyle: { backgroundColor: theme.colors.background },
+                            }}
+                          />
+                          <Stack.Screen 
+                            name="conversation"
+                            options={{
+                              contentStyle: { backgroundColor: theme.colors.background },
+                            }}
+                          />
+                          <Stack.Screen 
+                            name="(tabs)"
+                            options={{
+                              animation: 'none',
+                              contentStyle: { backgroundColor: theme.colors.background },
+                              gestureEnabled: false,
+                            }}
+                          />
+                        </Stack>
+                      </View>
+                    </ActivityWrapper>
+                  </SafeAreaProvider>
+                </ViewportTrackerProvider>
+              </ToastProvider>
+            </NotificationProvider>
+          </NavigationGuard>
+        </ScrollLockProvider>
+        </AppSettingsProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

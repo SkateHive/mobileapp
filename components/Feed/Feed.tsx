@@ -8,10 +8,12 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
 import { useAuth } from "~/lib/auth-provider";
+import { useFeedFilter } from "~/lib/FeedFilterContext";
 import { useSnaps } from "~/lib/hooks/useSnaps";
 import { theme } from "~/lib/theme";
 import {
@@ -20,6 +22,8 @@ import {
 } from "~/lib/ViewportTracker";
 import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
+import { useScrollLock } from "~/lib/ScrollLockContext";
+import { FullConversationDrawer } from "./FullConversationDrawer";
 import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
@@ -28,12 +32,25 @@ interface FeedProps {
 }
 
 function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
+  const { filter } = useFeedFilter();
+  const { isScrollLocked } = useScrollLock();
   const router = useRouter();
   const { username, mutedList, blacklistedList } = useAuth();
-  const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
+  const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps(filter, username);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
+
+  // Conversation drawer state (lifted out of PostCard)
+  const [conversationPost, setConversationPost] = React.useState<Discussion | null>(null);
+
+  const handleOpenConversation = React.useCallback((post: Discussion) => {
+    setConversationPost(post);
+  }, []);
+
+  const handleCloseConversation = React.useCallback(() => {
+    setConversationPost(null);
+  }, []);
 
   // Handle pull-to-refresh
   const handleRefresh = React.useCallback(async () => {
@@ -91,9 +108,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         key={item.permlink}
         post={item}
         currentUsername={username || ""}
+        onOpenConversation={handleOpenConversation}
       />
     ),
-    [username]
+    [username, handleOpenConversation]
   );
 
   const keyExtractor = React.useCallback(
@@ -106,33 +124,9 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     []
   );
 
-  const handleNotificationsPress = React.useCallback(() => {
-    router.push("/(tabs)/notifications");
-  }, [router]);
-
   const ListHeaderComponent = React.useCallback(
-    () => (
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Feed</Text>
-        <Pressable
-          onPress={handleNotificationsPress}
-          style={styles.notificationButton}
-          accessibilityRole="button"
-          accessibilityLabel={
-            badgeCount > 0
-              ? `Notifications, ${badgeCount} unread`
-              : "Notifications"
-          }
-        >
-          <BadgedIcon
-            name="notifications-outline"
-            color={theme.colors.text}
-            badgeCount={badgeCount}
-          />
-        </Pressable>
-      </View>
-    ),
-    [handleNotificationsPress, badgeCount]
+    () => <View style={{ height: theme.spacing.md }} />,
+    []
   );
 
   const ListFooterComponent = isLoading ? (
@@ -146,6 +140,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       <FlatList
         data={filteredFeedData}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isScrollLocked}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         ListHeaderComponent={ListHeaderComponent}
@@ -166,13 +161,22 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
             titleColor={theme.colors.text}
           />
         }
-        removeClippedSubviews={true}
+        removeClippedSubviews={true} // Re-enabled to help with memory/OOM crashes
         initialNumToRender={5}
-        maxToRenderPerBatch={3}
-        windowSize={7}
+        maxToRenderPerBatch={5}
+        windowSize={11}
         updateCellsBatchingPeriod={50}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       />
+
+      {/* Single shared conversation drawer */}
+      {conversationPost && (
+        <FullConversationDrawer
+          visible={!!conversationPost}
+          onClose={handleCloseConversation}
+          discussion={conversationPost}
+        />
+      )}
     </View>
   );
 }
@@ -189,23 +193,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xxs,
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  headerText: {
-    fontSize: theme.fontSizes.xxl,
-    fontWeight: "bold",
-    color: theme.colors.text,
-    lineHeight: 40,
-    fontFamily: theme.fonts.bold,
-  },
-  notificationButton: {
-    padding: theme.spacing.xs,
+  chevron: {
+    marginLeft: theme.spacing.xs,
+    marginTop: 4,
   },
   separator: {
     height: 1,

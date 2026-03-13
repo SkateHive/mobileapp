@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -10,138 +10,57 @@ import {
   Pressable,
   Share,
 } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { useAuth } from "~/lib/auth-provider";
-import { getFeed } from "~/lib/api";
-import { extractMediaFromBody } from "~/lib/utils";
 import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
+import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
+import { useScrollLock } from "~/lib/ScrollLockContext";
 import { theme } from "~/lib/theme";
-import type { Post } from "~/lib/types";
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
-interface VideoPost {
-  videoUrl: string;
-  username: string;
-  permlink: string;
-  author: string;
-  // Extended data from the original post
-  title: string;
-  body: string;
-  created: string;
-  votes: number;
-  payout: string;
-  replies: number;
-  thumbnailUrl?: string;
-  tags: string[];
-  json_metadata: any;
-  active_votes: any[];
-}
+const { height: WINDOW_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function VideosScreen() {
+  const { isScrollLocked } = useScrollLock();
   const router = useRouter();
+  // Get tab bar height to calculate exact screen height for each video
+  const tabBarHeight = 60; // Hardcoded fallback based on _layout.tsx
+  const SCREEN_HEIGHT = WINDOW_HEIGHT - tabBarHeight;
   const { session, username } = useAuth();
   const { showToast } = useToast();
-  const [videos, setVideos] = useState<VideoPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: videos = [], isLoading } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
   const [likedStates, setLikedStates] = useState<Record<string, boolean>>({});
   const [voteCountStates, setVoteCountStates] = useState<
     Record<string, number>
   >({});
+  const [playingStates, setPlayingStates] = useState<Record<string, boolean>>({});
   const flatListRef = useRef<FlatList>(null);
 
-  const loadVideos = async () => {
-    try {
-      setIsLoading(true);
-      const posts = await getFeed(1, 50);
-
-      const videoList: VideoPost[] = [];
-
-      posts.forEach((post: Post) => {
-        const media = extractMediaFromBody(post.body);
-        const videoMedia = media.filter((m) => m.type === "video");
-
-        // Cast to any to access all HIVE blockchain fields
-        const rawPost = post as any;
-
-        if (videoMedia.length > 0) {
-          // Parse json_metadata
-          let metadata: any = {};
-          try {
-            metadata =
-              typeof rawPost.json_metadata === "string"
-                ? JSON.parse(rawPost.json_metadata)
-                : rawPost.json_metadata;
-          } catch (e) {
-            metadata = {};
-          }
-
-          const imageMedia = media.filter((m) => m.type === "image");
-
-          videoMedia.forEach((video) => {
-            // Find thumbnail - prefer metadata image, then first image in post
-            const thumbnail = metadata?.image?.[0] || imageMedia[0]?.url;
-
-            videoList.push({
-              videoUrl: video.url,
-              username: post.author,
-              permlink: post.permlink,
-              author: post.author,
-              title: post.title || "",
-              body: post.body || "",
-              created: post.created || "",
-              votes: rawPost.net_votes || 0,
-              payout:
-                rawPost.pending_payout_value ||
-                rawPost.total_payout_value ||
-                "0.000 HBD",
-              replies: rawPost.children || 0,
-              thumbnailUrl: thumbnail,
-              tags: metadata?.tags || [],
-              json_metadata: metadata,
-              active_votes: rawPost.active_votes || [],
-            });
-          });
-        }
-      });
-
-      setVideos(videoList);
-
-      // Initialize liked and vote count states based on active_votes
-      const initialLiked: Record<string, boolean> = {};
-      const initialVoteCounts: Record<string, number> = {};
-      videoList.forEach((video) => {
-        const key = `${video.author}-${video.permlink}`;
-        const hasVoted =
-          username &&
-          video.active_votes?.some(
-            (v: any) => v.voter === username && v.weight > 0
-          );
-        initialLiked[key] = !!hasVoted;
-        initialVoteCounts[key] = video.votes;
-      });
-      setLikedStates(initialLiked);
-      setVoteCountStates(initialVoteCounts);
-    } catch (error) {
-      console.error("Error loading videos:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Refresh videos when tab comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      loadVideos();
-      setCurrentIndex(0);
-    }, [])
-  );
+  // Initialize liked and vote count states when videos load
+  useEffect(() => {
+    if (videos.length === 0) return;
+    const initialLiked: Record<string, boolean> = {};
+    const initialVoteCounts: Record<string, number> = {};
+    videos.forEach((video) => {
+      const key = `${video.author}-${video.permlink}`;
+      const hasVoted =
+        username &&
+        video.active_votes?.some(
+          (v: any) => v.voter === username && v.weight > 0
+        );
+      initialLiked[key] = !!hasVoted;
+      initialVoteCounts[key] = video.votes;
+    });
+    setLikedStates(initialLiked);
+    setVoteCountStates(initialVoteCounts);
+  }, [videos, username]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
@@ -251,6 +170,7 @@ export default function VideosScreen() {
 
   const renderVideo = ({ item, index }: { item: VideoPost; index: number }) => {
     const isActive = index === currentIndex;
+    const isNearby = Math.abs(index - currentIndex) <= 1;
     const avatarUrl = `https://images.hive.blog/u/${item.username}/avatar`;
     const key = `${item.author}-${item.permlink}`;
     const isLiked = likedStates[key] ?? false;
@@ -267,19 +187,50 @@ export default function VideosScreen() {
       router.push(`/(tabs)/profile?username=${item.username}`);
     };
 
+    const isVideoPlaying = playingStates[key] ?? false;
+
     return (
-      <View style={styles.videoContainer}>
-        <VideoPlayer
-          url={item.videoUrl}
-          playing={isActive}
-          contentFit="cover"
-          showControls={false}
-        />
+      <View style={[styles.videoContainer, { height: SCREEN_HEIGHT }]}>
+        {/* Thumbnail shown behind video — visible while video buffers */}
+        {item.thumbnailUrl && (
+          <Image
+            source={{ uri: item.thumbnailUrl }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+            fadeDuration={0}
+          />
+        )}
+
+        {/* Only mount VideoPlayer for current and adjacent items */}
+        {isNearby ? (
+          <VideoPlayer
+            url={item.videoUrl}
+            playing={isActive}
+            contentFit="cover"
+            showControls={false}
+            onPlaybackStarted={() => {
+              setPlayingStates((prev) => ({ ...prev, [key]: true }));
+            }}
+          />
+        ) : (
+          <View style={styles.thumbnailPlaceholder}>
+            {!item.thumbnailUrl && (
+              <Ionicons name="play-circle-outline" size={64} color="rgba(255,255,255,0.5)" />
+            )}
+          </View>
+        )}
+
+        {/* Loading indicator — only while video is actively buffering */}
+        {isActive && !isVideoPlaying && (
+          <View style={styles.bufferingIndicator}>
+            <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+          </View>
+        )}
 
         {/* Top header with user info */}
         <View style={styles.topHeader}>
           <Pressable style={styles.userInfo} onPress={handleUserPress}>
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} fadeDuration={0} />
             <Text style={styles.username}>@{item.username}</Text>
           </Pressable>
 
@@ -381,6 +332,7 @@ export default function VideosScreen() {
         <FlatList
           ref={flatListRef}
           data={videos}
+          scrollEnabled={!isScrollLocked}
           renderItem={renderVideo}
           keyExtractor={(item, index) => `${item.permlink}-${index}`}
           pagingEnabled
@@ -390,11 +342,12 @@ export default function VideosScreen() {
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          removeClippedSubviews
-          maxToRenderPerBatch={2}
-          windowSize={3}
+          removeClippedSubviews={true} // Re-enabled to help with memory/OOM crashes
+          maxToRenderPerBatch={3}
+          windowSize={5}
+          initialNumToRender={2}
           initialScrollIndex={0}
-          getItemLayout={(data, index) => ({
+          getItemLayout={(_, index) => ({
             length: SCREEN_HEIGHT,
             offset: SCREEN_HEIGHT * index,
             index,
@@ -426,8 +379,25 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
+    // Note: Height is set via inline style to use the dynamic SCREEN_HEIGHT
     backgroundColor: "#000",
+  },
+  thumbnail: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  thumbnailPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bufferingIndicator: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginTop: -10,
+    marginLeft: -10,
+    zIndex: 1,
   },
   // Top header styles
   topHeader: {

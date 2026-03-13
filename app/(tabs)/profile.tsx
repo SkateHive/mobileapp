@@ -19,14 +19,19 @@ import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { FollowersModal } from "~/components/Profile/FollowersModal";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
-import { useUserComments } from "~/lib/hooks/useUserComments";
+import { useUserComments } from '~/lib/hooks/useUserComments';
+import { useScrollLock } from '~/lib/ScrollLockContext';
+import { FullConversationDrawer } from '~/components/Feed/FullConversationDrawer';
+import type { Discussion } from '@hiveio/dhive';
 
 export default function ProfileScreen() {
   const { username: currentUsername, logout } = useAuth();
+  const { isScrollLocked } = useScrollLock();
   const params = useLocalSearchParams();
   const [message, setMessage] = useState("");
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
+  const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
 
   // Use the URL param username if available, otherwise use current user's username
   const profileUsername = (params.username as string) || currentUsername;
@@ -275,6 +280,7 @@ export default function ProfileScreen() {
       key={item.permlink}
       post={item}
       currentUsername={currentUsername || ''}
+      onOpenConversation={(post) => setConversationPost(post)}
     />
   );
 
@@ -305,6 +311,7 @@ export default function ProfileScreen() {
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isScrollLocked}
         >
           {renderProfileHeader()}
         </ScrollView>
@@ -329,6 +336,7 @@ export default function ProfileScreen() {
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isScrollLocked}
           removeClippedSubviews={true}
           initialNumToRender={5}
           maxToRenderPerBatch={3}
@@ -344,6 +352,15 @@ export default function ProfileScreen() {
           onClose={() => setFollowersModalVisible(false)}
           username={profileUsername || ''}
           type={modalType}
+        />
+      )}
+
+      {/* Single shared conversation drawer */}
+      {conversationPost && (
+        <FullConversationDrawer
+          visible={!!conversationPost}
+          onClose={() => setConversationPost(null)}
+          discussion={conversationPost}
         />
       )}
     </View>
