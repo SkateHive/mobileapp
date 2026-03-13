@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   View,
   ScrollView,
@@ -9,6 +9,8 @@ import {
   StyleSheet,
   FlatList,
   Modal,
+  Dimensions,
+  Animated,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +24,46 @@ import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
+import { extractMediaFromBody } from "~/lib/utils";
+import { GridVideoTile } from "~/components/Profile/GridVideoTile";
+
+const GRID_COLS = 3;
+const GRID_GAP = 2;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+// Skeleton grid shown while posts load
+const SkeletonTile = React.memo(({ size, delay }: { size: number; delay: number }) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.6, duration: 800, delay, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  return <Animated.View style={{ width: size, height: size, backgroundColor: theme.colors.secondaryCard, opacity }} />;
+});
+
+const GridSkeleton = ({ tileSize }: { tileSize: number }) => (
+  <View style={skeletonStyles.container}>
+    {Array.from({ length: 12 }).map((_, i) => (
+      <SkeletonTile key={i} size={tileSize} delay={(i % 3) * 150} />
+    ))}
+  </View>
+);
+
+const skeletonStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+  },
+});
 
 // Map common country names/codes to flag emojis
 function countryToFlag(location: string): string {
@@ -67,9 +109,16 @@ export default function ProfileScreen() {
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
+  const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
 
-  // Use the URL param username if available, otherwise use current user's username
+  // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
+  useEffect(() => {
+    setFollowersModalVisible(false);
+    setEditProfileVisible(false);
+    setSettingsMenuVisible(false);
+    setProfileTab('grid');
+  }, [profileUsername]);
 
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
   const {
@@ -79,6 +128,130 @@ export default function ProfileScreen() {
     hasMore,
     refresh: refreshPosts,
   } = useUserComments(profileUsername);
+
+  // Get thumbnail for a post — checks multiple sources
+  const getPostThumbnail = useCallback((post: any): string | null => {
+    let metadata: any = {};
+    try {
+      metadata = typeof post.json_metadata === 'string'
+        ? JSON.parse(post.json_metadata)
+        : (post.json_metadata || {});
+    } catch {}
+
+    // 1. Try json_metadata.image (most reliable, set by posting apps)
+    if (metadata?.image) {
+      const imgs = Array.isArray(metadata.image) ? metadata.image : [metadata.image];
+      if (imgs[0]) return imgs[0];
+    }
+
+    // 2. Try 3speak / video app thumbnail from json_metadata.video
+    if (metadata?.video?.info?.snaphash) {
+      return `https://threespeakvideo.b-cdn.net/${metadata.video.info.snaphash}/thumbnails/default.png`;
+    }
+    if (metadata?.video?.info?.thumbnail) {
+      return metadata.video.info.thumbnail;
+    }
+
+    // 3. Parse body for markdown images
+    const media = extractMediaFromBody(post.body);
+    const img = media.find((m: any) => m.type === 'image');
+    if (img) return img.url;
+
+    // 4. Extract YouTube thumbnail from embed URLs in body
+    const ytMatch = post.body?.match(
+      /(?:youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+    );
+    if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+
+    // 5. Try direct image URLs in body (not in markdown syntax)
+    const directUrl = post.body?.match(
+      /(https?:\/\/[^\s)"']+\.(?:png|jpe?g|gif|webp))(?=$|\s|[)"'])/i
+    );
+    if (directUrl) return directUrl[1];
+
+    return null;
+  }, []);
+
+  // Check if a post has any media (image or video)
+  const postHasMedia = useCallback((post: any): boolean => {
+    // Check json_metadata.image
+    try {
+      const metadata = typeof post.json_metadata === 'string'
+        ? JSON.parse(post.json_metadata)
+        : post.json_metadata;
+      if (metadata?.image?.length > 0) return true;
+    } catch {}
+
+    // Check body for media
+    const media = extractMediaFromBody(post.body);
+    if (media.length > 0) return true;
+
+    // Check for direct image/video URLs
+    const hasDirectMedia = /(https?:\/\/[^\s)"']+\.(?:png|jpe?g|gif|webp|mp4|mov|m4v|m3u8))(?=$|\s|[)"'])/i
+      .test(post.body || '');
+    return hasDirectMedia;
+  }, []);
+
+  // Filter posts to only those with media for the grid view
+  const gridPosts = useMemo(() =>
+    userPosts.filter(postHasMedia),
+    [userPosts, postHasMedia]
+  );
+
+  // Auto-load more when grid doesn't have enough items to fill the screen
+  // A 3-col grid needs ~15 items (5 rows) to be scrollable
+  const MIN_GRID_ITEMS = 15;
+  useEffect(() => {
+    if (
+      profileTab === 'grid' &&
+      !isLoadingPosts &&
+      hasMore &&
+      gridPosts.length < MIN_GRID_ITEMS &&
+      userPosts.length > 0
+    ) {
+      loadNextPage();
+    }
+  }, [profileTab, isLoadingPosts, hasMore, gridPosts.length, userPosts.length, loadNextPage]);
+
+  // Render grid item
+  const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+
+  const renderGridItem = useCallback(({ item }: { item: any }) => {
+    const media = extractMediaFromBody(item.body);
+    const videoMedia = media.find((m: any) => m.type === 'video');
+
+    // Video posts autoplay muted when in view
+    if (videoMedia) {
+      return (
+        <GridVideoTile
+          videoUrl={videoMedia.url}
+          size={tileSize}
+          onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+        />
+      );
+    }
+
+    // Image/embed posts show thumbnail
+    const thumb = getPostThumbnail(item);
+    return (
+      <Pressable
+        style={[styles.gridTile, { width: tileSize, height: tileSize }]}
+        onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+      >
+        {thumb ? (
+          <Image
+            source={{ uri: thumb }}
+            style={styles.gridImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.gridPlaceholder}>
+            <Ionicons name="image-outline" size={28} color={theme.colors.muted} />
+          </View>
+        )}
+      </Pressable>
+    );
+  }, [tileSize, getPostThumbnail]);
 
   const handleLogout = async () => {
     try {
@@ -263,9 +436,32 @@ export default function ProfileScreen() {
 
       {/* Show Create Account CTA only for SPECTATOR */}
       {profileUsername === "SPECTATOR" && <ProfileSpectatorInfo />}
-      
-      {/* Add spacing before posts section */}
-      {profileUsername !== "SPECTATOR" && <View style={styles.postsSpacing} />}
+
+      {/* Tab Switcher */}
+      {profileUsername !== "SPECTATOR" && (
+        <View style={styles.tabBar}>
+          <Pressable
+            style={[styles.tab, profileTab === 'grid' && styles.tabActive]}
+            onPress={() => setProfileTab('grid')}
+          >
+            <Ionicons
+              name="grid-outline"
+              size={20}
+              color={profileTab === 'grid' ? theme.colors.primary : theme.colors.muted}
+            />
+          </Pressable>
+          <Pressable
+            style={[styles.tab, profileTab === 'posts' && styles.tabActive]}
+            onPress={() => setProfileTab('posts')}
+          >
+            <Ionicons
+              name="list-outline"
+              size={20}
+              color={profileTab === 'posts' ? theme.colors.primary : theme.colors.muted}
+            />
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 
@@ -308,8 +504,42 @@ export default function ProfileScreen() {
         >
           {renderProfileHeader()}
         </ScrollView>
+      ) : profileTab === 'grid' ? (
+        <FlatList
+          key="grid"
+          data={gridPosts}
+          renderItem={renderGridItem}
+          keyExtractor={(item) => item.permlink}
+          numColumns={GRID_COLS}
+          columnWrapperStyle={{ gap: GRID_GAP }}
+          ListHeaderComponent={renderProfileHeader}
+          ListFooterComponent={
+            isLoadingPosts ? (
+              <GridSkeleton tileSize={tileSize} />
+            ) : null
+          }
+          ListEmptyComponent={
+            !isLoadingPosts ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.noPostsText}>No posts yet</Text>
+              </View>
+            ) : null
+          }
+          onEndReached={hasMore ? loadNextPage : undefined}
+          onEndReachedThreshold={0.8}
+          refreshControl={
+            <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          initialNumToRender={12}
+          maxToRenderPerBatch={9}
+          windowSize={7}
+          contentContainerStyle={{ gap: GRID_GAP }}
+        />
       ) : (
         <FlatList
+          key="posts"
           data={userPosts}
           renderItem={renderPostItem}
           keyExtractor={(item) => item.permlink}
@@ -564,8 +794,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  postsSpacing: {
-    height: theme.spacing.lg,
+  // Tab bar
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm + 2,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: theme.colors.primary,
+  },
+  // Grid
+  gridTile: {
+    overflow: 'hidden',
+    backgroundColor: theme.colors.secondaryCard,
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  gridPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.secondaryCard,
+  },
+  gridVideoIcon: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorContainer: {
     flex: 1,

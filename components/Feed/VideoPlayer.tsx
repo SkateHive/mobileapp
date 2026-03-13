@@ -8,7 +8,9 @@ interface VideoPlayerProps {
   playing?: boolean;
   contentFit?: "contain" | "cover" | "fill";
   showControls?: boolean;
+  showMuteButton?: boolean;
   initialMuted?: boolean;
+  loop?: boolean;
   onPlaybackStarted?: () => void;
 }
 
@@ -18,7 +20,9 @@ export const VideoPlayer = React.memo(
     playing = true,
     contentFit = "contain",
     showControls = true,
+    showMuteButton,
     initialMuted = true,
+    loop = true,
     onPlaybackStarted,
   }: VideoPlayerProps) => {
     const [isMuted, setIsMuted] = useState(initialMuted);
@@ -28,13 +32,20 @@ export const VideoPlayer = React.memo(
     onPlaybackStartedRef.current = onPlaybackStarted;
 
     const player = useVideoPlayer(url, (player) => {
-      player.loop = true;
+      player.loop = loop;
     });
 
     // Set initial muted state after player is created
     useEffect(() => {
       player.muted = initialMuted;
     }, [player, initialMuted]);
+
+    // Cleanup: pause player on unmount to free resources
+    useEffect(() => {
+      return () => {
+        try { player.pause(); } catch {}
+      };
+    }, [player]);
 
     // Notify parent when video starts playing
     useEffect(() => {
@@ -95,7 +106,7 @@ export const VideoPlayer = React.memo(
         />
 
         {/* Custom mute/unmute button when native controls are hidden */}
-        {!showControls && (
+        {(showMuteButton ?? !showControls) && (
           <Pressable
             style={styles.muteButton}
             onPress={toggleMute}
