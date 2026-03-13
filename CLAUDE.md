@@ -62,6 +62,7 @@ Update version in 4 places before `eas build`:
 
 ## Known Gotchas
 - **Bare Workflow**: Changes in `ios/` or `android/` folders require `pnpm prebuild` if not using EAS.
-- **New Architecture**: `newArchEnabled` is currently `false` in `app.json`.
+- **New Architecture**: `newArchEnabled` is currently `false` in `app.json`. You can ignore the warning: `setLayoutAnimationEnabledExperimental is currently a no-op in the New Architecture.`
+- **React Lists**: Always ensure every child in a list (e.g., `map()` or `FlatList`) has a unique `key` prop to prevent React warnings.
 - **RPC Failover**: `hive-utils.ts` handles multiple fallback nodes automatically.
 - **Apple Review**: Test account with simple password logic exists in `lib/auth-provider.tsx`.

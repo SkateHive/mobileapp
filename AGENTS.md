@@ -59,4 +59,5 @@ This file provides critical context for AI agents working on the SkateHive mobil
 1. **Version Drift**: `app.json`, `Info.plist`, `project.pbxproj`, and `package.json` must be synced manually.
 2. **Native Modules**: This is a **Bare Workflow** project; native changes require `pnpm prebuild` or EAS.
 3. **RPC Nodes**: Multiple fallback nodes are configured in `hive-utils.ts`.
-4. **Video Autoplay**: Uses `lib/ViewportTracker.tsx` (60%+ visibility triggers play).
+5. **React Lists**: Always ensure every child in a list (e.g., `map()` or `FlatList`) has a unique `key` prop to prevent standard React warnings.
+6. **New Architecture**: You can ignore the warning: `setLayoutAnimationEnabledExperimental is currently a no-op in the New Architecture.`

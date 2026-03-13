@@ -166,10 +166,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
             titleColor={theme.colors.text}
           />
         }
-        removeClippedSubviews={true}
+        removeClippedSubviews={false} // Important: prevents scroll jumps on fast scrolls
         initialNumToRender={5}
-        maxToRenderPerBatch={3}
-        windowSize={7}
+        maxToRenderPerBatch={5}
+        windowSize={11}
         updateCellsBatchingPeriod={50}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       />

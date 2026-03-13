@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
@@ -12,6 +12,7 @@ import { useViewportTracker } from '~/lib/ViewportTracker';
 import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
+import { CommentBottomSheet } from '../ui/CommentBottomSheet';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
 // Lazy imports break the require cycle:
 // PostCard → ConversationDrawer → PostCard
@@ -67,7 +68,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [showSlider, setShowSlider] = useState(false);
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
-  const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
+  const [isCommentSheetVisible, setIsCommentSheetVisible] = useState(false);
   const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -232,7 +233,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   };
 
   const handleConversationPress = () => {
-    setIsConversationDrawerVisible(true);
+    setIsCommentSheetVisible(true);
   };
 
   const handleBodyPress = () => {
@@ -360,7 +361,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               {/* Three dots menu - only show if not viewing own post */}
               {currentUsername && post.author !== currentUsername && (
                 <Pressable onPress={handleUserMenuPress} style={styles.menuButton}>
-                  <FontAwesome name="ellipsis-h" size={16} color={theme.colors.text} />
+                  <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.text} />
                 </Pressable>
               )}
             </View>
@@ -418,7 +419,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                   {isVoting ? (
                     <ActivityIndicator size="small" color={theme.colors.green} />
                   ) : (
-                    <FontAwesome name="arrow-up" size={22} color={theme.colors.green} />
+                    <Ionicons name="thumbs-up" size={22} color={theme.colors.green} />
                   )}
                 </Pressable>
               </View>
@@ -433,7 +434,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               <View style={styles.actionsContainer}>
                 {/* Replies section - clickable to open conversation */}
                 <Pressable onPress={handleConversationPress} style={styles.actionItem} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                  <FontAwesome name="comment-o" size={22} color={theme.colors.gray} />
+                  <Ionicons name="chatbubble-outline" size={22} color={theme.colors.gray} />
                   <Text style={styles.actionText}>{post.children}</Text>
                 </Pressable>
 
@@ -454,8 +455,8 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                       <Text style={[styles.voteCount, { color: isLiked ? theme.colors.green : theme.colors.gray }]}>
                         {voteCount}
                       </Text>
-                      <FontAwesome
-                        name="arrow-up"
+                      <Ionicons
+                        name={isLiked ? "thumbs-up" : "thumbs-up-outline"}
                         size={22}
                         color={isLiked ? theme.colors.green : theme.colors.gray}
                       />
@@ -468,16 +469,17 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         </View>
       </View>
 
-      {/* Conversation Drawer - Quick reply only */}
-      {isConversationDrawerVisible && (
-        <React.Suspense fallback={null}>
-          <ConversationDrawer
-            visible={isConversationDrawerVisible}
-            onClose={() => setIsConversationDrawerVisible(false)}
-            discussion={post}
-          />
-        </React.Suspense>
-      )}
+      {/* Comment Bottom Sheet for quick reply */}
+      <CommentBottomSheet
+        isVisible={isCommentSheetVisible}
+        onClose={() => setIsCommentSheetVisible(false)}
+        parentAuthor={post.author}
+        parentPermlink={post.permlink}
+        onReplySuccess={(reply) => {
+          // Could optionally update post children count here optimistically
+          // setPostChildrenCount(prev => prev + 1);
+        }}
+      />
 
       {/* Full Conversation Drawer - Entire conversation thread */}
       {isFullConversationVisible && (

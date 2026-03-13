@@ -2,8 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
 import { StyleSheet, View, PanResponder } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { theme } from "~/lib/theme";
+import { GlobalHeader } from "~/components/ui/GlobalHeader";
+import { SideMenu } from "~/components/ui/SideMenu";
 
 interface TabItem {
   name: string;
@@ -75,6 +77,7 @@ const styles = StyleSheet.create({
 
 export default function TabLayout() {
   const router = useRouter();
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
@@ -96,7 +99,8 @@ export default function TabLayout() {
   ).current;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <View style={styles.container}>
+      <GlobalHeader onOpenMenu={() => setIsMenuVisible(true)} />
       <View style={styles.gestureContainer} {...panResponder.panHandlers}>
           <Tabs
             screenOptions={{
@@ -153,9 +157,19 @@ export default function TabLayout() {
                 title: "Notifications",
               }}
             />
+            
+            {/* Hidden search tab - accessible from header */}
+            <Tabs.Screen
+              name="search"
+              options={{
+                href: null,
+                title: "Search",
+              }}
+            />
           </Tabs>
         </View>
-      </SafeAreaView>
+        <SideMenu isVisible={isMenuVisible} onClose={() => setIsMenuVisible(false)} />
+      </View>
   );
 }
 
