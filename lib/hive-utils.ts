@@ -284,6 +284,32 @@ export async function getContentReplies({
 }
 
 /**
+ * Get discussions (posts) by filter and tag
+ */
+export async function getDiscussions(
+  type: 'created' | 'trending' | 'hot' | 'feed',
+  query: { 
+    tag?: string; 
+    limit?: number; 
+    start_author?: string; 
+    start_permlink?: string;
+  }
+): Promise<Discussion[]> {
+  const params: any = {
+    limit: query.limit || 10,
+    tag: query.tag || COMMUNITY_TAG,
+  };
+  
+  if (query.start_author && query.start_permlink) {
+    params.start_author = query.start_author;
+    params.start_permlink = query.start_permlink;
+  }
+
+  // get_discussions_by_feed requires account name in 'tag' field
+  return HiveClient.database.call(`get_discussions_by_${type}`, [params]);
+}
+
+/**
  * Get a single post/comment content by author and permlink
  */
 export async function getContent(author: string, permlink: string): Promise<Discussion | null> {
@@ -961,7 +987,7 @@ export async function getUserRelationshipList(
   username: string,
   type: 'blog' | 'ignore' | 'blacklist',
   startFollowing: string = '',
-  limit: number = 100
+  limit: number = 1000
 ): Promise<string[]> {
   try {
     // Use the traditional follow_api for getting full lists

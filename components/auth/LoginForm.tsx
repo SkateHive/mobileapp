@@ -275,12 +275,7 @@ export function LoginForm({
             <Text style={styles.secondaryButtonText}>Enter as Spectator</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => WebBrowser.openBrowserAsync('https://docs.skatehive.app/docs/')}
-            style={styles.textLink}
-          >
-            <Text style={styles.textLinkText}>More info</Text>
-          </Pressable>
+          {/* "More info" moved to About screen as requested */}
         </>
       )}
 

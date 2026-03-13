@@ -173,7 +173,7 @@ export default function Index() {
     <View style={styles.container}>
       <BackgroundVideo />
 
-      <Pressable onPress={handleInfoPress} style={styles.infoButton}>
+      <Pressable onPress={handleInfoPress} style={styles.infoButton} accessibilityRole="button" accessibilityLabel="More Info">
         <View style={styles.infoButtonContent}>
           <Ionicons
             name="information-circle-outline"
@@ -197,11 +197,13 @@ export default function Index() {
       <KeyboardAvoidingView
         style={styles.formWrapper}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        pointerEvents="box-none"
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          pointerEvents="box-none"
         >
           <View style={styles.spacer} />
           <View
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 48,
     right: 24,
-    zIndex: 2,
+    zIndex: 999,
   },
   infoButtonContent: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",

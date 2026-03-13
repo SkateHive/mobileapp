@@ -13,6 +13,7 @@ import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
 import { useAuth } from "~/lib/auth-provider";
+import { useFeedFilter } from "~/lib/FeedFilterContext";
 import { useSnaps } from "~/lib/hooks/useSnaps";
 import { theme } from "~/lib/theme";
 import {
@@ -30,10 +31,11 @@ interface FeedProps {
 }
 
 function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
+  const { filter } = useFeedFilter();
   const { isScrollLocked } = useScrollLock();
   const router = useRouter();
   const { username, mutedList, blacklistedList } = useAuth();
-  const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
+  const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps(filter, username);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
@@ -109,36 +111,9 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     []
   );
 
-  const handleNotificationsPress = React.useCallback(() => {
-    router.push("/(tabs)/notifications");
-  }, [router]);
-
   const ListHeaderComponent = React.useCallback(
-    () => (
-      <View style={styles.header}>
-        <Pressable style={styles.dropdownTrigger}>
-          <Text style={styles.headerText}>Recent</Text>
-          <Ionicons name="chevron-down" size={20} color={theme.colors.text} style={styles.chevron} />
-        </Pressable>
-        <Pressable
-          onPress={handleNotificationsPress}
-          style={styles.notificationButton}
-          accessibilityRole="button"
-          accessibilityLabel={
-            badgeCount > 0
-              ? `Notifications, ${badgeCount} unread`
-              : "Notifications"
-          }
-        >
-          <BadgedIcon
-            name="notifications-outline"
-            color={theme.colors.text}
-            badgeCount={badgeCount}
-          />
-        </Pressable>
-      </View>
-    ),
-    [handleNotificationsPress, badgeCount]
+    () => <View style={{ height: theme.spacing.md }} />,
+    []
   );
 
   const ListFooterComponent = isLoading ? (
@@ -195,24 +170,6 @@ export function Feed({ refreshTrigger, onRefresh }: FeedProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xxs,
-  },
-  headerText: {
-    fontSize: theme.fontSizes.xxl,
-    fontWeight: "bold",
-    color: theme.colors.text,
-    lineHeight: 40,
-    fontFamily: theme.fonts.bold,
-  },
-  notificationButton: {
-    padding: theme.spacing.xs,
   },
   dropdownTrigger: {
     flexDirection: 'row',

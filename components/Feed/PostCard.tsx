@@ -136,10 +136,20 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   // Check if user has already voted on this post
   useEffect(() => {
     if (currentUsername && Array.isArray(post.active_votes)) {
-      const hasVoted = post.active_votes.some((vote: any) => vote.voter === currentUsername && vote.weight > 0);
+      const hasVoted = post.active_votes.some((vote: any) => 
+        vote.voter.toLowerCase() === currentUsername.toLowerCase() && vote.weight > 0
+      );
       setIsLiked(hasVoted);
     }
   }, [post.active_votes, currentUsername]);
+
+  // Sync following status
+  useEffect(() => {
+    if (followingList && post.author) {
+      const following = followingList.some(u => u.toLowerCase() === post.author.toLowerCase());
+      setIsFollowing(following);
+    }
+  }, [followingList, post.author]);
 
   const handleMediaPress = useCallback((media: Media) => {
     setSelectedMedia(media);
@@ -386,8 +396,8 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
 
               {/* Follow Button */}
               {currentUsername && 
-               post.author !== currentUsername && 
-               !followingList.includes(post.author) && (
+               post.author.toLowerCase() !== currentUsername.toLowerCase() && 
+               !isFollowing && (
                 <Pressable 
                   onPress={handleFollow} 
                   style={styles.followButton}

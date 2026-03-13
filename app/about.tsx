@@ -2,6 +2,7 @@ import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Text } from '~/components/ui/text';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { MatrixRain } from '~/components/ui/loading-effects/MatrixRain';
 import { theme } from '~/lib/theme';
 
@@ -56,6 +57,21 @@ export default function AboutScreen() {
             <Bullet text="Put skate media back in skaters' hands. Forever." />
             <Bullet text="Grow a real-deal global skate culture — raw, connected, and free AF." />
           </Section>
+
+          <View style={styles.buttonContainer}>
+            <Pressable
+              onPress={() => WebBrowser.openBrowserAsync('https://docs.skatehive.app/docs/')}
+              style={[styles.actionButton, styles.primaryActionButton]}
+            >
+              <Text style={styles.actionButtonText}>More Info</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.back()}
+              style={[styles.actionButton, styles.secondaryActionButton]}
+            >
+              <Text style={styles.secondaryActionButtonText}>Close</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </View>
     </View>
@@ -142,6 +158,36 @@ const styles = StyleSheet.create({
     lineHeight: theme.fontSizes.md + theme.spacing.xs,
     flex: 1,
     color: theme.colors.text,
+    fontFamily: theme.fonts.regular,
+  },
+  buttonContainer: {
+    marginTop: theme.spacing.xl,
+    gap: theme.spacing.md,
+    paddingBottom: theme.spacing.xxl,
+  },
+  actionButton: {
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  primaryActionButton: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  secondaryActionButton: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  actionButtonText: {
+    color: theme.colors.background,
+    fontSize: theme.fontSizes.md,
+    fontFamily: theme.fonts.bold,
+  },
+  secondaryActionButtonText: {
+    color: theme.colors.text,
+    fontSize: theme.fontSizes.md,
     fontFamily: theme.fonts.regular,
   },
 });
