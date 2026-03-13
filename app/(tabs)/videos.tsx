@@ -18,6 +18,7 @@ import { useAuth } from "~/lib/auth-provider";
 import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
+import { useScrollLock } from "~/lib/ScrollLockContext";
 import { theme } from "~/lib/theme";
 
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -25,6 +26,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 const { height: WINDOW_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function VideosScreen() {
+  const { isScrollLocked } = useScrollLock();
   const router = useRouter();
   // Get tab bar height to calculate exact screen height for each video
   const tabBarHeight = 60; // Hardcoded fallback based on _layout.tsx
@@ -330,6 +332,7 @@ export default function VideosScreen() {
         <FlatList
           ref={flatListRef}
           data={videos}
+          scrollEnabled={!isScrollLocked}
           renderItem={renderVideo}
           keyExtractor={(item, index) => `${item.permlink}-${index}`}
           pagingEnabled

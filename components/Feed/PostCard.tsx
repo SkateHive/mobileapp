@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
+import { useScrollLock } from '~/lib/ScrollLockContext';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
 import { useViewportTracker } from '~/lib/ViewportTracker';
 import { Text } from '../ui/text';
@@ -60,7 +61,9 @@ interface PostCardProps {
 
 
 export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
+  const { isScrollLocked, setScrollLocked } = useScrollLock();
   const { session, followingList, updateUserRelationship } = useAuth();
+  const [isFollowing, setIsFollowing] = useState(false);
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -142,6 +145,27 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
     setSelectedMedia(media);
     setIsModalVisible(true);
   }, []);
+
+  const handleFollow = async () => {
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsFollowing(true);
+      const success = await updateUserRelationship(post.author, 'blog');
+      if (success) {
+        showToast(`Following @${post.author}`, 'success');
+      } else {
+        showToast('Failed to follow user', 'error');
+      }
+    } catch (error) {
+      showToast('Error following user', 'error');
+    } finally {
+      setIsFollowing(false);
+    }
+  };
 
   const handleVote = async (customWeight?: number) => {
     try {
@@ -359,6 +383,23 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               <Text style={styles.dateText}>
                 {formattedDate}
               </Text>
+
+              {/* Follow Button */}
+              {currentUsername && 
+               post.author !== currentUsername && 
+               !followingList.includes(post.author) && (
+                <Pressable 
+                  onPress={handleFollow} 
+                  style={styles.followButton}
+                  disabled={isFollowing}
+                >
+                  {isFollowing ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <Text style={styles.followButtonText}>Follow</Text>
+                  )}
+                </Pressable>
+              )}
               
               {/* Three dots menu - only show if not viewing own post */}
               {currentUsername && post.author !== currentUsername && (
@@ -408,7 +449,10 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               <View style={styles.sliderControls}>
                 <Pressable
                   style={styles.cancelVoteButton}
-                  onPress={() => setShowSlider(false)}
+                  onPress={() => {
+                    setShowSlider(false);
+                    setScrollLocked(false);
+                  }}
                   disabled={isVoting}
                 >
                   <FontAwesome name="times" size={22} color={theme.colors.gray} />
@@ -442,7 +486,10 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
 
                 {/* Voting section */}
                 <Pressable
-                  onPress={() => setShowSlider(true)}
+                  onPress={() => {
+                    setShowSlider(true);
+                    setScrollLocked(true);
+                  }}
                   style={[styles.actionItem, isVoting && styles.disabledButton]}
                   disabled={isVoting}
                   hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
@@ -758,6 +805,22 @@ const styles = StyleSheet.create({
     minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  followButton: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(50, 205, 50, 0.1)',
+    marginHorizontal: theme.spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 70,
+  },
+  followButtonText: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.green,
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
   },
   modalOverlay: {
     flex: 1,

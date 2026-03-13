@@ -21,6 +21,7 @@ import {
 } from "~/lib/ViewportTracker";
 import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
+import { useScrollLock } from "~/lib/ScrollLockContext";
 import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
@@ -29,6 +30,7 @@ interface FeedProps {
 }
 
 function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
+  const { isScrollLocked } = useScrollLock();
   const router = useRouter();
   const { username, mutedList, blacklistedList } = useAuth();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
@@ -150,6 +152,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       <FlatList
         data={filteredFeedData}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isScrollLocked}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         ListHeaderComponent={ListHeaderComponent}
