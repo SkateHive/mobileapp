@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { getUserComments, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
 
 interface LastPostInfo {
@@ -9,20 +9,20 @@ interface LastPostInfo {
 export function useUserComments(username: string | null) {
   const lastPostRef = useRef<LastPostInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
+  const prevUsernameRef = useRef<string | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  // fetchTrigger increments to force a new fetch (avoids the currentPage=1 stale problem)
+  const [fetchTrigger, setFetchTrigger] = useState(0);
 
   // Filter comments by parent_author (peak.snaps)
   function filterByParentAuthor(posts: any[], targetAuthor: string): any[] {
-    return posts.filter((post) => {
-      return post.parent_author === targetAuthor;
-    });
+    return posts.filter((post) => post.parent_author === targetAuthor);
   }
 
-  // Filter comments by community tag (same as main feed)
+  // Filter comments by community tag
   function filterCommentsByTag(posts: any[], targetTag: string): any[] {
     return posts.filter((post) => {
       try {
@@ -32,35 +32,31 @@ export function useUserComments(username: string | null) {
           : post.json_metadata;
         const tags = metadata.tags || [];
         return tags.includes(targetTag);
-      } catch (error) {
+      } catch {
         return false;
       }
     });
   }
 
-  // Fetch user posts with progressive loading
+  // Fetch a batch of user posts
   async function getMoreUserComments(): Promise<any[]> {
-    if (!username || username === 'SPECTATOR') {
-      return [];
-    }
+    if (!username || username === 'SPECTATOR') return [];
 
     const pageSize = 10;
     const allFilteredPosts: any[] = [];
     let hasMoreData = true;
     let iterationCount = 0;
-    const maxIterations = 10; // Prevent infinite loops
-    
-    // Track all permlinks to avoid duplicates
+    const maxIterations = 10;
     const allPermlinks = new Set(fetchedPermlinksRef.current);
 
     while (allFilteredPosts.length < pageSize && hasMoreData && iterationCount < maxIterations) {
       iterationCount++;
-      
+
       try {
         const result = await getUserComments(
           username,
           'comments',
-          20, // Fetch more at once to improve efficiency
+          20,
           lastPostRef.current?.author,
           lastPostRef.current?.permlink
         );
@@ -70,62 +66,45 @@ export function useUserComments(username: string | null) {
           break;
         }
 
-        // Filter by parent_author first (peak.snaps)
         const parentFilteredPosts = filterByParentAuthor(result, SNAPS_CONTAINER_AUTHOR);
-        
-        // Then filter by community tag
         const tagFilteredPosts = filterCommentsByTag(parentFilteredPosts, COMMUNITY_TAG);
-
-        // Remove duplicates
         const uniquePosts = tagFilteredPosts.filter(post => !allPermlinks.has(post.permlink));
-        
-        // Add to results and track permlinks
+
         uniquePosts.forEach(post => {
           allPermlinks.add(post.permlink);
           allFilteredPosts.push(post);
         });
 
-        // Update pagination info using the last item from the original result
         if (result.length > 0) {
           const lastItem = result[result.length - 1];
-          lastPostRef.current = {
-            author: lastItem.author,
-            permlink: lastItem.permlink
-          };
+          lastPostRef.current = { author: lastItem.author, permlink: lastItem.permlink };
         }
 
-        // If we got fewer results than requested, we've reached the end
-        if (result.length < 20) {
-          hasMoreData = false;
-        }
-
+        if (result.length < 20) hasMoreData = false;
       } catch (error) {
         console.error('Error fetching user posts:', error);
         hasMoreData = false;
       }
     }
 
-    // Update the ref with all permlinks seen so far
     fetchedPermlinksRef.current = allPermlinks;
-
-    // Sort by created date descending
     allFilteredPosts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-    
     return allFilteredPosts;
   }
 
-  // Reset when username changes
+  // Reset all state when username changes
   useEffect(() => {
-    if (username && username !== 'SPECTATOR') {
+    if (prevUsernameRef.current !== username) {
+      prevUsernameRef.current = username;
       lastPostRef.current = null;
       fetchedPermlinksRef.current = new Set();
       setPosts([]);
-      setCurrentPage(1);
       setHasMore(true);
+      setFetchTrigger(0);
     }
   }, [username]);
 
-  // Fetch posts when currentPage changes
+  // Single effect that handles all fetching
   useEffect(() => {
     if (!username || username === 'SPECTATOR') {
       setPosts([]);
@@ -134,56 +113,61 @@ export function useUserComments(username: string | null) {
       return;
     }
 
+    let cancelled = false;
+
     const fetchPosts = async () => {
       setIsLoading(true);
       try {
         const newPosts = await getMoreUserComments();
+        if (cancelled) return;
+
         setPosts((prevPosts) => {
-          const existingPermlinks = new Set(prevPosts.map((post) => post.permlink));
-          const uniquePosts = newPosts.filter((post: any) => !existingPermlinks.has(post.permlink));
-          
-          // If no new unique posts, set hasMore to false
+          const existingPermlinks = new Set(prevPosts.map((p) => p.permlink));
+          const uniquePosts = newPosts.filter((p: any) => !existingPermlinks.has(p.permlink));
+
           if (uniquePosts.length === 0) {
             setHasMore(false);
           }
-          
+
           return [...prevPosts, ...uniquePosts];
         });
       } catch (err) {
         console.error('Error in fetchPosts:', err);
-        setHasMore(false);
+        if (!cancelled) setHasMore(false);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchPosts();
-  }, [currentPage, username]);
 
-  // Load the next page
-  const loadNextPage = () => {
+    return () => { cancelled = true; };
+  }, [fetchTrigger, username]);
+
+  // Load next page — just bump the trigger
+  const loadNextPage = useCallback(() => {
     if (!isLoading && hasMore && username && username !== 'SPECTATOR') {
-      setCurrentPage((prevPage) => prevPage + 1);
+      setFetchTrigger((t) => t + 1);
     }
-  };
+  }, [isLoading, hasMore, username]);
 
-  // Refresh function to reset and reload
-  const refresh = () => {
+  // Refresh — reset everything and re-fetch
+  const refresh = useCallback(() => {
     if (username && username !== 'SPECTATOR') {
       lastPostRef.current = null;
       fetchedPermlinksRef.current = new Set();
       setPosts([]);
-      setCurrentPage(1);
       setHasMore(true);
+      // Force a new fetch by bumping the trigger
+      setFetchTrigger((t) => t + 1);
     }
-  };
+  }, [username]);
 
-  return { 
-    posts, 
-    isLoading, 
-    loadNextPage, 
-    hasMore, 
-    currentPage,
-    refresh 
+  return {
+    posts,
+    isLoading,
+    loadNextPage,
+    hasMore,
+    refresh
   };
 }
