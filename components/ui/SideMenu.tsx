@@ -172,8 +172,17 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     appearance: [
       { title: "Theme", icon: "color-palette-outline" as const, value: "System", onPress: () => {} },
       { title: "Language", icon: "language-outline" as const, value: "System", onPress: () => {} },
-      { title: "Feeds", icon: "list-outline" as const, onPress: () => {} },
-      { title: "Explore", icon: "compass-outline" as const, onPress: () => {} },
+      { 
+        title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons", 
+        icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const, 
+        onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); } 
+      },
+      { 
+        title: `Stance: ${settings.stance.charAt(0).toUpperCase() + settings.stance.slice(1)}`, 
+        icon: "body-outline" as const, 
+        onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); } 
+      },
+      { title: "Feeds", icon: "list-outline" as const, value: "System", onPress: () => {} },
     ],
     about: [
       { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
@@ -223,8 +232,9 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           </View>
         </Pressable>
 
-        <Text style={styles.groupLabel}>Service</Text>
-        {renderCard(settingsItems.service)}
+        {/* service section hidden per user request */}
+        {/* <Text style={styles.groupLabel}>Service</Text>
+        {renderCard(settingsItems.service)} */}
 
         <Text style={styles.groupLabel}>Appearance</Text>
         {renderCard(settingsItems.appearance)}
