@@ -23,7 +23,10 @@ import { FollowersModal } from "~/components/Profile/FollowersModal";
 import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
-import { useUserComments } from "~/lib/hooks/useUserComments";
+import { useUserComments } from '~/lib/hooks/useUserComments';
+import { useScrollLock } from '~/lib/ScrollLockContext';
+import { ConversationDrawer } from '~/components/Feed/ConversationDrawer';
+import type { Discussion } from '@hiveio/dhive';
 import { extractMediaFromBody } from "~/lib/utils";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 
@@ -104,11 +107,13 @@ function countryToFlag(location: string): string {
 
 export default function ProfileScreen() {
   const { username: currentUsername, logout } = useAuth();
+  const { isScrollLocked } = useScrollLock();
   const params = useLocalSearchParams();
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
+  const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
 
   // Reset UI state when navigating between profiles
@@ -226,7 +231,7 @@ export default function ProfileScreen() {
         <GridVideoTile
           videoUrl={videoMedia.url}
           size={tileSize}
-          onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+          onPress={() => setConversationPost(item)}
         />
       );
     }
@@ -236,7 +241,7 @@ export default function ProfileScreen() {
     return (
       <Pressable
         style={[styles.gridTile, { width: tileSize, height: tileSize }]}
-        onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+        onPress={() => setConversationPost(item)}
       >
         {thumb ? (
           <Image
@@ -471,6 +476,7 @@ export default function ProfileScreen() {
       key={item.permlink}
       post={item}
       currentUsername={currentUsername || ''}
+      onOpenConversation={(post) => setConversationPost(post)}
     />
   );
 
@@ -501,6 +507,7 @@ export default function ProfileScreen() {
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isScrollLocked}
         >
           {renderProfileHeader()}
         </ScrollView>
@@ -559,6 +566,7 @@ export default function ProfileScreen() {
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isScrollLocked}
           removeClippedSubviews={true}
           initialNumToRender={5}
           maxToRenderPerBatch={3}
@@ -574,6 +582,15 @@ export default function ProfileScreen() {
           onClose={() => setFollowersModalVisible(false)}
           username={profileUsername || ''}
           type={modalType}
+        />
+      )}
+
+      {/* Single shared conversation drawer */}
+      {conversationPost && (
+        <ConversationDrawer
+          isVisible={!!conversationPost}
+          onClose={() => setConversationPost(null)}
+          post={conversationPost}
         />
       )}
 
