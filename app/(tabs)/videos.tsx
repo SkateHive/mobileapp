@@ -19,6 +19,7 @@ import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { useAppSettings } from "~/lib/AppSettingsContext";
 
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
@@ -30,6 +31,7 @@ export default function VideosScreen() {
   const tabBarHeight = 60; // Hardcoded fallback based on _layout.tsx
   const SCREEN_HEIGHT = WINDOW_HEIGHT - tabBarHeight;
   const { session, username } = useAuth();
+  const { settings } = useAppSettings();
   const { showToast } = useToast();
   const { data: videos = [], isLoading } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -252,8 +254,11 @@ export default function VideosScreen() {
           )}
         </View>
 
-        {/* Left side action buttons */}
-        <View style={styles.leftActions}>
+        {/* Side action buttons (Regular = left, Goofy = right) */}
+        <View style={[
+          styles.actionsContainer, 
+          settings.stance === 'regular' ? { left: 16 } : { right: 16 }
+        ]}>
           <Pressable
             style={styles.actionButton}
             onPress={() => handleVote(item)}
@@ -504,12 +509,12 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   // Left side action buttons
-  leftActions: {
+  actionsContainer: {
     position: "absolute",
-    left: 16,
     bottom: 200,
     alignItems: "center",
     gap: 20,
+    zIndex: 10,
   },
   actionButton: {
     alignItems: "center",
