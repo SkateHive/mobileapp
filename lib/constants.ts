@@ -1,7 +1,9 @@
+import { API_BASE_URL as ENV_API_BASE_URL, LEADERBOARD_API_URL as ENV_LEADERBOARD_API_URL } from '@env';
+
 export const APP_NAME="Skatehive";
 export const STORED_USERS_KEY = 'myc_users';
-export const API_BASE_URL = 'https://api.skatehive.app/api/v1';
-export const LEADERBOARD_API_URL = 'https://api.skatehive.app/api/v2/leaderboard';
+export const API_BASE_URL = ENV_API_BASE_URL || 'https://api.skatehive.app/api/v1';
+export const LEADERBOARD_API_URL = ENV_LEADERBOARD_API_URL || 'https://api.skatehive.app/api/v2/leaderboard';
 
 export const NAV_THEME = {
   light: {
