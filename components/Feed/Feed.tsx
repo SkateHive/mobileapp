@@ -183,9 +183,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
 export function Feed({ refreshTrigger, onRefresh }: FeedProps) {
   return (
-    <ViewportTrackerProvider>
-      <FeedContent refreshTrigger={refreshTrigger} onRefresh={onRefresh} />
-    </ViewportTrackerProvider>
+    <FeedContent refreshTrigger={refreshTrigger} onRefresh={onRefresh} />
   );
 }
 

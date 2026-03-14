@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { View } from 'react-native';
+import { View, AppState } from 'react-native';
 
 interface UseInViewOptions {
   threshold?: number;
@@ -17,7 +17,7 @@ export const useInView = (options: UseInViewOptions = {}) => {
 
     // Continuously check visibility
     const checkVisibility = () => {
-      if (!ref) return;
+      if (!ref || AppState.currentState !== 'active') return;
 
       ref.measure?.((x, y, width, height, pageX, pageY) => {
         // Get screen dimensions
