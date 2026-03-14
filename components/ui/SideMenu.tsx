@@ -1,30 +1,44 @@
-import React from "react";
-import { View, StyleSheet, Pressable, Dimensions, Animated, Easing, ScrollView, Alert } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, StyleSheet, Pressable, Dimensions, Animated, Easing, ScrollView, Alert, Clipboard } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as Haptics from 'expo-haptics';
+import { Image } from "expo-image";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
 import { useAppSettings } from "~/lib/AppSettingsContext";
+import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
+import useHiveAccount from "~/lib/hooks/useHiveAccount";
+import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
 
 interface SideMenuProps {
   isVisible: boolean;
   onClose: () => void;
 }
 
+type MenuView = "settings" | "accounts";
+
 export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   const router = useRouter();
-  const { username, logout, storedUsers, loginStoredUser, deleteStoredUser } = useAuth();
+  const { username, logout, storedUsers, deleteStoredUser, refreshUserRelationships } = useAuth();
   const { settings, updateSettings } = useAppSettings();
+  const { showToast } = useToast();
+  const { hiveAccount } = useHiveAccount(username || "");
   
-  // Animation value for sliding in/out
-  const slideAnim = React.useRef(new Animated.Value(-SCREEN_WIDTH * 0.75)).current;
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const [currentView, setCurrentView] = useState<MenuView>("settings");
+  const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
+  
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const viewTransitionAnim = useRef(new Animated.Value(0)).current; // 0 for settings, 1 for accounts
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isVisible) {
       Animated.parallel([
         Animated.timing(slideAnim, {
@@ -42,7 +56,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     } else {
       Animated.parallel([
         Animated.timing(slideAnim, {
-          toValue: -SCREEN_WIDTH * 0.75,
+          toValue: -DRAWER_WIDTH,
           duration: 250,
           easing: Easing.in(Easing.ease),
           useNativeDriver: true,
@@ -52,11 +66,23 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           duration: 250,
           useNativeDriver: true,
         })
-      ]).start();
+      ]).start(() => {
+        setCurrentView("settings");
+        viewTransitionAnim.setValue(0);
+      });
     }
-  }, [isVisible, slideAnim, fadeAnim]);
+  }, [isVisible]);
 
-  if (!isVisible && slideAnim.addListener === undefined) return null;
+  const transitionTo = (view: MenuView) => {
+    const toValue = view === "accounts" ? 1 : 0;
+    setCurrentView(view);
+    Animated.timing(viewTransitionAnim, {
+      toValue,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
 
   const handleLogout = async () => {
     onClose();
@@ -64,22 +90,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     router.replace("/");
   };
 
-  const handleSwitchAccount = async (targetUsername: string) => {
-    try {
-      onClose();
-      // Since we don't have the PIN here, we might need to redirect to login 
-      // but for now let's just logout and let them pick from the login screen
-      // or if it's already the current user, do nothing
-      if (targetUsername === username) return;
-      
-      await logout();
-      router.replace("/");
-    } catch (error) {
-      console.error("Error switching account:", error);
-    }
-  };
-
-  const handleDeleteAccount = () => {
+  const handleRemoveAccount = () => {
     if (!username || username === 'SPECTATOR') return;
 
     Alert.alert(
@@ -94,11 +105,10 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             try {
               onClose();
               await deleteStoredUser(username);
-              // After deletion, we should be logged out and sent to login screen
               router.replace("/");
             } catch (error) {
               console.error("Error deleting account:", error);
-              Alert.alert("Error", "Failed to remove account.");
+              showToast("Failed to remove account.", "error");
             }
           }
         }
@@ -106,64 +116,225 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     );
   };
 
-  const accountItems = [
-    { title: "Sign in with Twitter (X)", icon: "logo-twitter" as const, onPress: () => { onClose(); } },
-    { title: "Farcaster", icon: "cube-outline" as const, onPress: () => { onClose(); } },
-    { title: "Lens", icon: "leaf-outline" as const, onPress: () => { onClose(); } },
-    { title: "Bluesky", icon: "cloud-outline" as const, onPress: () => { onClose(); } },
-    { title: "Google", icon: "logo-google" as const, onPress: () => { onClose(); } },
-    { title: "Telegram", icon: "paper-plane-outline" as const, onPress: () => { onClose(); } },
-    { title: "Email", icon: "mail-outline" as const, onPress: () => { onClose(); } },
-    { title: "Edit Profile", icon: "create-outline" as const, onPress: () => { onClose(); router.push({ pathname: "/(tabs)/profile", params: { username } }); } },
-    { title: "Remove from device", icon: "trash-outline" as const, onPress: handleDeleteAccount },
-  ];
+  const copyToClipboard = (text: string, label: string) => {
+    Clipboard.setString(text);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    showToast(`${label} copied!`, "success");
+  };
 
-  const walletItems = [
-    { title: "Add Wallet", icon: "wallet-outline" as const, onPress: () => { onClose(); } },
-  ];
+  // Helper for rendering account avatar
+  const renderAvatar = (size = 40) => {
+    const profileImage = hiveAccount?.metadata?.profile?.profile_image;
+    const hiveAvatarUrl = `https://images.hive.blog/u/${username}/avatar/small`;
+    return (
+      <Image 
+        source={{ uri: profileImage || hiveAvatarUrl }} 
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.colors.secondaryCard }} 
+        transition={200}
+      />
+    );
+  };
 
-  const serviceItems = [
-    { title: "Mute List", icon: "volume-mute-outline" as const, onPress: () => { onClose(); } },
-    { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => { onClose(); } },
-    { title: "Scan", icon: "qr-code-outline" as const, onPress: () => { onClose(); } },
-  ];
-
-  const appearanceItems = [
-    { title: "Theme", icon: "color-palette-outline" as const, onPress: () => { onClose(); } },
-    { title: "Language", icon: "language-outline" as const, onPress: () => { onClose(); } },
-    { 
-      title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons", 
-      icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const, 
-      onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); } 
-    },
-    { title: "Feeds", icon: "list-outline" as const, onPress: () => { onClose(); } },
-    { title: "Explore", icon: "compass-outline" as const, onPress: () => { onClose(); } },
-  ];
-
-  const aboutItems = [
-    { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
-    { title: "Support", icon: "help-circle-outline" as const, onPress: () => { onClose(); } },
-    { title: "Privacy Policy", icon: "shield-checkmark-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
-    { title: "Terms of Service", icon: "document-text-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
-  ];
-
-  const renderSection = (title: string, items: { title: string, icon: any, onPress: () => void }[]) => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+  const renderCard = (items: { title: string, icon: any, value?: string, onPress: () => void, disabled?: boolean }[]) => (
+    <View style={styles.card}>
       {items.map((item, index) => (
-        <Pressable key={index} style={styles.menuItem} onPress={item.onPress}>
-          <Ionicons name={item.icon} size={22} color={theme.colors.text} />
-          <Text style={styles.menuItemText}>{item.title}</Text>
-        </Pressable>
+        <React.Fragment key={index}>
+          <Pressable 
+            style={[styles.menuItem, item.disabled && { opacity: 0.5 }]} 
+            onPress={item.onPress}
+            disabled={item.disabled}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name={item.icon} size={22} color={theme.colors.text} />
+              <Text style={styles.menuItemText}>{item.title}</Text>
+            </View>
+            <View style={styles.menuItemRight}>
+              {item.value && <Text style={styles.menuItemValue}>{item.value}</Text>}
+              {!item.disabled && <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />}
+            </View>
+          </Pressable>
+          {index < items.length - 1 && <View style={styles.divider} />}
+        </React.Fragment>
       ))}
     </View>
   );
 
+  const settingsItems = {
+    service: [
+      { title: "Scan", icon: "qr-code-outline" as const, onPress: () => {} },
+      { title: "Multi-Device Login", icon: "phone-portrait-outline" as const, disabled: true, onPress: () => {} },
+      { title: "Lucky Drop History", icon: "gift-outline" as const, disabled: true, onPress: () => {} },
+      { title: "Viewing History", icon: "time-outline" as const, onPress: () => {} },
+      { title: "Bookmarks", icon: "bookmark-outline" as const, onPress: () => {} },
+      { title: "Mute List", icon: "volume-mute-outline" as const, onPress: () => {} },
+      { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => {} },
+    ],
+    appearance: [
+      { title: "Theme", icon: "color-palette-outline" as const, value: "System", onPress: () => {} },
+      { title: "Language", icon: "language-outline" as const, value: "System", onPress: () => {} },
+      { title: "Feeds", icon: "list-outline" as const, onPress: () => {} },
+      { title: "Explore", icon: "compass-outline" as const, onPress: () => {} },
+    ],
+    about: [
+      { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
+    ]
+  };
+
+  const socialSlots = [
+    { title: "X", icon: "logo-twitter" as const, value: "Coming Soon", disabled: true },
+    { title: "Farcaster", icon: "cube-outline" as const, value: "Coming Soon", disabled: true },
+    { title: "Lens", icon: "leaf-outline" as const, value: "Coming Soon", disabled: true },
+    { title: "Bluesky", icon: "cloud-outline" as const, value: "Coming Soon", disabled: true },
+    { title: "Google", icon: "logo-google" as const, value: "Coming Soon", disabled: true },
+    { title: "Telegram", icon: "paper-plane-outline" as const, value: "Coming Soon", disabled: true },
+    { title: "Email", icon: "mail-outline" as const, value: "Coming Soon", disabled: true },
+  ];
+
+  const renderSettingsView = () => (
+    <View style={styles.viewContent}>
+      <View style={styles.viewHeader}>
+        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>Settings</Text>
+        <Pressable onPress={onClose} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color={theme.colors.text} />
+        </Pressable>
+      </View>
+
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Account Entry Card */}
+        <Pressable style={styles.accountCard} onPress={() => transitionTo("accounts")}>
+          <View style={styles.accountCardLeft}>
+            {renderAvatar(50)}
+            <View style={styles.accountInfo}>
+              <Text style={styles.displayName}>{hiveAccount?.metadata?.profile?.name || username}</Text>
+              <Text style={styles.uid}>UID:{hiveAccount?.id || "---"}</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
+        </Pressable>
+
+        <Pressable style={styles.card} onPress={() => {}}>
+          <View style={styles.menuItem}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="wallet-outline" size={22} color={theme.colors.text} />
+              <Text style={styles.menuItemText}>Wallets</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+          </View>
+        </Pressable>
+
+        <Text style={styles.groupLabel}>Service</Text>
+        {renderCard(settingsItems.service)}
+
+        <Text style={styles.groupLabel}>Appearance</Text>
+        {renderCard(settingsItems.appearance)}
+
+        <Text style={styles.groupLabel}>About</Text>
+        {renderCard(settingsItems.about)}
+        
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  );
+
+  const renderAccountsView = () => (
+    <View style={styles.viewContent}>
+      <View style={styles.viewHeader}>
+        <Pressable onPress={() => transitionTo("settings")} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Accounts</Text>
+        <Pressable 
+          onPress={() => setIsEditProfileVisible(true)} 
+          style={styles.editButton}
+        >
+          <Text style={styles.editButtonText}>Edit</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.accountsHeader}>
+          {renderAvatar(80)}
+          <Pressable 
+            onPress={() => copyToClipboard(username || "", "Username")}
+            style={styles.accountDetailInfo}
+          >
+            <Text style={styles.accountsDisplayName}>{hiveAccount?.metadata?.profile?.name || username}</Text>
+            <Text style={styles.accountsUid}>UID:{hiveAccount?.id || "---"}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.card}>
+          {/* Active Session */}
+          <View style={styles.menuItem}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="infinite-outline" size={22} color={theme.colors.text} />
+              <View>
+                <Text style={styles.menuItemText}>Hive</Text>
+                <Text style={styles.sessionStatus}>Active Session</Text>
+              </View>
+            </View>
+            <Text style={styles.menuItemValue}>@{username}</Text>
+          </View>
+
+          {/* Other Stored Sessions */}
+          {storedUsers.filter(u => u.username !== username && u.username !== "SPECTATOR").map((user, idx) => (
+            <React.Fragment key={user.username}>
+              <View style={styles.divider} />
+              <View style={styles.menuItem}>
+                <View style={styles.menuItemLeft}>
+                  <Ionicons name="person-circle-outline" size={22} color={theme.colors.muted} />
+                  <Text style={styles.menuItemText}>@{user.username}</Text>
+                </View>
+                <Text style={styles.menuItemValue}>Stored</Text>
+              </View>
+            </React.Fragment>
+          ))}
+
+          <View style={styles.divider} />
+          <Pressable style={styles.menuItem} onPress={() => { onClose(); router.push("/login"); }}>
+            <Text style={styles.menuItemTextSecondary}>Add Hive Account</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+          </Pressable>
+        </View>
+
+        {socialSlots.map((slot, idx) => (
+          <View key={idx} style={[styles.card, { marginTop: theme.spacing.md }]}>
+             <View style={[styles.menuItem, { opacity: 0.5 }]}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name={slot.icon} size={22} color={theme.colors.text} />
+                <Text style={styles.menuItemText}>{slot.title}</Text>
+              </View>
+              <Text style={styles.menuItemValue}>{slot.value}</Text>
+            </View>
+          </View>
+        ))}
+
+        <View style={styles.footerActions}>
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Log Out</Text>
+          </Pressable>
+          
+          <Pressable style={styles.removeButton} onPress={handleRemoveAccount}>
+            <Text style={styles.removeButtonText}>Remove from Device</Text>
+          </Pressable>
+        </View>
+        
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  );
+
+  if (!isVisible && slideAnim.addListener === undefined) return null;
+
+  const translateX = viewTransitionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -DRAWER_WIDTH],
+  });
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents={isVisible ? "auto" : "none"}>
-      <Animated.View 
-        style={[styles.backdrop, { opacity: fadeAnim }]} 
-      >
+      <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
       
@@ -174,48 +345,21 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         ]}
       >
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <Text style={styles.username}>@{username || 'Guest'}</Text>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
-            </Pressable>
-          </View>
-          
-          <ScrollView style={styles.menuItems} showsVerticalScrollIndicator={false}>
-            {/* Account Switcher */}
-            {storedUsers.filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== (username || "")).length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Switch Account</Text>
-                {storedUsers
-                  .filter(u => u.username && u.username.trim() !== "" && u.username !== "SPECTATOR" && u.username !== (username || ""))
-                  .map((user, index) => (
-                    <Pressable 
-                      key={`switch-${user.username}-${index}`} 
-                      style={styles.menuItem} 
-                      onPress={() => handleSwitchAccount(user.username)}
-                    >
-                      <Ionicons name="person-circle-outline" size={22} color={theme.colors.text} />
-                      <Text style={styles.menuItemText}>@{user.username}</Text>
-                    </Pressable>
-                  ))}
-              </View>
-            )}
-
-            {renderSection("ACCOUNT", accountItems)}
-            {renderSection("WALLET", walletItems)}
-            {renderSection("SERVICE", serviceItems)}
-            {renderSection("APPEARANCE", appearanceItems)}
-            {renderSection("ABOUT", aboutItems)}
-          </ScrollView>
-          
-          <View style={styles.footer}>
-            <Pressable style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={24} color={theme.colors.danger} />
-              <Text style={[styles.menuItemText, { color: theme.colors.danger }]}>Logout</Text>
-            </Pressable>
-          </View>
+          <Animated.View style={[styles.multiViewContainer, { transform: [{ translateX }] }]}>
+            {renderSettingsView()}
+            {renderAccountsView()}
+          </Animated.View>
         </SafeAreaView>
       </Animated.View>
+
+      <EditProfileModal
+        visible={isEditProfileVisible}
+        onClose={() => setIsEditProfileVisible(false)}
+        currentProfile={hiveAccount?.metadata?.profile || {}}
+        onSaved={() => {
+          refreshUserRelationships();
+        }}
+      />
     </View>
   );
 }
@@ -231,71 +375,177 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: SCREEN_WIDTH * 0.75,
-    backgroundColor: theme.colors.card,
+    width: DRAWER_WIDTH,
+    backgroundColor: theme.colors.background,
     zIndex: 101,
     borderRightWidth: 1,
     borderRightColor: theme.colors.border,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 5,
-      height: 0,
-    },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 20,
   },
   safeArea: {
     flex: 1,
   },
-  header: {
+  multiViewContainer: {
+    flex: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    width: DRAWER_WIDTH * 2,
   },
-  username: {
+  viewContent: {
+    width: DRAWER_WIDTH,
+    flex: 1,
+  },
+  viewHeader: {
+    height: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.md,
+  },
+  headerTitle: {
     fontSize: theme.fontSizes.lg,
     fontFamily: theme.fonts.bold,
     color: theme.colors.text,
   },
   closeButton: {
-    padding: theme.spacing.xs,
+    padding: theme.spacing.sm,
   },
-  menuItems: {
-    flex: 1,
+  backButton: {
+    padding: theme.spacing.sm,
   },
-  section: {
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+  editButton: {
+    padding: theme.spacing.sm,
   },
-  sectionTitle: {
-    fontSize: theme.fontSizes.sm,
+  editButtonText: {
+    color: theme.colors.primary,
     fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
+  },
+  scrollContent: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+  },
+  accountCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.card,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    justifyContent: "space-between",
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  accountCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+  },
+  accountInfo: {
+    gap: 2,
+  },
+  displayName: {
+    fontSize: theme.fontSizes.md,
+    fontFamily: theme.fonts.bold,
+    color: theme.colors.text,
+  },
+  uid: {
+    fontSize: theme.fontSizes.xs,
     color: theme.colors.muted,
-    paddingHorizontal: theme.spacing.lg,
+  },
+  card: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.lg,
+    overflow: "hidden",
+  },
+  groupLabel: {
+    fontSize: theme.fontSizes.xs,
+    color: theme.colors.muted,
+    fontFamily: theme.fonts.bold,
+    marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.xs,
-    textTransform: 'uppercase',
+    marginLeft: theme.spacing.sm,
+    textTransform: "uppercase",
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
+    padding: theme.spacing.md,
+    justifyContent: "space-between",
+  },
+  menuItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing.md,
+  },
+  menuItemRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
   },
   menuItemText: {
     fontSize: theme.fontSizes.md,
+    color: theme.colors.text,
     fontFamily: theme.fonts.regular,
+  },
+  sessionStatus: {
+    fontSize: 10,
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+    textTransform: "uppercase",
+  },
+  menuItemTextSecondary: {
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.fonts.bold,
+  },
+  menuItemValue: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.muted,
+    fontFamily: theme.fonts.regular,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginLeft: 54,
+  },
+  accountsHeader: {
+    alignItems: "center",
+    paddingVertical: theme.spacing.xl,
+    gap: theme.spacing.sm,
+  },
+  accountDetailInfo: {
+    alignItems: "center",
+  },
+  accountsDisplayName: {
+    fontSize: theme.fontSizes.xl,
+    fontFamily: theme.fonts.bold,
     color: theme.colors.text,
   },
-  footer: {
-    paddingVertical: theme.spacing.md,
+  accountsUid: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.muted,
   },
-  logoutItem: {
-    marginTop: theme.spacing.sm,
+  footerActions: {
+    marginTop: theme.spacing.xxxl,
+    gap: theme.spacing.lg,
+    alignItems: "center",
+  },
+  logoutButton: {
+    width: "100%",
+    backgroundColor: theme.colors.card,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.full,
+    alignItems: "center",
+  },
+  logoutButtonText: {
+    color: theme.colors.text,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.lg,
+  },
+  removeButton: {
+    padding: theme.spacing.sm,
+  },
+  removeButtonText: {
+    color: theme.colors.danger,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
   },
 });
