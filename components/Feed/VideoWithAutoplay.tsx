@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { VideoPlayer } from './VideoPlayer';
 import { useInView } from '../../lib/hooks/useInView';
 import { theme } from '../../lib/theme';
@@ -19,13 +20,15 @@ export function VideoWithAutoplay({
   requireInteraction = false 
 }: VideoWithAutoplayProps) {
   const [hasInteracted, setHasInteracted] = useState(false);
+  const isFocused = useIsFocused();
   const { ref, isInView } = useInView({ threshold: 0.5 });
   
   // Video should play if:
   // 1. It's currently in view (both parent visibility and intersection observer)
   // 2. The parent component says it's visible
-  // 3. If requireInteraction is true, user must have interacted with it
-  const shouldPlay = isInView && isVisible && (!requireInteraction || hasInteracted);
+  // 3. The screen is focused (not in a background tab)
+  // 4. If requireInteraction is true, user must have interacted with it
+  const shouldPlay = isInView && isVisible && isFocused && (!requireInteraction || hasInteracted);
   
   const handlePress = () => {
     if (!hasInteracted) {
@@ -36,10 +39,12 @@ export function VideoWithAutoplay({
   return (
     <View ref={ref} style={[styles.container, style]}>
       <Pressable style={styles.pressable} onPress={handlePress}>
-        <VideoPlayer 
-          url={url} 
-          playing={shouldPlay}
-        />
+        {isInView && (
+          <VideoPlayer 
+            url={url} 
+            playing={shouldPlay}
+          />
+        )}
         
         {/* Show play button overlay only if interaction is required and video hasn't been interacted with */}
         {requireInteraction && !hasInteracted && (

@@ -44,11 +44,13 @@ const BackgroundVideo = () => {
   );
 
   return (
-    <View style={styles.videoContainer}>
+    <View style={styles.videoContainer} pointerEvents="none">
       <VideoView
         style={{ width: "100%", height: "100%" }}
         contentFit="cover"
         player={player}
+        nativeControls={false}
+        pointerEvents="none"
       />
     </View>
   );
@@ -66,7 +68,6 @@ export default function Index() {
   } = useAuth();
   const queryClient = useQueryClient();
 
-  const [deletingUser, setDeletingUser] = React.useState<string | null>(null);
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [message, setMessage] = React.useState("");
@@ -80,7 +81,7 @@ export default function Index() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.push("/(tabs)/videos");
+      router.replace("/(tabs)/videos");
     }
   }, [isAuthenticated]);
 
@@ -95,16 +96,7 @@ export default function Index() {
     router.push("/about");
   };
 
-  const handleDeleteUser = async (username: string) => {
-    setDeletingUser(username);
-    try {
-      await deleteStoredUser(username);
-    } catch (error) {
-      console.error("Error deleting user:", error);
-    } finally {
-      setDeletingUser(null);
-    }
-  };
+
 
   const handleSpectator = async () => {
     try {
@@ -124,19 +116,22 @@ export default function Index() {
       }
       await login(username, password, method, pin);
       router.replace("/(tabs)/videos");
-    } catch (error: any) {
-      if (
-        error instanceof InvalidKeyFormatError ||
-        error instanceof AccountNotFoundError ||
-        error instanceof InvalidKeyError ||
-        error instanceof AuthError ||
-        error instanceof HiveError
-      ) {
-        setMessage(error.message);
-      } else {
-        setMessage("An unexpected error occurred");
+      } catch (error: any) {
+        if (
+          error instanceof InvalidKeyFormatError ||
+          error instanceof AccountNotFoundError ||
+          error instanceof InvalidKeyError ||
+          error instanceof AuthError ||
+          error instanceof HiveError
+        ) {
+          // Suppress biometric failure messages as requested
+          if (!error.message.includes('Biometric authentication')) {
+            setMessage(error.message);
+          }
+        } else {
+          setMessage("An unexpected error occurred");
+        }
       }
-    }
   };
 
   const handleQuickLogin = async (
@@ -155,7 +150,11 @@ export default function Index() {
         error instanceof AuthError ||
         error instanceof HiveError
       ) {
-        setMessage((error as Error).message);
+        // Suppress biometric failure messages as requested
+        const msg = (error as Error).message;
+        if (!msg.includes('Biometric authentication')) {
+          setMessage(msg);
+        }
       } else {
         setMessage("Error with quick login");
       }
@@ -174,7 +173,7 @@ export default function Index() {
     <View style={styles.container}>
       <BackgroundVideo />
 
-      <Pressable onPress={handleInfoPress} style={styles.infoButton}>
+      <Pressable onPress={handleInfoPress} style={styles.infoButton} accessibilityRole="button" accessibilityLabel="More Info">
         <View style={styles.infoButtonContent}>
           <Ionicons
             name="information-circle-outline"
@@ -198,11 +197,13 @@ export default function Index() {
       <KeyboardAvoidingView
         style={styles.formWrapper}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        pointerEvents="box-none"
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          pointerEvents="box-none"
         >
           <View style={styles.spacer} />
           <View
@@ -224,8 +225,6 @@ export default function Index() {
               onSpectator={handleSpectator}
               storedUsers={storedUsers}
               onQuickLogin={handleQuickLogin}
-              onDeleteUser={handleDeleteUser}
-              deletingUser={deletingUser}
             />
           </View>
         </ScrollView>
@@ -241,16 +240,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 0,
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#000000",
   },
   infoButton: {
     position: "absolute",
     top: 48,
     right: 24,
-    zIndex: 10,
+    zIndex: 999,
   },
   infoButtonContent: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
@@ -264,6 +264,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: "60%",
     flexDirection: "column",
+    zIndex: 1,
   },
   fadeBand: {
     flex: 1,
@@ -271,6 +272,7 @@ const styles = StyleSheet.create({
   },
   formWrapper: {
     flex: 1,
+    zIndex: 2,
   },
   scrollContent: {
     flexGrow: 1,

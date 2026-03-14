@@ -18,12 +18,19 @@ import { useAuth } from "~/lib/auth-provider";
 import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
+import { useScrollLock } from "~/lib/ScrollLockContext";
 import { theme } from "~/lib/theme";
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+
+const { height: WINDOW_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function VideosScreen() {
+  const { isScrollLocked } = useScrollLock();
   const router = useRouter();
+  // Get tab bar height to calculate exact screen height for each video
+  const tabBarHeight = 60; // Hardcoded fallback based on _layout.tsx
+  const SCREEN_HEIGHT = WINDOW_HEIGHT - tabBarHeight;
   const { session, username } = useAuth();
   const { showToast } = useToast();
   const { data: videos = [], isLoading } = useVideoFeed();
@@ -183,7 +190,7 @@ export default function VideosScreen() {
     const isVideoPlaying = playingStates[key] ?? false;
 
     return (
-      <View style={styles.videoContainer}>
+      <View style={[styles.videoContainer, { height: SCREEN_HEIGHT }]}>
         {/* Thumbnail shown behind video — visible while video buffers */}
         {item.thumbnailUrl && (
           <Image
@@ -325,6 +332,7 @@ export default function VideosScreen() {
         <FlatList
           ref={flatListRef}
           data={videos}
+          scrollEnabled={!isScrollLocked}
           renderItem={renderVideo}
           keyExtractor={(item, index) => `${item.permlink}-${index}`}
           pagingEnabled
@@ -334,12 +342,12 @@ export default function VideosScreen() {
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          removeClippedSubviews
-          maxToRenderPerBatch={2}
-          windowSize={3}
-          initialNumToRender={1}
+          removeClippedSubviews={true} // Re-enabled to help with memory/OOM crashes
+          maxToRenderPerBatch={3}
+          windowSize={5}
+          initialNumToRender={2}
           initialScrollIndex={0}
-          getItemLayout={(data, index) => ({
+          getItemLayout={(_, index) => ({
             length: SCREEN_HEIGHT,
             offset: SCREEN_HEIGHT * index,
             index,
@@ -371,7 +379,7 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
+    // Note: Height is set via inline style to use the dynamic SCREEN_HEIGHT
     backgroundColor: "#000",
   },
   thumbnail: {
