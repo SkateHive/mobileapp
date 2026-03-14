@@ -24,7 +24,7 @@ import {
   InvalidKeyError,
   InvalidKeyFormatError,
 } from "~/lib/hive-utils";
-import { prefetchVideoFeed, warmUpVideoAssets } from "~/lib/hooks/useQueries";
+import { prefetchVideoFeed, warmUpVideoAssets, prefetchCommunityFeed, prefetchProfile, prefetchBalance } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 
 // Enable LayoutAnimation for Android
@@ -73,9 +73,10 @@ export default function Index() {
   const [message, setMessage] = React.useState("");
   const [isFormVisible, setIsFormVisible] = React.useState(false);
 
-  // Prefetch video feed + warm HTTP cache while user is on login screen
+  // Prefetch video feed + community feed + warm HTTP cache while user is on login screen
   React.useEffect(() => {
     prefetchVideoFeed(queryClient);
+    prefetchCommunityFeed(queryClient);
     warmUpVideoAssets(queryClient);
   }, [queryClient]);
 
@@ -115,6 +116,9 @@ export default function Index() {
         return;
       }
       await login(username, password, method, pin);
+      // Prefetch user data after successful login
+      prefetchProfile(queryClient, username);
+      prefetchBalance(queryClient, username);
       router.replace("/(tabs)/videos");
       } catch (error: any) {
         if (
@@ -141,6 +145,9 @@ export default function Index() {
   ) => {
     try {
       await loginStoredUser(selectedUsername, pin);
+      // Prefetch user data after successful quick login
+      prefetchProfile(queryClient, selectedUsername);
+      prefetchBalance(queryClient, selectedUsername);
       router.replace("/(tabs)/videos");
     } catch (error) {
       if (

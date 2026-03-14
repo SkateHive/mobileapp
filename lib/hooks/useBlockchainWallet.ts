@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { resilientFetch, fetchBalanceFromAPI, fetchRewardsFromAPI, type NormalizedBalance, type NormalizedRewards } from '../resilient-fetch';
 import { getBlockchainAccountData, getBlockchainRewards } from '../hive-utils';
 
 interface BalanceData {
@@ -58,6 +59,7 @@ export function useBlockchainWallet(username: string | null) {
   const [rewardsData, setRewardsData] = useState<RewardsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<'api' | 'rpc' | null>(null);
 
   const fetchWalletData = async () => {
     if (!username || username === "SPECTATOR") {
@@ -72,15 +74,28 @@ export function useBlockchainWallet(username: string | null) {
     setError(null);
 
     try {
-      const [balanceResult, rewardsResult] = await Promise.all([
-        getBlockchainAccountData(username),
-        getBlockchainRewards(username),
-      ]);
+      // Resilient balance fetch: API first, RPC fallback
+      const balanceResult = await resilientFetch<NormalizedBalance>(
+        async () => {
+          setSource('api');
+          return fetchBalanceFromAPI(username);
+        },
+        async () => {
+          setSource('rpc');
+          const rpcData = await getBlockchainAccountData(username);
+          return { account_name: username, ...rpcData };
+        },
+        'wallet-balance'
+      );
 
-      setBalanceData({
-        account_name: username,
-        ...balanceResult,
-      });
+      // Resilient rewards fetch: API first, RPC fallback
+      const rewardsResult = await resilientFetch<RewardsData>(
+        async () => fetchRewardsFromAPI(username) as Promise<RewardsData>,
+        async () => getBlockchainRewards(username) as Promise<RewardsData>,
+        'wallet-rewards'
+      );
+
+      setBalanceData(balanceResult);
       setRewardsData(rewardsResult);
     } catch (err) {
       console.error("Error fetching blockchain wallet data:", err);
@@ -105,6 +120,7 @@ export function useBlockchainWallet(username: string | null) {
     rewardsData,
     isLoading,
     error,
+    source, // 'api' or 'rpc' — useful for debugging
     refresh,
   };
 }
