@@ -1,4 +1,4 @@
-export const APP_NAME="SkateHive";
+export const APP_NAME="Skatehive";
 export const STORED_USERS_KEY = 'myc_users';
 export const API_BASE_URL = 'https://api.skatehive.app/api/v1';
 export const LEADERBOARD_API_URL = 'https://api.skatehive.app/api/v2/leaderboard';

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Image, Modal, Pressable, View, Dimensions, StyleSheet } from 'react-native';
+import { Modal, Pressable, View, Dimensions, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { VideoPlayer } from './VideoPlayer';
 import { VideoWithAutoplay } from './VideoWithAutoplay';
 import { EmbedPlayer } from './EmbedPlayer';
@@ -102,9 +103,10 @@ export function MediaPreview({
                 <Image
                   source={{ uri: item.url }}
                   style={styles.fullSize}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  transition={200}
                   onLoad={(e) => {
-                    const { width, height } = e.nativeEvent.source;
+                    const { width, height } = e.source;
                     handleImageLoad(index, width, height);
                   }}
                 />
@@ -129,7 +131,8 @@ export function MediaPreview({
               <Image
                 source={{ uri: selectedMedia.url }}
                 style={styles.fullSize}
-                resizeMode="contain"
+                contentFit="contain"
+                transition={300}
               />
             ) : selectedMedia?.type === 'video' ? (
               <VideoPlayer url={selectedMedia.url} playing={true} />
