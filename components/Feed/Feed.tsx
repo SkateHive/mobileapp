@@ -23,7 +23,7 @@ import {
 import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
 import { useScrollLock } from "~/lib/ScrollLockContext";
-import { FullConversationDrawer } from "./FullConversationDrawer";
+import { ConversationDrawer } from "./ConversationDrawer";
 import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
@@ -171,10 +171,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
       {/* Single shared conversation drawer */}
       {conversationPost && (
-        <FullConversationDrawer
-          visible={!!conversationPost}
+        <ConversationDrawer
+          isVisible={!!conversationPost}
           onClose={handleCloseConversation}
-          discussion={conversationPost}
+          post={conversationPost}
         />
       )}
     </View>

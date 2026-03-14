@@ -25,7 +25,7 @@ import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from '~/lib/hooks/useUserComments';
 import { useScrollLock } from '~/lib/ScrollLockContext';
-import { FullConversationDrawer } from '~/components/Feed/FullConversationDrawer';
+import { ConversationDrawer } from '~/components/Feed/ConversationDrawer';
 import type { Discussion } from '@hiveio/dhive';
 import { extractMediaFromBody } from "~/lib/utils";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
@@ -231,7 +231,7 @@ export default function ProfileScreen() {
         <GridVideoTile
           videoUrl={videoMedia.url}
           size={tileSize}
-          onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+          onPress={() => setConversationPost(item)}
         />
       );
     }
@@ -241,7 +241,7 @@ export default function ProfileScreen() {
     return (
       <Pressable
         style={[styles.gridTile, { width: tileSize, height: tileSize }]}
-        onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+        onPress={() => setConversationPost(item)}
       >
         {thumb ? (
           <Image
@@ -587,10 +587,10 @@ export default function ProfileScreen() {
 
       {/* Single shared conversation drawer */}
       {conversationPost && (
-        <FullConversationDrawer
-          visible={!!conversationPost}
+        <ConversationDrawer
+          isVisible={!!conversationPost}
           onClose={() => setConversationPost(null)}
-          discussion={conversationPost}
+          post={conversationPost}
         />
       )}
 

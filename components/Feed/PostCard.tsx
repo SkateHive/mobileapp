@@ -267,16 +267,18 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
   };
 
   const handleConversationPress = () => {
-    setIsDrawerVisible(true);
     if (onOpenConversation) {
       onOpenConversation(post);
+    } else {
+      setIsDrawerVisible(true);
     }
   };
 
   const handleBodyPress = () => {
-    setIsDrawerVisible(true);
     if (onOpenConversation) {
       onOpenConversation(post);
+    } else {
+      setIsDrawerVisible(true);
     }
   };
 
@@ -544,8 +546,8 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
         </View>
       </View>
 
-      {/* Unified Conversation Drawer */}
-      {isDrawerVisible && (
+      {/* Unified Conversation Drawer - only show if not managed by parent */}
+      {!onOpenConversation && isDrawerVisible && (
         <React.Suspense fallback={null}>
           <ConversationDrawer
             isVisible={isDrawerVisible}

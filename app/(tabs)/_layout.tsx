@@ -209,7 +209,7 @@ export default function TabLayout() {
                 options={{
                   unmountOnBlur: tab.name === 'videos' || tab.name === 'feed',
                   title: tab.title,
-                  tabBarIcon: ({ color, focused }) =>
+                  tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) =>
                     tab.isCenter ? (
                       <View style={styles.centerButtonContainer}>
                         <Ionicons
