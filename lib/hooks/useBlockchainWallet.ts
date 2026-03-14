@@ -7,8 +7,11 @@ interface BalanceData {
   hbd: string;
   vests: string;
   hp_equivalent: string;
+  delegated_hp: string;
+  received_hp: string;
   hive_savings: string;
   hbd_savings: string;
+  hbd_claimable: string;
 }
 
 interface RewardsData {
