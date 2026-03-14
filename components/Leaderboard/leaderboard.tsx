@@ -7,6 +7,7 @@ import { Crown } from "lucide-react-native";
 import { useLeaderboard } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
+import { LoadingScreen } from "~/components/ui/LoadingScreen";
 
 interface LeaderboardProps {
   currentUsername: string | null;
@@ -77,9 +78,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading leaderboard...</Text>
-        </View>
+        <LoadingScreen />
       </View>
     );
   }

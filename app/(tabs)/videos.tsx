@@ -22,6 +22,7 @@ import { ConversationDrawer } from "~/components/Feed/ConversationDrawer";
 import { useScrollLock } from "~/lib/ScrollLockContext";
 import { theme } from "~/lib/theme";
 import { useAppSettings } from "~/lib/AppSettingsContext";
+import { LoadingScreen } from "~/components/ui/LoadingScreen";
 
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
@@ -340,9 +341,7 @@ export default function VideosScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
+        <LoadingScreen />
       </View>
     );
   }

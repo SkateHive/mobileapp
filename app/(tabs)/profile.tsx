@@ -20,7 +20,10 @@ import { ProfileSpectatorInfo } from "~/components/SpectatorMode/ProfileSpectato
 import { PostCard } from "~/components/Feed/PostCard";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { FollowersModal } from "~/components/Profile/FollowersModal";
+import { useFocusEffect } from '@react-navigation/native';
 import { EditProfileModal } from "~/components/Profile/EditProfileModal";
+
+const { width } = Dimensions.get('window');
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useToast } from "~/lib/toast-provider";
@@ -559,7 +562,7 @@ export default function ProfileScreen() {
     if (!isLoadingPosts) return null;
     return (
       <View style={styles.loadingFooter}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <LoadingScreen />
       </View>
     );
   };
