@@ -49,6 +49,7 @@ export function ConversationDrawer({
   
   const [post, setPost] = useState<Discussion | undefined>(initialPost);
   const [isPostLoading, setIsPostLoading] = useState(false);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
   const author = post?.author || initialAuthor || '';
   const permlink = post?.permlink || initialPermlink || '';
@@ -108,7 +109,7 @@ export function ConversationDrawer({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         // Only respond to downward swipes when at the top of the scroll
-        return gestureState.dy > 10;
+        return gestureState.dy > 10 && scrollOffset <= 0;
       },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
@@ -148,6 +149,7 @@ export function ConversationDrawer({
         <Pressable style={styles.backdrop} onPress={handleClose} />
         
         <Animated.View
+          {...panResponder.panHandlers}
           style={[
             styles.drawer,
             {
@@ -157,7 +159,7 @@ export function ConversationDrawer({
           ]}
         >
           {/* Gesture Sensitive Header Area */}
-          <View {...panResponder.panHandlers}>
+          <View>
             {/* Handle bar for swiping */}
             <View style={styles.handleBarContainer}>
               <View style={styles.handleBar} />
@@ -199,6 +201,8 @@ export function ConversationDrawer({
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               scrollEnabled={!isScrollLocked}
+              onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
+              scrollEventThrottle={16}
             >
               <View style={styles.repliesHeader}>
                 <Text style={styles.repliesTitle}>
