@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { STORED_USERS_KEY } from './constants';
 import {
   AccountNotFoundError,
@@ -28,6 +28,7 @@ import {
   setUserRelationship
 } from './hive-utils';
 import { useAppSettings } from './AppSettingsContext';
+import { getFollowingList, getFollowersList } from './api';
 
 const SESSION_KEY = 'current_auth_session';
 
@@ -166,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Load user relationship lists (following, muted, blacklisted)
-  const refreshUserRelationships = async () => {
+  const refreshUserRelationships = useCallback(async () => {
     if (!username || username === 'SPECTATOR') {
       setFollowingList([]);
       setMutedList([]);
@@ -175,20 +176,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const [following, muted, blacklisted] = await Promise.all([
-        getUserRelationshipList(username, 'blog'),
+      const [following, muted, blacklisted, followers] = await Promise.all([
+        getFollowingList(username),
         getUserRelationshipList(username, 'ignore'),
         getUserRelationshipList(username, 'blacklist'),
+        getFollowersList(username),
       ]);
       
       setFollowingList(following);
       setMutedList(muted);
       setBlacklistedList(blacklisted);
+      
+      console.log(`[Auth] User relationships refreshed for @${username}:`);
+      console.log(` - Following: ${following.length} users (${following.slice(0, 5).join(', ')}...)`);
+      console.log(` - Muted: ${muted.length} users`);
+      console.log(` - Blacklisted: ${blacklisted.length} users`);
     } catch (error) {
-      console.error('Error loading user relationships:', error);
+      console.error(`[Auth] Error refreshing relationships for @${username}:`, error);
       // Don't throw error, just log it to avoid breaking the app
     }
-  };
+  }, [username]);
 
   // Update user relationship and refresh the lists
   const updateUserRelationship = async (

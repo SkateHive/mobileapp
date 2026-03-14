@@ -6,7 +6,16 @@
  * Both sources are normalized to the same TypeScript interface.
  */
 
+import { Client } from '@hiveio/dhive';
 import { API_BASE_URL } from './constants';
+
+const HiveClient = new Client([
+  "https://api.deathwing.me",
+  "https://techcoderx.com",
+  "https://api.hive.blog",
+  "https://anyx.io",
+  "https://hive-api.arcange.eu",
+]);
 
 /**
  * Generic resilient fetcher: tries API first, falls back to RPC.
@@ -20,9 +29,154 @@ export async function resilientFetch<T>(
     const result = await apiFn();
     return result;
   } catch (apiError) {
-    console.warn(`[${label}] API failed, falling back to RPC:`, apiError);
+    if ((apiError as any).message?.includes('Network request failed')) {
+      console.warn(`[${label}] API unreachable (Local Network?), falling back to RPC.`);
+    } else {
+      console.warn(`[${label}] API failed, falling back to RPC:`, apiError);
+    }
     return rpcFallbackFn();
   }
+}
+
+// ============================================================================
+// RELATIONSHIPS DATA (Following/Followers)
+// ============================================================================
+
+/**
+ * Fetch following list from Skatehive API v2 (with pagination up to exhaustion).
+ */
+export async function fetchFollowingFromAPI(username: string): Promise<string[]> {
+  let allFollowing: string[] = [];
+  let offset = 0;
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${API_BASE_URL}/following/${username}?t=${Date.now()}&offset=${offset}`;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`API following failed: ${response.status}`);
+    const json = await response.json();
+    if (!json.success) throw new Error('API following returned success=false');
+    
+    const pageData = json.data.map((item: any) => item.following_name);
+    allFollowing = [...allFollowing, ...pageData];
+
+    if (pageData.length < limit) {
+      hasMore = false;
+    } else {
+      offset += limit;
+    }
+  }
+
+  return allFollowing;
+}
+
+/**
+ * Fetch followers list from Skatehive API v2 (with pagination up to exhaustion).
+ */
+export async function fetchFollowersFromAPI(username: string): Promise<string[]> {
+  let allFollowers: string[] = [];
+  let offset = 0;
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${API_BASE_URL}/followers/${username}?t=${Date.now()}&offset=${offset}`;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`API followers failed: ${response.status}`);
+    const json = await response.json();
+    if (!json.success) throw new Error('API followers returned success=false');
+    
+    const pageData = json.data.map((item: any) => item.follower_name);
+    allFollowers = [...allFollowers, ...pageData];
+
+    if (pageData.length < limit) {
+      hasMore = false;
+    } else {
+      offset += limit;
+    }
+  }
+
+  return allFollowers;
+}
+/**
+ * Fetch following from Hive RPC (Bridge API) with pagination.
+ */
+export async function fetchFollowingFromRPC(username: string): Promise<string[]> {
+  let allFollowing: string[] = [];
+  let start = '';
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const params: any = {
+      account: username,
+      sort: 'blog',
+      limit: limit
+    };
+    if (start) {
+      params.start = start;
+    }
+
+    const result = await HiveClient.call('bridge', 'get_following', params);
+    
+    // The bridge API returns the 'start' account as the first item when paginating,
+    // so we need to filter it out if we're not on the first page to avoid duplicates.
+    let pageData = result.map((item: any) => item.following);
+    if (start && pageData.length > 0 && pageData[0] === start) {
+      pageData = pageData.slice(1);
+    }
+    
+    allFollowing = [...allFollowing, ...pageData];
+
+    if (result.length < limit) {
+      hasMore = false;
+    } else {
+      start = result[result.length - 1].following;
+    }
+  }
+
+  return allFollowing;
+}
+
+/**
+ * Fetch followers from Hive RPC (Bridge API) with pagination.
+ */
+export async function fetchFollowersFromRPC(username: string): Promise<string[]> {
+  let allFollowers: string[] = [];
+  let start = '';
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const params: any = {
+      account: username,
+      sort: 'blog',
+      limit: limit
+    };
+    if (start) {
+      params.start = start;
+    }
+
+    const result = await HiveClient.call('bridge', 'get_followers', params);
+    
+    // The bridge API returns the 'start' account as the first item when paginating,
+    // so we need to filter it out if we're not on the first page to avoid duplicates.
+    let pageData = result.map((item: any) => item.follower);
+    if (start && pageData.length > 0 && pageData[0] === start) {
+      pageData = pageData.slice(1);
+    }
+    
+    allFollowers = [...allFollowers, ...pageData];
+
+    if (result.length < limit) {
+      hasMore = false;
+    } else {
+      start = result[result.length - 1].follower;
+    }
+  }
+
+  return allFollowers;
 }
 
 // ============================================================================

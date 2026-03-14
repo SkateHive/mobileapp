@@ -63,6 +63,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
   const { session, followingList, updateUserRelationship } = useAuth();
   const { settings } = useAppSettings();
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -161,7 +162,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
     }
 
     try {
-      setIsFollowing(true);
+      setIsFollowLoading(true);
       const success = await updateUserRelationship(post.author, 'blog');
       if (success) {
         showToast(`Following @${post.author}`, 'success');
@@ -171,7 +172,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
     } catch (error) {
       showToast('Error following user', 'error');
     } finally {
-      setIsFollowing(false);
+      setIsFollowLoading(false);
     }
   };
 
@@ -415,9 +416,9 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
                   <Pressable
                     onPress={handleFollow}
                     style={styles.followButton}
-                    disabled={isFollowing}
+                    disabled={isFollowLoading}
                   >
-                    {isFollowing ? (
+                    {isFollowLoading ? (
                       <ActivityIndicator size="small" color={theme.colors.primary} />
                     ) : (
                       <Text style={styles.followButtonText}>Follow</Text>
@@ -580,7 +581,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
           <View style={styles.userMenuContainer}>
             <Text style={styles.userMenuTitle}>@{post.author}</Text>
 
-            {followingList.includes(post.author) ? (
+            {isFollowing ? (
               <Pressable
                 style={styles.userMenuButton}
                 onPress={() => handleUserAction('unfollow')}

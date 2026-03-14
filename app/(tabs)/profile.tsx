@@ -23,12 +23,14 @@ import { FollowersModal } from "~/components/Profile/FollowersModal";
 import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
+import { useToast } from "~/lib/toast-provider";
 import { useUserComments } from '~/lib/hooks/useUserComments';
 import { useScrollLock } from '~/lib/ScrollLockContext';
 import { ConversationDrawer } from '~/components/Feed/ConversationDrawer';
 import type { Discussion } from '@hiveio/dhive';
 import { extractMediaFromBody } from "~/lib/utils";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
+import { VideoPlayer } from '~/components/Feed/VideoPlayer';
 
 const GRID_COLS = 3;
 const GRID_GAP = 2;
@@ -53,7 +55,7 @@ const SkeletonTile = React.memo(({ size, delay }: { size: number; delay: number 
 });
 
 const GridSkeleton = ({ tileSize }: { tileSize: number }) => (
-  <View style={skeletonStyles.container}>
+  <View style={[skeletonStyles.container, { width: SCREEN_WIDTH }]}>
     {Array.from({ length: 12 }).map((_, i) => (
       <SkeletonTile key={i} size={tileSize} delay={(i % 3) * 150} />
     ))}
@@ -65,6 +67,7 @@ const skeletonStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GRID_GAP,
+    justifyContent: 'flex-start',
   },
 });
 
@@ -115,6 +118,10 @@ export default function ProfileScreen() {
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
   const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const { followingList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
+  const { showToast } = useToast();
 
   // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
@@ -123,7 +130,59 @@ export default function ProfileScreen() {
     setEditProfileVisible(false);
     setSettingsMenuVisible(false);
     setProfileTab('grid');
+    setIsFollowLoading(false);
   }, [profileUsername]);
+
+  // Force refresh relationships when visiting a profile to ensure following status is accurate
+  useEffect(() => {
+    if (typeof currentUsername === 'string' && currentUsername !== "SPECTATOR") {
+      console.log(`[Profile Sync] Forcing relationship refresh for @${currentUsername} while viewing @${profileUsername}`);
+      refreshUserRelationships().catch(console.error);
+    }
+  }, [profileUsername, currentUsername, refreshUserRelationships]);
+
+  // Sync following status with global list
+  useEffect(() => {
+    if (followingList && profileUsername) {
+      const profileLower = profileUsername.toLowerCase();
+      const following = followingList.some((u: string) => u.toLowerCase() === profileLower);
+      
+      console.log(`[Profile Sync] Checking if @${profileLower} is in followingList: ${following}`);
+      console.log(` - Current followingList size: ${followingList.length}`);
+      
+      if (!following && followingList.length < 10) {
+        console.log(" - followingList (first 10):", followingList.slice(0, 10));
+      }
+      
+      setIsFollowing(following);
+    }
+  }, [followingList, profileUsername]);
+
+  const handleFollow = async () => {
+    if (!profileUsername || profileUsername === "SPECTATOR") return;
+    
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsFollowLoading(true);
+      const isCurrentlyFollowing = followingList.some((u: string) => u.toLowerCase() === profileUsername.toLowerCase());
+      const action = isCurrentlyFollowing ? '' : 'blog'; // '' unsets relationship (unfollow)
+      
+      const success = await updateUserRelationship(profileUsername, action);
+      if (success) {
+        showToast(isCurrentlyFollowing ? `Unfollowed @${profileUsername}` : `Following @${profileUsername}`, 'success');
+      } else {
+        showToast(`Failed to ${isCurrentlyFollowing ? 'unfollow' : 'follow'} user`, 'error');
+      }
+    } catch (error) {
+      showToast('Error updating relationship', 'error');
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
 
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
   const {
@@ -204,22 +263,11 @@ export default function ProfileScreen() {
   );
 
   // Auto-load more when grid doesn't have enough items to fill the screen
-  // A 3-col grid needs ~15 items (5 rows) to be scrollable
-  const MIN_GRID_ITEMS = 15;
-  useEffect(() => {
-    if (
-      profileTab === 'grid' &&
-      !isLoadingPosts &&
-      hasMore &&
-      gridPosts.length < MIN_GRID_ITEMS &&
-      userPosts.length > 0
-    ) {
-      loadNextPage();
-    }
-  }, [profileTab, isLoadingPosts, hasMore, gridPosts.length, userPosts.length, loadNextPage]);
+  // REMOVED: This was causing infinite loops and crashes (OOM) on profiles with many media-less posts.
+  // The user can still scroll down to trigger loadNextPage via onEndReached.
 
   // Render grid item
-  const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+  const tileSize = (SCREEN_WIDTH - (GRID_GAP * (GRID_COLS - 1))) / GRID_COLS - 0.5;
 
   const renderGridItem = useCallback(({ item }: { item: any }) => {
     const media = extractMediaFromBody(item.body);
@@ -397,8 +445,31 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Username */}
-            <Text style={styles.username}>@{profileUsername}</Text>
+            {/* Username + Follow Button */}
+            <View style={styles.usernameRow}>
+              <Text style={styles.username}>@{profileUsername}</Text>
+              {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
+                <Pressable
+                  style={[
+                    styles.followActionBtn,
+                    isFollowing ? styles.unfollowBtn : styles.followBtn
+                  ]}
+                  onPress={handleFollow}
+                  disabled={isFollowLoading}
+                >
+                  {isFollowLoading ? (
+                    <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
+                  ) : (
+                    <Text style={[
+                      styles.followActionBtnText,
+                      isFollowing ? styles.unfollowBtnText : styles.followBtnText
+                    ]}>
+                      {isFollowing ? 'Unfollow' : 'Follow'}
+                    </Text>
+                  )}
+                </Pressable>
+              )}
+            </View>
 
             {/* Stats + flag inline */}
             <View style={styles.statsRow}>
@@ -533,15 +604,15 @@ export default function ProfileScreen() {
             ) : null
           }
           onEndReached={hasMore ? loadNextPage : undefined}
-          onEndReachedThreshold={0.8}
+          onEndReachedThreshold={0.5}
           refreshControl={
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
-          initialNumToRender={12}
-          maxToRenderPerBatch={9}
-          windowSize={7}
+          initialNumToRender={6}
+          maxToRenderPerBatch={3}
+          windowSize={3}
           contentContainerStyle={{ gap: GRID_GAP }}
         />
       ) : (
@@ -718,6 +789,38 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  followActionBtn: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xxs,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followBtn: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  unfollowBtn: {
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.border,
+  },
+  followActionBtnText: {
+    fontSize: theme.fontSizes.xs,
+    fontFamily: theme.fonts.bold,
+  },
+  followBtnText: {
+    color: theme.colors.background,
+  },
+  unfollowBtnText: {
+    color: theme.colors.text,
   },
   statsRow: {
     flexDirection: 'row',
