@@ -32,6 +32,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   
   const [currentView, setCurrentView] = useState<MenuView>("settings");
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const [versionColor, setVersionColor] = useState(theme.colors.muted);
   
   // Animation values
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
@@ -135,7 +137,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     );
   };
 
-  const renderCard = (items: { title: string, icon: any, value?: string, onPress: () => void, disabled?: boolean }[]) => (
+  const renderCard = (items: { title: string, icon: any, value?: string, onPress: () => void, disabled?: boolean, color?: string }[]) => (
     <View style={styles.card}>
       {items.map((item, index) => (
         <React.Fragment key={index}>
@@ -145,11 +147,11 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             disabled={item.disabled}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name={item.icon} size={22} color={theme.colors.text} />
-              <Text style={styles.menuItemText}>{item.title}</Text>
+              <Ionicons name={item.icon} size={22} color={item.color || theme.colors.text} />
+              <Text style={[styles.menuItemText, item.color ? { color: item.color } : {}]}>{item.title}</Text>
             </View>
             <View style={styles.menuItemRight}>
-              {item.value && <Text style={styles.menuItemValue}>{item.value}</Text>}
+              {item.value && <Text style={[styles.menuItemValue, item.color ? { color: item.color } : {}]}>{item.value}</Text>}
               {!item.disabled && <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />}
             </View>
           </Pressable>
@@ -175,12 +177,14 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       { 
         title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons", 
         icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const, 
-        onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); } 
+        onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); },
+        color: theme.colors.muted
       },
       { 
         title: `Stance: ${settings.stance.charAt(0).toUpperCase() + settings.stance.slice(1)}`, 
         icon: "body-outline" as const, 
-        onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); } 
+        onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); },
+        color: theme.colors.muted
       },
       { title: "Feeds", icon: "list-outline" as const, value: "System", onPress: () => {} },
     ],
@@ -222,15 +226,17 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
         </Pressable>
 
-        <Pressable style={styles.card} onPress={() => {}}>
-          <View style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="wallet-outline" size={22} color={theme.colors.text} />
-              <Text style={styles.menuItemText}>Wallets</Text>
+        {settings.isWalletUnlocked && (
+          <Pressable style={styles.card} onPress={() => { onClose(); router.push("/wallet"); }}>
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="wallet-outline" size={22} color={theme.colors.text} />
+                <Text style={styles.menuItemText}>Wallets</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
             </View>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
-          </View>
-        </Pressable>
+          </Pressable>
+        )}
 
         {/* service section hidden per user request */}
         {/* <Text style={styles.groupLabel}>Service</Text>
@@ -242,6 +248,26 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         <Text style={styles.groupLabel}>About</Text>
         {renderCard(settingsItems.about)}
         
+        <View style={styles.versionContainer}>
+          <Pressable 
+            onPress={() => {
+              const newCount = tapCount + 1;
+              setTapCount(newCount);
+              if (newCount === 5) {
+                setVersionColor(theme.colors.primary);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } else if (newCount === 10) {
+                updateSettings({ isWalletUnlocked: true });
+                showToast("Wallet Unlocked!", "success");
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            }}
+            style={styles.versionButton}
+          >
+            <Text style={[styles.versionText, { color: versionColor }]}>Version 1.0.1</Text>
+          </Pressable>
+        </View>
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -558,5 +584,17 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
     fontFamily: theme.fonts.bold,
     fontSize: theme.fontSizes.md,
+  },
+  versionContainer: {
+    marginTop: theme.spacing.xl,
+    alignItems: "center",
+    paddingBottom: theme.spacing.lg,
+  },
+  versionButton: {
+    padding: theme.spacing.sm,
+  },
+  versionText: {
+    fontSize: theme.fontSizes.xs,
+    fontFamily: theme.fonts.regular,
   },
 });

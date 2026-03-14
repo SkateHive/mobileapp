@@ -10,6 +10,7 @@ import { FeedFilterProvider, useFeedFilter } from "~/lib/FeedFilterContext";
 import { Pressable, Text as RNText, Modal } from "react-native";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
+import { useAppSettings } from "~/lib/AppSettingsContext";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { Image } from "expo-image";
 
@@ -208,7 +209,7 @@ export default function TabLayout() {
         {!isVideosTab && (
           <GlobalHeader 
             onOpenMenu={() => setIsMenuVisible(true)} 
-            title={getHeaderTitle()}
+            // title={getHeaderTitle()}
             // centerComponent={currentTab === "feed" ? <FeedHeaderTitle /> : undefined} // Future feature: Filter dropdown
             showSettings={isProfileTab}
           />
