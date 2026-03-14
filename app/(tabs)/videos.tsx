@@ -256,8 +256,8 @@ export default function VideosScreen() {
 
         {/* Side action buttons (Regular = left, Goofy = right) */}
         <View style={[
-          styles.actionsContainer, 
-          settings.stance === 'regular' ? { left: 16 } : { right: 16 }
+          styles.actionsContainer,
+          settings.stance === 'goofy' ? { left: 16 } : { right: 16 }
         ]}>
           <Pressable
             style={styles.actionButton}

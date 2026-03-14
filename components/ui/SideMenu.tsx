@@ -186,7 +186,19 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         value: settings.stance === 'regular' ? 'Regular' : 'Goofy',
         onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); },
       },
-      { title: "Feeds", icon: "list-outline" as const, value: "System", hideChevron: true, onPress: () => {} },
+    ],
+    security: [
+      { 
+        title: "Session Lock", 
+        icon: "lock-closed-outline" as const, 
+        value: settings.sessionDuration === 0 ? "Auto" : (settings.sessionDuration < 60 ? `${settings.sessionDuration}m` : `${settings.sessionDuration / 60}h`),
+        onPress: () => { 
+          const durations = [0, 5, 60, 480, 1440];
+          const currentIndex = durations.indexOf(settings.sessionDuration);
+          const nextIndex = (currentIndex + 1) % durations.length;
+          updateSettings({ sessionDuration: durations[nextIndex] });
+        },
+      },
     ],
     about: [
       { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
@@ -241,6 +253,9 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         {/* service section hidden per user request */}
         {/* <Text style={styles.groupLabel}>Service</Text>
         {renderCard(settingsItems.service)} */}
+
+        <Text style={styles.groupLabel}>Security</Text>
+        {renderCard(settingsItems.security)}
 
         <Text style={styles.groupLabel}>Appearance</Text>
         {renderCard(settingsItems.appearance)}
@@ -326,12 +341,6 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
               </View>
             </React.Fragment>
           ))}
-
-          <View style={styles.divider} />
-          <Pressable style={styles.menuItem} onPress={() => { onClose(); router.push("/login"); }}>
-            <Text style={styles.menuItemTextSecondary}>Add Hive Account</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
-          </Pressable>
         </View>
 
         {socialSlots.map((slot, idx) => (

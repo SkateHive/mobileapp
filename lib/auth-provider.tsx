@@ -27,6 +27,9 @@ import {
   getUserRelationshipList,
   setUserRelationship
 } from './hive-utils';
+import { useAppSettings } from './AppSettingsContext';
+
+const SESSION_KEY = 'current_auth_session';
 
 // ============================================================================
 // APPLE REVIEW TEST ACCOUNT CONFIGURATION
@@ -93,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mutedList, setMutedList] = useState<string[]>([]);
   const [blacklistedList, setBlacklistedList] = useState<string[]>([]);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { settings } = useAppSettings();
 
   // Delete a single stored user and update state
   const removeStoredUser = async (usernameToRemove: string) => {
@@ -113,8 +117,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Inactivity timeout (5 minutes)
-  const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
+  // Inactivity timeout based on settings
+  const INACTIVITY_TIMEOUT = settings.sessionDuration * 60 * 1000;
 
   useEffect(() => {
     loadStoredUsers();
@@ -129,12 +133,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       clearInactivityTimer();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // Handle Session persistence settings change
+  useEffect(() => {
+    if (settings.sessionDuration === 0) {
+      // If Auto-lock is enabled, clear any persistent session from storage
+      // The current session will stay in memory until the app is closed
+      SecureStore.deleteItemAsync(SESSION_KEY).catch(console.error);
+    }
+  }, [settings.sessionDuration]);
 
   const resetInactivityTimer = () => {
     // Only reset timer if user is authenticated and has a session
-    if (!session || !isAuthenticated) return;
+    if (!session || !isAuthenticated || settings.sessionDuration === 0) return;
     
     clearInactivityTimer();
     inactivityTimer.current = setTimeout(() => {
@@ -241,7 +253,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Check if a user is already logged in (restore session)
   const checkCurrentUser = async () => {
     try {
-      // Do not auto-login: always require full login for decrypted key
+      // Robust check: Verify session duration from storage to avoid race conditions
+      // with AppSettingsContext loading.
+      const storedSettingsStr = await SecureStore.getItemAsync('app_settings');
+      let isAutoLock = false;
+      if (storedSettingsStr) {
+        const storedSettings = JSON.parse(storedSettingsStr);
+        if (storedSettings.sessionDuration === 0) {
+          isAutoLock = true;
+        }
+      }
+
+      if (isAutoLock) {
+        // If Auto-lock is enabled, we never restore from SecureStore
+        await SecureStore.deleteItemAsync(SESSION_KEY);
+        setUsername(null);
+        setIsAuthenticated(false);
+        setSession(null);
+        return;
+      }
+
+      const storedSession = await SecureStore.getItemAsync(SESSION_KEY);
+      if (storedSession) {
+        const parsed: AuthSession & { expiryAt: number } = JSON.parse(storedSession);
+        
+        // Check if session has expired
+        if (parsed.expiryAt > Date.now()) {
+          setUsername(parsed.username);
+          setSession(parsed);
+          setIsAuthenticated(true);
+          
+          // Refresh relationships in background
+          refreshUserRelationships();
+          return;
+        } else {
+          // Session expired, clear it
+          await SecureStore.deleteItemAsync(SESSION_KEY);
+        }
+      }
+      
+      // No valid session found
       setUsername(null);
       setIsAuthenticated(false);
       setSession(null);
@@ -340,9 +391,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: Date.now(),
       };
       await updateStoredUsers(user);
+      const authSession: AuthSession = { 
+        username: normalizedUsername, 
+        decryptedKey: postingKey, 
+        loginTime: Date.now() 
+      };
+      
+      // Store session for persistence (skip if duration is 0 / "Auto")
+      if (settings.sessionDuration > 0) {
+        const expiryAt = Date.now() + (settings.sessionDuration * 60 * 1000);
+        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...authSession, expiryAt }));
+      }
+
       setUsername(normalizedUsername);
       setIsAuthenticated(true);
-      setSession({ username: normalizedUsername, decryptedKey: postingKey, loginTime: Date.now() });
+      setSession(authSession);
       
       // Load user relationships after successful login
       setTimeout(() => refreshUserRelationships(), 100);
@@ -399,9 +462,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await deleteEncryptedKey(selectedUsername);
         throw new AuthError('Stored credentials are incompatible. Please log in again.');
       }
+      const authSession: AuthSession = { 
+        username: selectedUsername, 
+        decryptedKey, 
+        loginTime: Date.now() 
+      };
+
+      // Store session for persistence (skip if duration is 0 / "Auto")
+      if (settings.sessionDuration > 0) {
+        const expiryAt = Date.now() + (settings.sessionDuration * 60 * 1000);
+        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...authSession, expiryAt }));
+      }
+
       setUsername(selectedUsername);
       setIsAuthenticated(true);
-      setSession({ username: selectedUsername, decryptedKey, loginTime: Date.now() });
+      setSession(authSession);
       await updateStoredUsers({ username: selectedUsername, method: encryptedKey.method, createdAt: encryptedKey.createdAt });
       
       // Load user relationships after successful login
@@ -431,6 +506,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
+      await SecureStore.deleteItemAsync(SESSION_KEY);
       await SecureStore.deleteItemAsync('lastLoggedInUser');
     } catch (error) {
       console.error('Error during logout:', error);
@@ -458,6 +534,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await deleteEncryptedKey(user.username);
       }
       await SecureStore.deleteItemAsync(STORED_USERS_KEY);
+      await SecureStore.deleteItemAsync(SESSION_KEY);
       await SecureStore.deleteItemAsync('lastLoggedInUser');
       setStoredUsers([]);
       setSession(null);

@@ -8,6 +8,7 @@ export interface AppSettings {
   stance: 'regular' | 'goofy';
   isWalletUnlocked: boolean;
   isAdvancedWallet: boolean;
+  sessionDuration: number; // minutes: 0 (Auto), 5, 60, 480, 1440
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   stance: 'regular',
   isWalletUnlocked: false,
   isAdvancedWallet: true,
+  sessionDuration: 1440,
 };
 
 interface AppSettingsContextType {
