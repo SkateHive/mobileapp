@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { STORED_USERS_KEY } from './constants';
 import {
@@ -167,32 +168,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Load user relationship lists (following, muted, blacklisted)
-  const refreshUserRelationships = useCallback(async () => {
-    if (!username || username === 'SPECTATOR') {
+  const refreshUserRelationships = useCallback(async (explicitUsername?: string) => {
+    const targetUser = explicitUsername || username;
+    
+    if (!targetUser || targetUser === 'SPECTATOR') {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
       return;
     }
 
+    // 1. Instantly load from local disk cache to prevent UI flashing
+    try {
+      const cacheKey = `skatehive_relationships_${targetUser}`;
+      const cachedDataStr = await AsyncStorage.getItem(cacheKey);
+      
+      if (cachedDataStr) {
+        const cachedData = JSON.parse(cachedDataStr);
+        if (cachedData.following) setFollowingList(cachedData.following);
+        if (cachedData.muted) setMutedList(cachedData.muted);
+        if (cachedData.blacklisted) setBlacklistedList(cachedData.blacklisted);
+        console.log(`[Auth] Loaded cached relationships for @${targetUser}`);
+      }
+    } catch (cacheError) {
+      console.warn(`[Auth] Failed to load relationship cache for @${targetUser}:`, cacheError);
+    }
+
+    // 2. Fetch fresh data silently in the background
     try {
       const [following, muted, blacklisted, followers] = await Promise.all([
-        getFollowingList(username),
-        getUserRelationshipList(username, 'ignore'),
-        getUserRelationshipList(username, 'blacklist'),
-        getFollowersList(username),
+        getFollowingList(targetUser),
+        getUserRelationshipList(targetUser, 'ignore'),
+        getUserRelationshipList(targetUser, 'blacklist'),
+        getFollowersList(targetUser),
       ]);
       
+      // Update React state
       setFollowingList(following);
       setMutedList(muted);
       setBlacklistedList(blacklisted);
       
-      console.log(`[Auth] User relationships refreshed for @${username}:`);
+      // 3. Save the fresh data back to the disk cache
+      try {
+        const cacheKey = `skatehive_relationships_${targetUser}`;
+        const cacheDataToSave = JSON.stringify({ following, muted, blacklisted });
+        await AsyncStorage.setItem(cacheKey, cacheDataToSave);
+      } catch (saveError) {
+        console.warn(`[Auth] Failed to save relationship cache for @${targetUser}:`, saveError);
+      }
+      
+      console.log(`[Auth] User relationships refreshed & cached for @${targetUser}:`);
       console.log(` - Following: ${following.length} users (${following.slice(0, 5).join(', ')}...)`);
       console.log(` - Muted: ${muted.length} users`);
       console.log(` - Blacklisted: ${blacklisted.length} users`);
     } catch (error) {
-      console.error(`[Auth] Error refreshing relationships for @${username}:`, error);
+      console.error(`[Auth] Error refreshing relationships for @${targetUser}:`, error);
       // Don't throw error, just log it to avoid breaking the app
     }
   }, [username]);
@@ -291,7 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(true);
           
           // Refresh relationships in background
-          refreshUserRelationships();
+          refreshUserRelationships(parsed.username);
           return;
         } else {
           // Session expired, clear it
@@ -415,7 +445,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(authSession);
       
       // Load user relationships after successful login
-      setTimeout(() => refreshUserRelationships(), 100);
+      refreshUserRelationships(normalizedUsername);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -487,7 +517,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await updateStoredUsers({ username: selectedUsername, method: encryptedKey.method, createdAt: encryptedKey.createdAt });
       
       // Load user relationships after successful login
-      setTimeout(() => refreshUserRelationships(), 100);
+      refreshUserRelationships(selectedUsername);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
