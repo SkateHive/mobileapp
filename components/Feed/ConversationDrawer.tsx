@@ -106,9 +106,13 @@ export function ConversationDrawer({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to downward swipes when at the top of the scroll
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        // Immediately start if touching the top part (header/handle)
+        return evt.nativeEvent.locationY < 100;
+      },
+      onMoveShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        // Capture the gesture if swiping down at the top of the scroll
         return gestureState.dy > 10 && scrollOffset <= 0;
       },
       onPanResponderMove: (_, gestureState) => {
@@ -322,6 +326,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    flexGrow: 1, // Ensure it fills space for gestures
     paddingBottom: 100, // Space for composer
   },
   repliesHeader: {
@@ -368,11 +373,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   emptyContainer: {
+    flex: 1,
     padding: 48,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
   },
   emptyText: {
     color: theme.colors.muted,
     fontSize: 16,
+    textAlign: 'center',
   },
 });
