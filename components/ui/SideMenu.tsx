@@ -137,7 +137,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     );
   };
 
-  const renderCard = (items: { title: string, icon: any, value?: string, onPress: () => void, disabled?: boolean, color?: string }[]) => (
+  const renderCard = (items: { title: string, icon: any, value?: string, onPress: () => void, disabled?: boolean, color?: string, hideChevron?: boolean }[]) => (
     <View style={styles.card}>
       {items.map((item, index) => (
         <React.Fragment key={index}>
@@ -147,12 +147,12 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             disabled={item.disabled}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name={item.icon} size={22} color={item.color || theme.colors.text} />
-              <Text style={[styles.menuItemText, item.color ? { color: item.color } : {}]}>{item.title}</Text>
+              <Ionicons name={item.icon} size={22} color={theme.colors.primary} />
+              <Text style={styles.menuItemText}>{item.title}</Text>
             </View>
             <View style={styles.menuItemRight}>
-              {item.value && <Text style={[styles.menuItemValue, item.color ? { color: item.color } : {}]}>{item.value}</Text>}
-              {!item.disabled && <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />}
+              {item.value && <Text style={styles.menuItemValue}>{item.value}</Text>}
+              {!item.disabled && !item.hideChevron && <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />}
             </View>
           </Pressable>
           {index < items.length - 1 && <View style={styles.divider} />}
@@ -172,21 +172,21 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => {} },
     ],
     appearance: [
-      { title: "Theme", icon: "color-palette-outline" as const, value: "System", onPress: () => {} },
-      { title: "Language", icon: "language-outline" as const, value: "System", onPress: () => {} },
+      { title: "Theme", icon: "color-palette-outline" as const, value: "System", hideChevron: true, onPress: () => {} },
+      { title: "Language", icon: "language-outline" as const, value: "System", hideChevron: true, onPress: () => {} },
       { 
-        title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons", 
+        title: "Voter", 
         icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const, 
+        value: settings.useVoteSlider ? "Slider" : "Preset Buttons",
         onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); },
-        color: theme.colors.muted
       },
       { 
-        title: `Stance: ${settings.stance.charAt(0).toUpperCase() + settings.stance.slice(1)}`, 
+        title: "Stance", 
         icon: "body-outline" as const, 
+        value: settings.stance === 'regular' ? 'Regular' : 'Goofy',
         onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); },
-        color: theme.colors.muted
       },
-      { title: "Feeds", icon: "list-outline" as const, value: "System", onPress: () => {} },
+      { title: "Feeds", icon: "list-outline" as const, value: "System", hideChevron: true, onPress: () => {} },
     ],
     about: [
       { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },

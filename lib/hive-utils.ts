@@ -565,8 +565,11 @@ export async function getBlockchainAccountData(username: string): Promise<{
   hbd: string;
   vests: string;
   hp_equivalent: string;
+  delegated_hp: string;
+  received_hp: string;
   hive_savings: string;
   hbd_savings: string;
+  hbd_claimable: string;
 }> {
   try {
     const [account] = await HiveClient.database.getAccounts([username]);
@@ -579,19 +582,41 @@ export async function getBlockchainAccountData(username: string): Promise<{
     const hive = extractNumber(account.balance);
     const hbd = extractNumber(account.hbd_balance);
     const vestingShares = extractNumber(account.vesting_shares);
+    const delegatedVestingShares = extractNumber(account.delegated_vesting_shares);
+    const receivedVestingShares = extractNumber(account.received_vesting_shares);
     const hiveSavings = extractNumber(account.savings_balance);
     const hbdSavings = extractNumber(account.savings_hbd_balance);
     
     // Convert VESTS to HIVE Power
     const hpEquivalent = await convertVestToHive(parseFloat(vestingShares));
+    const delegatedHP = await convertVestToHive(parseFloat(delegatedVestingShares));
+    const receivedHP = await convertVestToHive(parseFloat(receivedVestingShares));
+
+    // Calculate Claimable HBD Interest
+    // Simplified interest calculation: (hbd_seconds * rate) / (seconds_in_year * precision)
+    // Rate is usually 14% (0.14)
+    const HBD_PRINT_RATE_MAX = 10000;
+    const rate = 0.14; 
+    const hbdSeconds = BigInt(account.savings_hbd_seconds);
+    const now = new Date();
+    const lastUpdate = new Date(account.savings_hbd_seconds_last_update + "Z");
+    const secondsSinceUpdate = BigInt(Math.floor((now.getTime() - lastUpdate.getTime()) / 1000));
+    const totalHbdSeconds = hbdSeconds + (BigInt(parseFloat(hbdSavings) * 1000) * secondsSinceUpdate);
+    
+    // interest = (HBD_seconds * interest_rate) / (seconds_per_year * 10000)
+    // 31536000 seconds in a year
+    const pendingInterest = Number(totalHbdSeconds * BigInt(1400)) / (31536000 * 10000 * 1000);
     
     return {
       hive,
       hbd,
       vests: vestingShares,
       hp_equivalent: hpEquivalent.toFixed(3),
+      delegated_hp: delegatedHP.toFixed(3),
+      received_hp: receivedHP.toFixed(3),
       hive_savings: hiveSavings,
       hbd_savings: hbdSavings,
+      hbd_claimable: pendingInterest.toFixed(3),
     };
   } catch (error) {
     console.error('Error fetching blockchain account data:', error);
@@ -705,11 +730,15 @@ export async function getBlockchainRewards(username: string): Promise<{
       };
     });
 
+    // Hive payouts are typically 50% HP and 50% HBD/Liquid Hive (depending on settings)
+    const pendingHBD = totalPendingPayout / 2;
+    const pendingHP = totalPendingPayout / 2; // This is in HBD value, would need conversion if we want HP count
+
     return {
       summary: {
         total_pending_payout: totalPendingPayout.toFixed(3),
-        pending_hbd: totalPendingPayout.toFixed(3),
-        pending_hp: "0.000", // Would need to calculate based on rewards split
+        pending_hbd: pendingHBD.toFixed(3),
+        pending_hp: pendingHP.toFixed(3), 
         pending_posts_count: pendingPosts.length.toString(),
         total_author_rewards: totalAuthorRewards.toFixed(3),
         total_curator_payouts: totalCuratorRewards.toFixed(3),
