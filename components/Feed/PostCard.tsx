@@ -518,7 +518,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
               <View style={styles.actionsContainer}>
                 {/* Replies section - clickable to open conversation */}
                 <Pressable onPress={handleConversationPress} style={styles.actionItem} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                  <Ionicons name="chatbubble-outline" size={22} color={theme.colors.gray} />
+                  <Ionicons name="chatbubble-outline" size={18} color={theme.colors.gray} />
                   <Text style={styles.actionText}>{post.children}</Text>
                 </Pressable>
 
@@ -544,7 +544,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
                       </Text>
                       <Ionicons
                         name={isLiked ? "thumbs-up" : "thumbs-up-outline"}
-                        size={22}
+                        size={18}
                         color={isLiked ? theme.colors.green : theme.colors.gray}
                       />
                     </>
@@ -703,10 +703,11 @@ const styles = StyleSheet.create({
   },
   leftColumn: {
     width: 42, // Fixed width for profile pic column
-    marginRight: theme.spacing.sm,
+    marginRight: 10,
   },
   rightColumn: {
     flex: 1, // Takes remaining space
+    paddingTop: 2, // Minor alignment with avatar top
   },
   profileImage: {
     width: 40,
@@ -774,10 +775,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 6,
     borderRadius: theme.borderRadius.sm,
-    backgroundColor: 'rgba(50, 205, 50, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   actionText: {
     fontSize: theme.fontSizes.md,
@@ -827,22 +828,19 @@ const styles = StyleSheet.create({
     height: 36,
   },
   menuButton: {
-    padding: theme.spacing.sm,
+    padding: theme.spacing.xs,
     marginLeft: 'auto',
-    minWidth: 40,
-    minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   followButton: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: 'rgba(50, 205, 50, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(50, 205, 50, 0.08)',
     marginHorizontal: theme.spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 70,
   },
   followButtonText: {
     fontSize: theme.fontSizes.sm,
