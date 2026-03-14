@@ -6,4 +6,5 @@ declare module '@env' {
   export const SNAPS_PAGE_MIN_SIZE: string;
   export const SNAPS_CONTAINER_FETCH_LIMIT: string;
   export const COMMUNITY_TAG: string;
+  export const LOGIN_BACKGROUND_TYPE: string;
 }

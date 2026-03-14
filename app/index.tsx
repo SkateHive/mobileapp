@@ -12,6 +12,7 @@ import {
   UIManager,
   View,
   StyleSheet,
+  Animated,
 } from "react-native";
 import { LoginForm } from "~/components/auth/LoginForm";
 import {
@@ -26,6 +27,9 @@ import {
 } from "~/lib/hive-utils";
 import { prefetchVideoFeed, warmUpVideoAssets, prefetchCommunityFeed, prefetchProfile, prefetchBalance } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { LOGIN_BACKGROUND_TYPE } from "~/lib/constants";
+import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
+import { Text } from "~/components/ui/text";
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === "android") {
@@ -33,6 +37,54 @@ if (Platform.OS === "android") {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 }
+
+const DecryptingText = ({ text }: { text: string }) => {
+  const chars = "アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン";
+  const [displayedText, setDisplayedText] = React.useState("");
+
+  React.useEffect(() => {
+    let iteration = 0;
+    let interval: NodeJS.Timeout;
+
+    const startDecryption = () => {
+      iteration = 0;
+      interval = setInterval(() => {
+        setDisplayedText(
+          text
+            .split("")
+            .map((char, index) => {
+              // Bit-flicker: 2% chance to show a random char even if "resolved"
+              const isResolved = index < iteration;
+              const shouldFlicker = isResolved && Math.random() < 0.02;
+
+              if (isResolved && !shouldFlicker) {
+                return text[index];
+              }
+              // Randomly sample from the authentic set
+              return chars[Math.floor(Math.random() * chars.length)];
+            })
+            .join("")
+        );
+
+        if (iteration >= text.length) {
+          clearInterval(interval);
+          // Wait 5 seconds before restarting the decryption loop
+          setTimeout(startDecryption, 5000);
+        }
+
+        iteration += 1 / 3;
+      }, 40) as any;
+    };
+
+    startDecryption();
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [text]);
+
+  return <>{displayedText}</>;
+};
 
 const BackgroundVideo = () => {
   const player = useVideoPlayer(
@@ -44,7 +96,7 @@ const BackgroundVideo = () => {
   );
 
   return (
-    <View style={styles.videoContainer} pointerEvents="none">
+    <View style={styles.backgroundContainer} pointerEvents="none">
       <VideoView
         style={{ width: "100%", height: "100%" }}
         contentFit="cover"
@@ -52,6 +104,81 @@ const BackgroundVideo = () => {
         nativeControls={false}
         pointerEvents="none"
       />
+    </View>
+  );
+};
+
+const LoginBackground = () => {
+  const isMatrix = LOGIN_BACKGROUND_TYPE === "matrix";
+  const glitchX = React.useRef(new Animated.Value(0)).current;
+  const revealAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (isMatrix) {
+      // Glitch flicker loop
+      const glitchLoop = () => {
+        Animated.sequence([
+          Animated.timing(glitchX, {
+            toValue: Math.random() * 6 - 3,
+            duration: 60,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glitchX, {
+            toValue: 0,
+            duration: 60,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setTimeout(glitchLoop, Math.random() * 2000 + 500);
+        });
+      };
+      glitchLoop();
+
+      // Reveal animation
+      Animated.timing(revealAnim, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [isMatrix]);
+
+  const animatedStyle = {
+    transform: [{ translateX: glitchX }],
+  };
+
+  const revealStyle = {
+    overflow: "hidden" as const,
+    height: revealAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 120],
+    }),
+  };
+
+  return (
+    <View style={styles.backgroundContainer}>
+      {isMatrix ? (
+        <>
+          <MatrixRain intensity={1} opacity={0.3} />
+          {/* Logo Overlay */}
+          <View style={styles.logoOverlayContainer} pointerEvents="none">
+            {/* Native animations (Transform/Glitch) */}
+            <Animated.View style={animatedStyle}>
+              {/* JS-driven reveal (Height) */}
+              <Animated.View style={revealStyle}>
+                <View style={{ alignItems: "center", justifyContent: "center" }}>
+                  <Text style={styles.matrixGlow}>skatehive</Text>
+                  <Text style={styles.matrixTextLogo}>
+                    <DecryptingText text="skatehive" />
+                  </Text>
+                </View>
+              </Animated.View>
+            </Animated.View>
+          </View>
+        </>
+      ) : (
+        <BackgroundVideo />
+      )}
     </View>
   );
 };
@@ -120,22 +247,22 @@ export default function Index() {
       prefetchProfile(queryClient, username);
       prefetchBalance(queryClient, username);
       router.replace("/(tabs)/videos");
-      } catch (error: any) {
-        if (
-          error instanceof InvalidKeyFormatError ||
-          error instanceof AccountNotFoundError ||
-          error instanceof InvalidKeyError ||
-          error instanceof AuthError ||
-          error instanceof HiveError
-        ) {
-          // Suppress biometric failure messages as requested
-          if (!error.message.includes('Biometric authentication')) {
-            setMessage(error.message);
-          }
-        } else {
-          setMessage("An unexpected error occurred");
+    } catch (error: any) {
+      if (
+        error instanceof InvalidKeyFormatError ||
+        error instanceof AccountNotFoundError ||
+        error instanceof InvalidKeyError ||
+        error instanceof AuthError ||
+        error instanceof HiveError
+      ) {
+        // Suppress biometric failure messages as requested
+        if (!error.message.includes('Biometric authentication')) {
+          setMessage(error.message);
         }
+      } else {
+        setMessage("An unexpected error occurred");
       }
+    }
   };
 
   const handleQuickLogin = async (
@@ -171,14 +298,14 @@ export default function Index() {
   if (isLoading || isAuthenticated) {
     return (
       <View style={styles.container}>
-        <BackgroundVideo />
+        <LoginBackground />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <BackgroundVideo />
+      <LoginBackground />
 
       <Pressable onPress={handleInfoPress} style={styles.infoButton} accessibilityRole="button" accessibilityLabel="More Info">
         <View style={styles.infoButtonContent}>
@@ -241,7 +368,7 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  videoContainer: {
+  backgroundContainer: {
     position: "absolute",
     top: 0,
     left: 0,
@@ -296,5 +423,39 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 400,
     alignItems: "center",
+  },
+  logoOverlayContainer: {
+    position: "absolute",
+    top: "25%",
+    left: 0,
+    right: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+  },
+  matrixGlow: {
+    position: "absolute",
+    color: "#00ff88",
+    fontSize: 56,
+    fontFamily: theme.fonts.bold,
+    textShadowColor: "#00ff88",
+    textShadowRadius: 40,
+    opacity: 0.4,
+    letterSpacing: 4,
+    textTransform: "lowercase",
+  },
+  matrixTextLogo: {
+    color: "#32CD32",
+    fontSize: 56,
+    fontFamily: theme.fonts.bold,
+    textTransform: "lowercase",
+    textAlign: "center",
+    paddingVertical: 20,
+    lineHeight: 70,
+    letterSpacing: 4,
+    // Neon glow effect
+    textShadowColor: "rgba(50, 205, 50, 0.8)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
 });
