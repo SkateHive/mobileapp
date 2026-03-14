@@ -377,9 +377,16 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
     <>
       <View style={styles.container}>
         {/* Two-column layout: Profile pic | Everything else */}
-        <View style={styles.mainLayout}>
+        <View style={[
+          styles.mainLayout,
+          // settings.stance === 'goofy' && { flexDirection: 'row-reverse' }
+        ]}>
           {/* Left column: Profile pic only */}
-          <View style={styles.leftColumn}>
+          <View style={[
+            styles.leftColumn,
+            { marginLeft: theme.spacing.sm, marginRight: 0 }
+            // settings.stance === 'goofy' ? {marginLeft: theme.spacing.sm, marginRight: 0 } : {marginRight: theme.spacing.sm, marginLeft: 0 }
+          ]}>
             <Pressable onPress={handleProfilePress}>
               <Image
                 source={{ uri: `https://images.hive.blog/u/${post.author}/avatar/small` }}
@@ -452,8 +459,11 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
           </View>
         </View>
 
-        {/* Full-width action bar — outside mainLayout for better thumb reach */}
-        <View style={styles.bottomBar}>
+        {/* Full-width action bar */}
+        <View style={[
+          styles.bottomBar,
+          settings.stance === 'goofy' && { flexDirection: 'row-reverse' }
+        ]}>
           {showSlider ? (
             /* Voting mode - takes entire bottom bar */
             <View style={styles.votingSliderContainer}>
@@ -544,18 +554,20 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
             </>
           )}
         </View>
-      </View>
+      </View >
 
       {/* Unified Conversation Drawer - only show if not managed by parent */}
-      {!onOpenConversation && isDrawerVisible && (
-        <React.Suspense fallback={null}>
-          <ConversationDrawer
-            isVisible={isDrawerVisible}
-            onClose={() => setIsDrawerVisible(false)}
-            post={post}
-          />
-        </React.Suspense>
-      )}
+      {
+        !onOpenConversation && isDrawerVisible && (
+          <React.Suspense fallback={null}>
+            <ConversationDrawer
+              isVisible={isDrawerVisible}
+              onClose={() => setIsDrawerVisible(false)}
+              post={post}
+            />
+          </React.Suspense>
+        )
+      }
 
       {/* User Menu Modal */}
       <Modal

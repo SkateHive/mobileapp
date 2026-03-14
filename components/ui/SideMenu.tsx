@@ -268,6 +268,9 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         {/* <Text style={styles.groupLabel}>Service</Text>
         {renderCard(settingsItems.service)} */}
 
+        <Text style={styles.groupLabel}>Security</Text>
+        {renderCard(settingsItems.security)}
+
         <Text style={styles.groupLabel}>Appearance</Text>
         {renderCard(settingsItems.appearance)}
 
@@ -352,12 +355,6 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
               </View>
             </React.Fragment>
           ))}
-
-          <View style={styles.divider} />
-          <Pressable style={styles.menuItem} onPress={() => { onClose(); router.push("/login"); }}>
-            <Text style={styles.menuItemTextSecondary}>Add Hive Account</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
-          </Pressable>
         </View>
 
         {socialSlots.map((slot, idx) => (
