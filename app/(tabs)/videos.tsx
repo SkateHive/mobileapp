@@ -73,6 +73,24 @@ export default function VideosScreen() {
     }
   }).current;
 
+  // Prefetch thumbnails and avatars for upcoming videos (look-ahead cache)
+  useEffect(() => {
+    if (videos.length === 0) return;
+    const { Image: RNImage } = require('react-native');
+    // Prefetch assets for the next 3 videos ahead
+    for (let offset = 2; offset <= 4; offset++) {
+      const idx = currentIndex + offset;
+      if (idx < videos.length) {
+        const video = videos[idx];
+        if (video.thumbnailUrl) {
+          RNImage.prefetch(video.thumbnailUrl).catch(() => {});
+        }
+        RNImage.prefetch(`https://images.hive.blog/u/${video.username}/avatar`).catch(() => {});
+      }
+    }
+  }, [currentIndex, videos]);
+
+
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
   }).current;

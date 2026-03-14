@@ -133,6 +133,48 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
   });
 }
 
+// ============================================================================
+// LOGIN-SCREEN PREFETCH — warm caches before user enters the app
+// ============================================================================
+
+/**
+ * Prefetch the main community feed (first page).
+ * Called on the login screen so the home tab loads instantly.
+ */
+export function prefetchCommunityFeed(queryClient: QueryClient) {
+  queryClient.prefetchQuery({
+    queryKey: ['feed', 1],
+    queryFn: () => getFeed(1, 10),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+/**
+ * Prefetch a user's profile after successful login.
+ */
+export function prefetchProfile(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['profile', username],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/profile/${username}`);
+      const json = await response.json();
+      return json.success ? json.data : null;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+/**
+ * Prefetch a user's balance data after successful login.
+ */
+export function prefetchBalance(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['balance', username],
+    queryFn: () => getBalance(username),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
 interface ProfileData {
   name: string;
   reputation: string;
