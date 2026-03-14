@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Crown } from "lucide-react-native";
 import { useLeaderboard } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
 
 interface LeaderboardProps {
   currentUsername: string | null;
@@ -86,8 +87,14 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
   if (error) {
     return (
       <View style={styles.container}>
+        <MatrixRain intensity={0.5} opacity={0.2} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error loading leaderboard</Text>
+          <Text style={styles.matrixErrorText}>
+            we are collecting data for the leaderboard.
+          </Text>
+          <Text style={[styles.matrixErrorText, { color: theme.colors.primary, marginTop: 10 }]}>
+            come back later to see our champions
+          </Text>
         </View>
       </View>
     );
@@ -214,6 +221,17 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
     fontSize: theme.fontSizes.md,
     fontFamily: theme.fonts.regular,
+  },
+  matrixErrorText: {
+    color: theme.colors.text,
+    fontSize: theme.fontSizes.lg,
+    fontFamily: theme.fonts.bold,
+    textAlign: "center",
+    textTransform: "lowercase",
+    paddingHorizontal: theme.spacing.xl,
+    textShadowColor: "rgba(0, 255, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
   headerContainer: {
     display: 'none',
