@@ -21,7 +21,6 @@ import { ReplyComposer } from '../ui/ReplyComposer';
 import { useReplies } from '~/lib/hooks/useReplies';
 import { useAuth } from '~/lib/auth-provider';
 import { getContent } from '~/lib/hive-utils';
-import { useScrollLock } from '~/lib/ScrollLockContext';
 import { theme } from '~/lib/theme';
 import type { Discussion } from '@hiveio/dhive';
 
@@ -44,12 +43,10 @@ export function ConversationDrawer({
 }: ConversationDrawerProps) {
   const insets = useSafeAreaInsets();
   const { username } = useAuth();
-  const { isScrollLocked } = useScrollLock();
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   
   const [post, setPost] = useState<Discussion | undefined>(initialPost);
   const [isPostLoading, setIsPostLoading] = useState(false);
-  const [scrollOffset, setScrollOffset] = useState(0);
 
   const author = post?.author || initialAuthor || '';
   const permlink = post?.permlink || initialPermlink || '';
@@ -106,14 +103,10 @@ export function ConversationDrawer({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: (evt, gestureState) => {
-        // Immediately start if touching the top part (header/handle)
-        return evt.nativeEvent.locationY < 100;
-      },
-      onMoveShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        // Capture the gesture if swiping down at the top of the scroll
-        return gestureState.dy > 10 && scrollOffset <= 0;
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to downward swipes when at the top of the scroll
+        return gestureState.dy > 10;
       },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
@@ -121,15 +114,12 @@ export function ConversationDrawer({
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        // Detect fast flicks down (positive velocity) or significant distance
         if (gestureState.dy > 150 || gestureState.vy > 0.5) {
           handleClose();
         } else {
           Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
-            tension: 65,
-            friction: 11,
           }).start();
         }
       },
@@ -153,7 +143,6 @@ export function ConversationDrawer({
         <Pressable style={styles.backdrop} onPress={handleClose} />
         
         <Animated.View
-          {...panResponder.panHandlers}
           style={[
             styles.drawer,
             {
@@ -162,36 +151,33 @@ export function ConversationDrawer({
             },
           ]}
         >
-          {/* Gesture Sensitive Header Area */}
-          <View>
-            {/* Handle bar for swiping */}
-            <View style={styles.handleBarContainer}>
-              <View style={styles.handleBar} />
-            </View>
+          {/* Handle bar for swiping */}
+          <View {...panResponder.panHandlers} style={styles.handleBarContainer}>
+            <View style={styles.handleBar} />
+          </View>
 
-            {/* Sticky Header: Original Post Context */}
-            <View style={styles.stickyHeader}>
-              <View style={styles.headerInfo}>
-                <Text style={styles.headerTitle}>Conversation</Text>
-                <Pressable onPress={handleClose} style={styles.closeButton}>
-                  <Ionicons name="close" size={24} color={theme.colors.text} />
-                </Pressable>
-              </View>
-              
-              {/* Minimal post preview for context */}
-              <View style={styles.postContext}>
-                {isPostLoading ? (
-                  <View style={styles.postLoadingContainer}>
-                    <ActivityIndicator size="small" color={theme.colors.primary} />
-                  </View>
-                ) : post ? (
-                  <PostCard 
-                    post={post} 
-                    currentUsername={username} 
-                    isStatic
-                  />
-                ) : null}
-              </View>
+          {/* Sticky Header: Original Post Context */}
+          <View style={styles.stickyHeader}>
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>Conversation</Text>
+              <Pressable onPress={handleClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </Pressable>
+            </View>
+            
+            {/* Minimal post preview for context */}
+            <View style={styles.postContext}>
+              {isPostLoading ? (
+                <View style={styles.postLoadingContainer}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                </View>
+              ) : post ? (
+                <PostCard 
+                  post={post} 
+                  currentUsername={username} 
+                  isStatic
+                />
+              ) : null}
             </View>
           </View>
 
@@ -204,9 +190,6 @@ export function ConversationDrawer({
               style={styles.repliesList}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
-              scrollEnabled={!isScrollLocked}
-              onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
-              scrollEventThrottle={16}
             >
               <View style={styles.repliesHeader}>
                 <Text style={styles.repliesTitle}>
@@ -326,7 +309,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1, // Ensure it fills space for gestures
     paddingBottom: 100, // Space for composer
   },
   repliesHeader: {
@@ -373,15 +355,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   emptyContainer: {
-    flex: 1,
     padding: 48,
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 200,
   },
   emptyText: {
     color: theme.colors.muted,
     fontSize: 16,
-    textAlign: 'center',
   },
 });
