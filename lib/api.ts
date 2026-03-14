@@ -1,4 +1,13 @@
-import { API_BASE_URL } from './constants';
+import {
+  API_BASE_URL,
+} from './constants';
+import {
+  fetchFollowingFromAPI,
+  fetchFollowingFromRPC,
+  fetchFollowersFromAPI,
+  fetchFollowersFromRPC,
+  resilientFetch
+} from './resilient-fetch';
 import type { Post } from './types';
 
 interface ApiResponse<T> {
@@ -82,4 +91,26 @@ export async function getRewards(username: string) {
     console.error('Error fetching rewards:', error);
     return null;
   }
+}
+
+/**
+ * Fetches user's following list (usernames) from Skatehive API
+ */
+export async function getFollowingList(username: string): Promise<string[]> {
+  return resilientFetch(
+    () => fetchFollowingFromAPI(username),
+    () => fetchFollowingFromRPC(username),
+    'Relationships'
+  );
+}
+
+/**
+ * Fetches user's followers list (usernames) from Skatehive API
+ */
+export async function getFollowersList(username: string): Promise<string[]> {
+  return resilientFetch(
+    () => fetchFollowersFromAPI(username),
+    () => fetchFollowersFromRPC(username),
+    'Relationships'
+  );
 }
