@@ -13,14 +13,8 @@ import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
-// Lazy imports break the require cycle:
-// PostCard → ConversationDrawer → PostCard
-// PostCard → FullConversationDrawer → PostCard
 const ConversationDrawer = React.lazy(() =>
   import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
-);
-const FullConversationDrawer = React.lazy(() =>
-  import('./FullConversationDrawer').then(m => ({ default: m.FullConversationDrawer }))
 );
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
@@ -54,10 +48,11 @@ const formatTimeAbbreviated = (date: Date): string => {
 interface PostCardProps {
   post: Discussion;
   currentUsername: string | null;
+  isStatic?: boolean;
 }
 
 
-export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
+export const PostCard = React.memo(({ post, currentUsername, isStatic }: PostCardProps) => {
   const { session, followingList, updateUserRelationship } = useAuth();
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
@@ -67,8 +62,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [showSlider, setShowSlider] = useState(false);
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
-  const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
-  const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState('');
@@ -232,11 +226,11 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   };
 
   const handleConversationPress = () => {
-    setIsConversationDrawerVisible(true);
+    setIsDrawerVisible(true);
   };
 
   const handleBodyPress = () => {
-    setIsFullConversationVisible(true);
+    setIsDrawerVisible(true);
   };
 
   const handleUserMenuPress = () => {
@@ -468,24 +462,13 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         </View>
       </View>
 
-      {/* Conversation Drawer - Quick reply only */}
-      {isConversationDrawerVisible && (
+      {/* Unified Conversation Drawer */}
+      {isDrawerVisible && (
         <React.Suspense fallback={null}>
           <ConversationDrawer
-            visible={isConversationDrawerVisible}
-            onClose={() => setIsConversationDrawerVisible(false)}
-            discussion={post}
-          />
-        </React.Suspense>
-      )}
-
-      {/* Full Conversation Drawer - Entire conversation thread */}
-      {isFullConversationVisible && (
-        <React.Suspense fallback={null}>
-          <FullConversationDrawer
-            visible={isFullConversationVisible}
-            onClose={() => setIsFullConversationVisible(false)}
-            discussion={post}
+            isVisible={isDrawerVisible}
+            onClose={() => setIsDrawerVisible(false)}
+            post={post}
           />
         </React.Suspense>
       )}

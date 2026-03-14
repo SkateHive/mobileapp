@@ -14,6 +14,8 @@ interface NotificationItemProps {
 
 export const NotificationItem = React.memo(({ notification }: NotificationItemProps) => {
   const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
+  const [parentAuthor, setParentAuthor] = useState<string | null>(null);
+  const [parentPermlink, setParentPermlink] = useState<string | null>(null);
   const [postData, setPostData] = useState<Discussion | null>(null);
 
   // Extract author from the notification message (usually starts with @username)
@@ -227,7 +229,14 @@ export const NotificationItem = React.memo(({ notification }: NotificationItemPr
             } as unknown as Discussion;
           }
           
-          setPostData(parentDiscussion);
+          if (replyContent && replyContent.parent_author && replyContent.parent_permlink) {
+            setParentAuthor(replyContent.parent_author);
+            setParentPermlink(replyContent.parent_permlink);
+          } else if (postInfo) {
+            setParentAuthor(postInfo.author);
+            setParentPermlink(postInfo.permlink);
+          }
+          
           setIsConversationDrawerVisible(true);
         }
       } else {
@@ -280,11 +289,13 @@ export const NotificationItem = React.memo(({ notification }: NotificationItemPr
       </Pressable>
 
       {/* Conversation Drawer for replies and mentions */}
-      {postData && (
+      {(parentAuthor || parentPermlink || postData) && (
         <ConversationDrawer
-          visible={isConversationDrawerVisible}
+          isVisible={isConversationDrawerVisible}
           onClose={() => setIsConversationDrawerVisible(false)}
-          discussion={postData}
+          post={postData || undefined}
+          author={parentAuthor || undefined}
+          permlink={parentPermlink || undefined}
         />
       )}
     </>

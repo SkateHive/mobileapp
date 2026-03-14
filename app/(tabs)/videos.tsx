@@ -18,6 +18,7 @@ import { useAuth } from "~/lib/auth-provider";
 import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
+import { ConversationDrawer } from "~/components/Feed/ConversationDrawer";
 import { theme } from "~/lib/theme";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -34,6 +35,8 @@ export default function VideosScreen() {
     Record<string, number>
   >({});
   const [playingStates, setPlayingStates] = useState<Record<string, boolean>>({});
+  const [selectedVideo, setSelectedVideo] = useState<VideoPost | null>(null);
+  const [isCommentsVisible, setIsCommentsVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Initialize liked and vote count states when videos load
@@ -135,15 +138,10 @@ export default function VideosScreen() {
   // Handle comment button - navigate to conversation
   const handleComment = useCallback(
     (video: VideoPost) => {
-      router.push({
-        pathname: "/conversation",
-        params: {
-          author: video.author,
-          permlink: video.permlink,
-        },
-      });
+      setSelectedVideo(video);
+      setIsCommentsVisible(true);
     },
-    [router]
+    []
   );
 
   // Handle share button
@@ -354,6 +352,16 @@ export default function VideosScreen() {
           />
           <Text style={styles.emptyText}>No videos found</Text>
         </View>
+      )}
+
+      {/* Unified Comment Drawer */}
+      {selectedVideo && (
+        <ConversationDrawer
+          isVisible={isCommentsVisible}
+          onClose={() => setIsCommentsVisible(false)}
+          author={selectedVideo.author}
+          permlink={selectedVideo.permlink}
+        />
       )}
     </View>
   );

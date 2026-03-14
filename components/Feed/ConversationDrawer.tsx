@@ -1,473 +1,238 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
-  Modal,
-  ScrollView,
-  Pressable,
   StyleSheet,
-  ActivityIndicator,
+  Modal,
   Animated,
+  PanResponder,
   Dimensions,
-  TextInput,
-  Keyboard,
+  Pressable,
+  ActivityIndicator,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FontAwesome, Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { Text } from '~/components/ui/text';
+import { Text } from '../ui/text';
 import { PostCard } from './PostCard';
+import { ConversationReply } from './ConversationReply';
+import { ReplyComposer } from '../ui/ReplyComposer';
+import { useReplies } from '~/lib/hooks/useReplies';
 import { useAuth } from '~/lib/auth-provider';
-import { useToast } from '~/lib/toast-provider';
-import { createHiveComment } from '~/lib/upload/post-utils';
-import { uploadVideoToWorker, createVideoIframe } from '~/lib/upload/video-upload';
-import { uploadImageToHive, createImageMarkdown } from '~/lib/upload/image-upload';
+import { getContent } from '~/lib/hive-utils';
 import { theme } from '~/lib/theme';
-import type { NestedDiscussion } from '~/lib/types';
 import type { Discussion } from '@hiveio/dhive';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.95;
 
 interface ConversationDrawerProps {
-  visible: boolean;
+  isVisible: boolean;
   onClose: () => void;
-  discussion: Discussion;
+  post?: Discussion;
+  author?: string;
+  permlink?: string;
 }
 
-export function ConversationDrawer({ visible, onClose, discussion }: ConversationDrawerProps) {
-  const { username, session } = useAuth();
-  const { showToast } = useToast();
+export function ConversationDrawer({
+  isVisible,
+  onClose,
+  post: initialPost,
+  author: initialAuthor,
+  permlink: initialPermlink,
+}: ConversationDrawerProps) {
   const insets = useSafeAreaInsets();
-  // Remove the useReplies hook since we're not showing comments anymore
-  // const { comments, isLoading, error } = useReplies(
-  //   discussion.author,
-  //   discussion.permlink,
-  //   true
-  // );
+  const { username } = useAuth();
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  
+  const [post, setPost] = useState<Discussion | undefined>(initialPost);
+  const [isPostLoading, setIsPostLoading] = useState(false);
 
-  const [optimisticReplies, setOptimisticReplies] = useState<NestedDiscussion[]>([]);
-  const [isReplyExpanded, setIsReplyExpanded] = useState(true); // Changed to true to show expanded by default
-  const [replyContent, setReplyContent] = useState('');
-  const [media, setMedia] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
-  const scrollViewRef = useRef<ScrollView>(null);
+  const author = post?.author || initialAuthor || '';
+  const permlink = post?.permlink || initialPermlink || '';
 
-  const handleExpandReply = () => {
-    setIsReplyExpanded(true);
-    // Scroll to bottom after a brief delay to ensure the expanded box is rendered
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-
-  const handleReplySuccess = (newReply: Discussion) => {
-    // Convert Discussion to NestedDiscussion
-    const nestedReply: NestedDiscussion = {
-      ...newReply,
-      replies: [],
-      depth: 0,
-    };
-    setOptimisticReplies((prev) => [...prev, nestedReply]);
-  };
-
-  const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const { comments, isLoading: isCommentsLoading, error, refetch } = useReplies(
+    author,
+    permlink,
+    isVisible && !!author && !!permlink
+  );
 
   useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: DRAWER_HEIGHT,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    if (isVisible && !post && initialAuthor && initialPermlink) {
+      const fetchPost = async () => {
+        setIsPostLoading(true);
+        const fetchedPost = await getContent(initialAuthor, initialPermlink);
+        if (fetchedPost) {
+          setPost(fetchedPost);
+        }
+        setIsPostLoading(false);
+      };
+      fetchPost();
     }
-  }, [visible]);
+  }, [isVisible, initialAuthor, initialPermlink, post]);
+
+  const [optimisticReplies, setOptimisticReplies] = useState<Discussion[]>([]);
+
+  useEffect(() => {
+    if (isVisible) {
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
+      setOptimisticReplies([]); // Reset optimistic replies when drawer opens
+    } else {
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isVisible]);
 
   const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: DRAWER_HEIGHT,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
       onClose();
-      setIsReplyExpanded(false);
-      setReplyContent('');
-      setMedia(null);
-      setMediaType(null);
-      Keyboard.dismiss();
     });
   };
 
-  const pickMedia = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'],
-        allowsEditing: false,
-        quality: 0.75,
-        exif: false,
-      });
-
-      if (!result.canceled && result.assets?.[0]) {
-        const asset = result.assets[0];
-        setMedia(asset.uri);
-        setMediaType(asset.type === 'video' ? 'video' : 'image');
-      }
-    } catch (error) {
-      showToast('Failed to select media', 'error');
-    }
-  };
-
-  const removeMedia = () => {
-    setMedia(null);
-    setMediaType(null);
-  };
-
-  const handleReply = async () => {
-    if (!replyContent.trim() && !media) {
-      showToast('Please add some content to your reply', 'error');
-      return;
-    }
-
-    if (!username || username === 'SPECTATOR' || !session?.decryptedKey) {
-      showToast('Please log in to reply', 'error');
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress('');
-
-    try {
-      let replyBody = replyContent;
-
-      // Handle media upload
-      if (media && mediaType) {
-        const fileName = media.split('/').pop() || `${Date.now()}.${mediaType === 'image' ? 'jpg' : 'mp4'}`;
-
-        if (mediaType === 'image') {
-          setUploadProgress('Uploading image...');
-          const imageResult = await uploadImageToHive(
-            media,
-            fileName,
-            'image/jpeg',
-            {
-              username,
-              privateKey: session.decryptedKey,
-            }
-          );
-          const imageMarkdown = createImageMarkdown(imageResult.url, 'Uploaded image');
-          replyBody += replyBody ? `\n\n${imageMarkdown}` : imageMarkdown;
-        } else if (mediaType === 'video') {
-          const fileName = media.split('/').pop() || `${Date.now()}.mp4`;
-          
-          setUploadProgress('Uploading video...');
-          
-          const videoResult = await uploadVideoToWorker(
-            media,
-            fileName,
-            'video/mp4',
-            { 
-              creator: username,
-            }
-          );
-          
-          const videoIframe = createVideoIframe(videoResult.gatewayUrl, 'Video');
-          replyBody += replyBody ? `\n\n${videoIframe}` : videoIframe;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to downward swipes when at the top of the scroll
+        return gestureState.dy > 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
         }
-      }
-
-      setUploadProgress('Posting reply...');
-
-      await createHiveComment(
-        replyBody,
-        discussion.author,
-        discussion.permlink,
-        {
-          username,
-          privateKey: session.decryptedKey,
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          handleClose();
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
         }
-      );
+      },
+    })
+  ).current;
 
-      // Create optimistic reply
-      const newReply = {
-        author: username,
-        permlink: `reply-${Date.now()}`,
-        body: replyBody,
-        created: new Date().toISOString(),
-        parent_author: discussion.author,
-        parent_permlink: discussion.permlink,
-        children: 0,
-        active_votes: [],
-        pending_payout_value: '0.000 HBD',
-        total_payout_value: '0.000 HBD',
-        total_pending_payout_value: '0.000 HBD',
-        curator_payout_value: '0.000 HBD',
-        root_comment: 0,
-        id: Date.now(),
-        category: '',
-        title: '',
-        json_metadata: '{}',
-        last_update: new Date().toISOString(),
-        active: new Date().toISOString(),
-        last_payout: '1970-01-01T00:00:00',
-        depth: 0,
-        net_rshares: '0',
-        abs_rshares: '0',
-        vote_rshares: '0',
-        children_abs_rshares: '0',
-        cashout_time: '1969-12-31T23:59:59',
-        max_cashout_time: '1969-12-31T23:59:59',
-        total_vote_weight: '0',
-        reward_weight: 10000,
-        author_rewards: '0',
-        net_votes: 0,
-        max_accepted_payout: '1000000.000 HBD',
-        percent_hbd: 10000,
-        allow_replies: true,
-        allow_votes: true,
-        allow_curation_rewards: true,
-        beneficiaries: [],
-        url: `/@${username}/reply-${Date.now()}`,
-        root_title: '',
-        replies: [],
-        author_reputation: 0,
-        promoted: '0.000 HBD',
-        body_length: replyBody.length,
-        reblogged_by: [],
-        blacklists: [],
-      } as unknown as Discussion;
-
-      // Convert to NestedDiscussion for optimistic updates
-      const nestedNewReply: NestedDiscussion = {
-        ...newReply,
-        replies: [],
-        depth: 0,
-      };
-
-      setOptimisticReplies(prev => [...prev, nestedNewReply]);
-
-      // Clear form
-      setReplyContent('');
-      setMedia(null);
-      setMediaType(null);
-      setIsReplyExpanded(false);
-
-      showToast('Reply posted successfully!', 'success');
-      Keyboard.dismiss();
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'An error occurred';
-      showToast(errorMsg, 'error');
-    } finally {
-      setIsUploading(false);
-      setUploadProgress('');
-    }
+  const handleReplySuccess = (newReply: Discussion) => {
+    setOptimisticReplies((prev) => [newReply, ...prev]);
   };
 
-  const renderSmallReplyBox = () => (
-    <View style={styles.smallReplyBox}>
-      <Pressable
-        style={styles.smallReplyContent}
-        onPress={handleExpandReply}
-      >
-        <View style={styles.profilePicSmall}>
-          <Text style={styles.profileInitial}>
-            {username ? username[0].toUpperCase() : 'U'}
-          </Text>
-        </View>
-        <Text style={styles.smallReplyPlaceholder}>Add a comment...</Text>
-      </Pressable>
-      <View style={styles.smallReplyIcons}>
-        <Pressable
-          onPress={handleExpandReply}
-          style={styles.smallIconButton}
-        >
-          <FontAwesome name="smile-o" size={20} color={theme.colors.gray} />
-        </Pressable>
-        <Pressable
-          onPress={pickMedia}
-          style={styles.smallIconButton}
-          disabled={isUploading}
-        >
-          <FontAwesome name="image" size={18} color={theme.colors.gray} />
-        </Pressable>
-      </View>
-    </View>
-  );
-
-  const renderExpandedReplyBox = () => (
-    <View style={styles.expandedReplyBox}>
-      {/* Header */}
-      <View style={styles.expandedReplyHeader}>
-        <Text style={styles.expandedReplyTitle}>Add a comment</Text>
-        <Pressable
-          onPress={() => setIsReplyExpanded(false)}
-          style={styles.collapseButton}
-        >
-          <FontAwesome name="times" size={18} color={theme.colors.gray} />
-        </Pressable>
-      </View>
-
-      {/* Upload Progress */}
-      {uploadProgress ? (
-        <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>{uploadProgress}</Text>
-        </View>
-      ) : null}
-
-      {/* Media Preview */}
-      {media && (
-        <View style={styles.mediaPreview}>
-          {mediaType === 'image' ? (
-            <View style={styles.mediaImageContainer}>
-              <Text style={styles.mediaLabel}>Image attached</Text>
-            </View>
-          ) : (
-            <View style={styles.mediaImageContainer}>
-              <Text style={styles.mediaLabel}>Video attached</Text>
-            </View>
-          )}
-          <Pressable onPress={removeMedia} style={styles.removeMediaButton}>
-            <FontAwesome name="times" size={14} color={theme.colors.text} />
-          </Pressable>
-        </View>
-      )}
-
-      {/* Text Input */}
-      <TextInput
-        multiline
-        placeholder="Write your comment..."
-        value={replyContent}
-        onChangeText={setReplyContent}
-        style={styles.expandedTextInput}
-        placeholderTextColor={theme.colors.gray}
-        maxLength={500}
-        autoFocus
-      />
-
-      {/* Actions */}
-      <View style={styles.expandedActions}>
-        <Pressable
-          onPress={pickMedia}
-          style={styles.mediaActionButton}
-          disabled={isUploading}
-        >
-          <Ionicons name="image-outline" size={20} color={theme.colors.green} />
-          <Text style={styles.mediaButtonText}>Add media</Text>
-        </Pressable>
-        
-        <Pressable
-          onPress={handleReply}
-          style={[
-            styles.postButton,
-            ((!replyContent.trim() && !media) || isUploading) && styles.postButtonDisabled
-          ]}
-          disabled={(!replyContent.trim() && !media) || isUploading}
-        >
-          {isUploading ? (
-            <ActivityIndicator size="small" color={theme.colors.background} />
-          ) : (
-            <Text style={styles.postButtonText}>Post</Text>
-          )}
-        </Pressable>
-      </View>
-    </View>
-  );
-
-  if (!visible) return null;
+  const allReplies = [...optimisticReplies, ...comments];
 
   return (
     <Modal
-      visible={visible}
+      visible={isVisible}
       transparent
       animationType="none"
       onRequestClose={handleClose}
     >
-      <View style={styles.modalContainer}>
-        {/* Backdrop */}
-        <Animated.View 
-          style={[styles.backdrop, { opacity: backdropOpacity }]}
-        >
-          <Pressable style={styles.backdropPress} onPress={handleClose} />
-        </Animated.View>
-
-        {/* Drawer */}
+      <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={handleClose} />
+        
         <Animated.View
           style={[
             styles.drawer,
             {
               transform: [{ translateY }],
+              paddingBottom: insets.bottom,
             },
           ]}
         >
-          <KeyboardAvoidingView
-            style={styles.keyboardAvoidingView}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
-          >
-            {/* Handle */}
-            <View style={styles.handle} />
+          {/* Handle bar for swiping */}
+          <View {...panResponder.panHandlers} style={styles.handleBarContainer}>
+            <View style={styles.handleBar} />
+          </View>
 
-            {/* Header */}
-            <View style={styles.header}>
-              <Pressable onPress={handleClose} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          {/* Sticky Header: Original Post Context */}
+          <View style={styles.stickyHeader}>
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>Conversation</Text>
+              <Pressable onPress={handleClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
               </Pressable>
-              <Text style={styles.headerTitle}>Reply</Text>
-              <View style={styles.headerSpacer} />
             </View>
+            
+            {/* Minimal post preview for context */}
+            <View style={styles.postContext}>
+              {isPostLoading ? (
+                <View style={styles.postLoadingContainer}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                </View>
+              ) : post ? (
+                <PostCard 
+                  post={post} 
+                  currentUsername={username} 
+                  isStatic
+                />
+              ) : null}
+            </View>
+          </View>
 
-            {/* Content - Just the reply box, no comments shown */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.container}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
             <ScrollView 
-              ref={scrollViewRef}
-              style={styles.content} 
+              style={styles.repliesList}
+              contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
             >
-              {/* Show the post being replied to */}
-              <View style={styles.postPreview}>
-                <PostCard post={discussion} currentUsername={username} />
+              <View style={styles.repliesHeader}>
+                <Text style={styles.repliesTitle}>
+                  {post?.children || 0} Comments
+                </Text>
+                {(isCommentsLoading || isPostLoading) && (
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                )}
               </View>
+
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>Error: {error}</Text>
+                  <Pressable onPress={refetch} style={styles.retryButton}>
+                    <Text style={styles.retryText}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : (allReplies || []).length === 0 && !(isCommentsLoading || isPostLoading) ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No comments yet. Be the first!</Text>
+                </View>
+              ) : (
+                (allReplies || []).map((reply, index) => (
+                  <View key={`${reply.author}-${reply.permlink}-${index}`} style={styles.replyWrapper}>
+                    <ConversationReply
+                      post={reply as unknown as any}
+                      currentUsername={username}
+                      onReplySuccess={handleReplySuccess}
+                    />
+                  </View>
+                ))
+              )}
             </ScrollView>
 
-            {/* Reply Section */}
-            {username && username !== 'SPECTATOR' ? (
-              <View style={[styles.replySection, { paddingBottom: insets.bottom || theme.spacing.md }]}>
-                {isReplyExpanded ? renderExpandedReplyBox() : renderSmallReplyBox()}
-              </View>
-            ) : (
-              <View style={styles.loginPrompt}>
-                <Text style={styles.loginPromptText}>Please log in to comment</Text>
+            {/* Bottom composer always visible */}
+            {post && (
+              <View style={styles.composerWrapper}>
+                <ReplyComposer
+                  parentAuthor={post.author}
+                  parentPermlink={post.permlink}
+                  onReplySuccess={handleReplySuccess}
+                  placeholder={`Reply to @${post.author}...`}
+                />
               </View>
             )}
           </KeyboardAvoidingView>
@@ -478,273 +243,123 @@ export function ConversationDrawer({ visible, onClose, discussion }: Conversatio
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  overlay: {
     flex: 1,
+    justifyContent: 'flex-end',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  backdropPress: {
-    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
   drawer: {
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: SCREEN_HEIGHT * 0.9,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  postLoadingContainer: {
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  handleBarContainer: {
+    width: '100%',
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  handleBar: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: theme.colors.border,
+  },
+  stickyHeader: {
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  headerInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  postContext: {
+    maxHeight: 200, // Limit height of the sticky post context
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+  },
+  container: {
+    flex: 1,
+  },
+  repliesList: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100, // Space for composer
+  },
+  repliesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    backgroundColor: theme.colors.card,
+  },
+  repliesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.muted,
+  },
+  replyWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  composerWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: DRAWER_HEIGHT,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: theme.spacing.xs,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    paddingBottom: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  backButton: {
-    padding: theme.spacing.xs,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    fontFamily: theme.fonts.bold,
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    padding: theme.spacing.md,
-  },
-  replyContainer: {
-    marginBottom: theme.spacing.sm,
-  },
-  replySeparator: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.xs,
-    marginLeft: 54,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    padding: theme.spacing.xl,
-  },
-  loadingText: {
-    marginTop: theme.spacing.sm,
-    color: theme.colors.muted,
-    fontSize: theme.fontSizes.sm,
   },
   errorContainer: {
+    padding: 32,
     alignItems: 'center',
-    padding: theme.spacing.xl,
   },
   errorText: {
     color: theme.colors.danger,
-    fontSize: theme.fontSizes.sm,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    padding: 12,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#000',
+    fontWeight: 'bold',
   },
   emptyContainer: {
+    padding: 48,
     alignItems: 'center',
-    padding: theme.spacing.xl,
   },
   emptyText: {
     color: theme.colors.muted,
-    fontSize: theme.fontSizes.sm,
-    textAlign: 'center',
-  },
-  replySection: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
-  },
-  smallReplyBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: theme.spacing.sm,
-    backgroundColor: theme.colors.card,
-    minHeight: 56, // Ensure minimum touch target height
-  },
-  smallReplyContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: theme.spacing.xs,
-  },
-  profilePicSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: theme.colors.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: theme.spacing.sm,
-  },
-  profileInitial: {
-    color: theme.colors.background,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: 'bold',
-  },
-  smallReplyPlaceholder: {
-    color: theme.colors.gray,
-    fontSize: theme.fontSizes.md,
-  },
-  smallReplyIcons: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  smallIconButton: {
-    padding: theme.spacing.xs,
-    minWidth: 32,
-    minHeight: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  expandedReplyBox: {
-    backgroundColor: theme.colors.card,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.md, // Increased bottom padding
-  },
-  expandedReplyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  expandedReplyTitle: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    fontFamily: theme.fonts.bold,
-  },
-  collapseButton: {
-    padding: theme.spacing.xs,
-  },
-  progressContainer: {
-    marginBottom: theme.spacing.sm,
-  },
-  progressText: {
-    color: theme.colors.green,
-    fontSize: theme.fontSizes.sm,
-    textAlign: 'center',
-  },
-  mediaPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: theme.spacing.sm,
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.sm,
-  },
-  mediaImageContainer: {
-    flex: 1,
-  },
-  mediaLabel: {
-    color: theme.colors.text,
-    fontSize: theme.fontSizes.sm,
-  },
-  removeMediaButton: {
-    padding: theme.spacing.xs,
-  },
-  expandedTextInput: {
-    color: theme.colors.text,
-    fontSize: theme.fontSizes.md,
-    fontFamily: theme.fonts.default,
-    minHeight: 100,
-    maxHeight: 120,
-    textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
-    backgroundColor: theme.colors.background,
-  },
-  expandedActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: theme.spacing.lg, // Increased bottom padding for buttons
-    marginBottom: theme.spacing.sm, // Add margin for extra space
-  },
-  mediaActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    minHeight: 44,
-  },
-  mediaButtonText: {
-    color: theme.colors.green,
-    fontSize: theme.fontSizes.sm,
-    fontFamily: theme.fonts.default,
-  },
-  postButton: {
-    backgroundColor: theme.colors.green,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  postButtonDisabled: {
-    backgroundColor: theme.colors.gray,
-    opacity: 0.6,
-  },
-  postButtonText: {
-    color: theme.colors.background,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: 'bold',
-    fontFamily: theme.fonts.bold,
-  },
-  loginPrompt: {
-    padding: theme.spacing.md,
-    alignItems: 'center',
-    backgroundColor: theme.colors.card,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  loginPromptText: {
-    color: theme.colors.muted,
-    fontSize: theme.fontSizes.sm,
-  },
-  placeholderContainer: {
-    alignItems: 'center',
-    padding: theme.spacing.xl,
-  },
-  placeholderText: {
-    color: theme.colors.muted,
-    fontSize: theme.fontSizes.md,
-    textAlign: 'center',
-  },
-  postPreview: {
-    backgroundColor: theme.colors.card,
+    fontSize: 16,
   },
 });
