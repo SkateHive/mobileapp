@@ -102,7 +102,7 @@ function countryToFlag(location: string): string {
   for (const [key, flag] of Object.entries(map)) {
     if (loc.includes(key)) return flag;
   }
-  return '🌍';
+  return '📍';
 }
 
 export default function ProfileScreen() {
