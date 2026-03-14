@@ -21,6 +21,7 @@ import { ReplyComposer } from '../ui/ReplyComposer';
 import { useReplies } from '~/lib/hooks/useReplies';
 import { useAuth } from '~/lib/auth-provider';
 import { getContent } from '~/lib/hive-utils';
+import { useScrollLock } from '~/lib/ScrollLockContext';
 import { theme } from '~/lib/theme';
 import type { Discussion } from '@hiveio/dhive';
 
@@ -43,6 +44,7 @@ export function ConversationDrawer({
 }: ConversationDrawerProps) {
   const insets = useSafeAreaInsets();
   const { username } = useAuth();
+  const { isScrollLocked } = useScrollLock();
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   
   const [post, setPost] = useState<Discussion | undefined>(initialPost);
@@ -114,12 +116,15 @@ export function ConversationDrawer({
         }
       },
       onPanResponderRelease: (_, gestureState) => {
+        // Detect fast flicks down (positive velocity) or significant distance
         if (gestureState.dy > 150 || gestureState.vy > 0.5) {
           handleClose();
         } else {
           Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
+            tension: 65,
+            friction: 11,
           }).start();
         }
       },
@@ -151,33 +156,36 @@ export function ConversationDrawer({
             },
           ]}
         >
-          {/* Handle bar for swiping */}
-          <View {...panResponder.panHandlers} style={styles.handleBarContainer}>
-            <View style={styles.handleBar} />
-          </View>
-
-          {/* Sticky Header: Original Post Context */}
-          <View style={styles.stickyHeader}>
-            <View style={styles.headerInfo}>
-              <Text style={styles.headerTitle}>Conversation</Text>
-              <Pressable onPress={handleClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
-              </Pressable>
+          {/* Gesture Sensitive Header Area */}
+          <View {...panResponder.panHandlers}>
+            {/* Handle bar for swiping */}
+            <View style={styles.handleBarContainer}>
+              <View style={styles.handleBar} />
             </View>
-            
-            {/* Minimal post preview for context */}
-            <View style={styles.postContext}>
-              {isPostLoading ? (
-                <View style={styles.postLoadingContainer}>
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                </View>
-              ) : post ? (
-                <PostCard 
-                  post={post} 
-                  currentUsername={username} 
-                  isStatic
-                />
-              ) : null}
+
+            {/* Sticky Header: Original Post Context */}
+            <View style={styles.stickyHeader}>
+              <View style={styles.headerInfo}>
+                <Text style={styles.headerTitle}>Conversation</Text>
+                <Pressable onPress={handleClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={theme.colors.text} />
+                </Pressable>
+              </View>
+              
+              {/* Minimal post preview for context */}
+              <View style={styles.postContext}>
+                {isPostLoading ? (
+                  <View style={styles.postLoadingContainer}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  </View>
+                ) : post ? (
+                  <PostCard 
+                    post={post} 
+                    currentUsername={username} 
+                    isStatic
+                  />
+                ) : null}
+              </View>
             </View>
           </View>
 
@@ -190,6 +198,7 @@ export function ConversationDrawer({
               style={styles.repliesList}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              scrollEnabled={!isScrollLocked}
             >
               <View style={styles.repliesHeader}>
                 <Text style={styles.repliesTitle}>
