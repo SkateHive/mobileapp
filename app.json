@@ -76,6 +76,9 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "cb49cb24-702c-4d0c-9747-1d7197c9c4d8"
       }
     },
     "owner": "bgrana"
