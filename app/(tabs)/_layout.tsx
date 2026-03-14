@@ -171,7 +171,7 @@ export default function TabLayout() {
       case "videos":
         return "Skatehive";
       case "feed":
-        return "Feed";
+        return "Skatehive";
       case "create":
         return "Skatehive Create";
       case "leaderboard":
@@ -209,7 +209,7 @@ export default function TabLayout() {
           <GlobalHeader 
             onOpenMenu={() => setIsMenuVisible(true)} 
             title={getHeaderTitle()}
-            centerComponent={currentTab === "feed" ? <FeedHeaderTitle /> : undefined}
+            // centerComponent={currentTab === "feed" ? <FeedHeaderTitle /> : undefined} // Future feature: Filter dropdown
             showSettings={isProfileTab}
           />
         )}
