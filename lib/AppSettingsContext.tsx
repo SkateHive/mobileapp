@@ -6,11 +6,13 @@ const SETTINGS_KEY = 'app_settings';
 export interface AppSettings {
   useVoteSlider: boolean; // true = slider, false = preset buttons
   stance: 'regular' | 'goofy';
+  isWalletUnlocked: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   useVoteSlider: true,
   stance: 'regular',
+  isWalletUnlocked: false,
 };
 
 interface AppSettingsContextType {

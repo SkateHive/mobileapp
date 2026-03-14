@@ -9,8 +9,13 @@ import { Card, CardHeader, CardTitle, CardContent } from "~/components/ui/card";
 import { useMarket } from "~/lib/hooks/useQueries";
 import { useBlockchainWallet } from "~/lib/hooks/useBlockchainWallet";
 import { theme } from "~/lib/theme";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 
 export default function WalletScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { username } = useAuth();
   const { balanceData, rewardsData, isLoading, error, refresh } = useBlockchainWallet(username);
   const [showWallet, setShowWallet] = useState(false);
@@ -85,33 +90,49 @@ export default function WalletScreen() {
   };
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl 
-          refreshing={isRefreshing} 
-          onRefresh={handleRefresh}
-          tintColor={theme.colors.primary}
-          colors={[theme.colors.primary]}
-          title="Pull to refresh..."
-          titleColor={theme.colors.text}
-        />
-      }
-    >
-      {username === "SPECTATOR" ? (
-        <RewardsSpectatorInfo />
-      ) : (
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name="wallet-outline"
-                size={48}
-                color={theme.colors.primary}
-              />
+    <View style={styles.container}>
+      <View style={[styles.topHeader, { paddingTop: insets.top }]}>
+        <Text style={styles.topHeaderTitle}>Wallet</Text>
+        <Pressable 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.back();
+          }}
+          style={styles.closeButton}
+        >
+          <Ionicons name="close" size={28} color={theme.colors.text} />
+        </Pressable>
+      </View>
+
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl 
+            refreshing={isRefreshing} 
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+            title="Pull to refresh..."
+            titleColor={theme.colors.text}
+          />
+        }
+      >
+        {username === "SPECTATOR" ? (
+          <RewardsSpectatorInfo />
+        ) : (
+          <View style={styles.content}>
+            {/* The existing big header can stay or be removed, keeping it for now as a sub-header */}
+            <View style={styles.header}>
+              <View style={styles.iconContainer}>
+                <Ionicons
+                  name="wallet-outline"
+                  size={48}
+                  color={theme.colors.primary}
+                />
+              </View>
+              <Text style={styles.headerTitle}>Overview</Text>
             </View>
-            <Text style={styles.headerTitle}>Wallet</Text>
-          </View>
 
           {/* Account Overview Card */}
           <Card style={styles.card}>
@@ -288,7 +309,8 @@ export default function WalletScreen() {
             )}
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -296,6 +318,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  topHeaderTitle: {
+    fontSize: theme.fontSizes.lg,
+    fontFamily: theme.fonts.bold,
+    color: theme.colors.text,
+  },
+  closeButton: {
+    padding: theme.spacing.xs,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: theme.spacing.md,
   },
   content: {

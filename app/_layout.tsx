@@ -127,6 +127,13 @@ export default function RootLayout() {
                             }}
                           />
                           <Stack.Screen 
+                            name="wallet"
+                            options={{
+                              contentStyle: { backgroundColor: theme.colors.background },
+                              headerShown: false,
+                            }}
+                          />
+                          <Stack.Screen 
                             name="(tabs)"
                             options={{
                               animation: 'none',

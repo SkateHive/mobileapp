@@ -29,12 +29,12 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   const { settings, updateSettings } = useAppSettings();
   const { showToast } = useToast();
   const { hiveAccount } = useHiveAccount(username || "");
-
+  
   const [currentView, setCurrentView] = useState<MenuView>("settings");
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const [versionColor, setVersionColor] = useState(theme.colors.muted);
-
+  
   // Animation values
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -100,8 +100,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       `Are you sure you want to remove @${username} from this device? You will need your posting key to log in again.`,
       [
         { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
+        { 
+          text: "Remove", 
           style: "destructive",
           onPress: async () => {
             try {
@@ -129,30 +129,30 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     const profileImage = hiveAccount?.metadata?.profile?.profile_image;
     const hiveAvatarUrl = `https://images.hive.blog/u/${username}/avatar/small`;
     return (
-      <Image
-        source={{ uri: profileImage || hiveAvatarUrl }}
-        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.colors.secondaryCard }}
+      <Image 
+        source={{ uri: profileImage || hiveAvatarUrl }} 
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.colors.secondaryCard }} 
         transition={200}
       />
     );
   };
 
-  const renderCard = (items: { title: string, icon: any, value?: string, onPress: () => void, disabled?: boolean, color?: string, hideChevron?: boolean }[]) => (
+  const renderCard = (items: { title: string, icon: any, value?: string, onPress: () => void, disabled?: boolean, color?: string }[]) => (
     <View style={styles.card}>
       {items.map((item, index) => (
         <React.Fragment key={index}>
-          <Pressable
-            style={[styles.menuItem, item.disabled && { opacity: 0.5 }]}
+          <Pressable 
+            style={[styles.menuItem, item.disabled && { opacity: 0.5 }]} 
             onPress={item.onPress}
             disabled={item.disabled}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name={item.icon} size={22} color={theme.colors.primary} />
-              <Text style={styles.menuItemText}>{item.title}</Text>
+              <Ionicons name={item.icon} size={22} color={item.color || theme.colors.text} />
+              <Text style={[styles.menuItemText, item.color ? { color: item.color } : {}]}>{item.title}</Text>
             </View>
             <View style={styles.menuItemRight}>
-              {item.value && <Text style={styles.menuItemValue}>{item.value}</Text>}
-              {!item.disabled && !item.hideChevron && <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />}
+              {item.value && <Text style={[styles.menuItemValue, item.color ? { color: item.color } : {}]}>{item.value}</Text>}
+              {!item.disabled && <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />}
             </View>
           </Pressable>
           {index < items.length - 1 && <View style={styles.divider} />}
@@ -163,42 +163,30 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
 
   const settingsItems = {
     service: [
-      { title: "Scan", icon: "qr-code-outline" as const, onPress: () => { } },
-      { title: "Multi-Device Login", icon: "phone-portrait-outline" as const, disabled: true, onPress: () => { } },
-      { title: "Lucky Drop History", icon: "gift-outline" as const, disabled: true, onPress: () => { } },
-      { title: "Viewing History", icon: "time-outline" as const, onPress: () => { } },
-      { title: "Bookmarks", icon: "bookmark-outline" as const, onPress: () => { } },
-      { title: "Mute List", icon: "volume-mute-outline" as const, onPress: () => { } },
-      { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => { } },
+      { title: "Scan", icon: "qr-code-outline" as const, onPress: () => {} },
+      { title: "Multi-Device Login", icon: "phone-portrait-outline" as const, disabled: true, onPress: () => {} },
+      { title: "Lucky Drop History", icon: "gift-outline" as const, disabled: true, onPress: () => {} },
+      { title: "Viewing History", icon: "time-outline" as const, onPress: () => {} },
+      { title: "Bookmarks", icon: "bookmark-outline" as const, onPress: () => {} },
+      { title: "Mute List", icon: "volume-mute-outline" as const, onPress: () => {} },
+      { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => {} },
     ],
     appearance: [
-      { title: "Theme", icon: "color-palette-outline" as const, value: "System", hideChevron: true, onPress: () => { } },
-      { title: "Language", icon: "language-outline" as const, value: "System", hideChevron: true, onPress: () => { } },
-      {
-        title: "Voter",
-        icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const,
-        value: settings.useVoteSlider ? "Slider" : "Preset",
+      { title: "Theme", icon: "color-palette-outline" as const, value: "System", onPress: () => {} },
+      { title: "Language", icon: "language-outline" as const, value: "System", onPress: () => {} },
+      { 
+        title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons", 
+        icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const, 
         onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); },
+        color: theme.colors.muted
       },
-      {
-        title: "Stance",
-        icon: "body-outline" as const,
-        value: settings.stance === 'regular' ? 'Regular' : 'Goofy',
+      { 
+        title: `Stance: ${settings.stance.charAt(0).toUpperCase() + settings.stance.slice(1)}`, 
+        icon: "body-outline" as const, 
         onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); },
+        color: theme.colors.muted
       },
-    ],
-    security: [
-      {
-        title: "Session Lock",
-        icon: "lock-closed-outline" as const,
-        value: settings.sessionDuration === 0 ? "Auto" : (settings.sessionDuration < 60 ? `${settings.sessionDuration}m` : `${settings.sessionDuration / 60}h`),
-        onPress: () => {
-          const durations = [0, 5, 60, 480, 1440];
-          const currentIndex = durations.indexOf(settings.sessionDuration);
-          const nextIndex = (currentIndex + 1) % durations.length;
-          updateSettings({ sessionDuration: durations[nextIndex] });
-        },
-      },
+      { title: "Feeds", icon: "list-outline" as const, value: "System", onPress: () => {} },
     ],
     about: [
       { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
@@ -254,17 +242,14 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         {/* <Text style={styles.groupLabel}>Service</Text>
         {renderCard(settingsItems.service)} */}
 
-        <Text style={styles.groupLabel}>Security</Text>
-        {renderCard(settingsItems.security)}
-
         <Text style={styles.groupLabel}>Appearance</Text>
         {renderCard(settingsItems.appearance)}
 
         <Text style={styles.groupLabel}>About</Text>
         {renderCard(settingsItems.about)}
-
+        
         <View style={styles.versionContainer}>
-          <Pressable
+          <Pressable 
             onPress={() => {
               const newCount = tapCount + 1;
               setTapCount(newCount);
@@ -295,8 +280,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Accounts</Text>
-        <Pressable
-          onPress={() => setIsEditProfileVisible(true)}
+        <Pressable 
+          onPress={() => setIsEditProfileVisible(true)} 
           style={styles.editButton}
         >
           <Text style={styles.editButtonText}>Edit</Text>
@@ -306,7 +291,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.accountsHeader}>
           {renderAvatar(80)}
-          <Pressable
+          <Pressable 
             onPress={() => copyToClipboard(username || "", "Username")}
             style={styles.accountDetailInfo}
           >
@@ -341,11 +326,17 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
               </View>
             </React.Fragment>
           ))}
+
+          <View style={styles.divider} />
+          <Pressable style={styles.menuItem} onPress={() => { onClose(); router.push("/login"); }}>
+            <Text style={styles.menuItemTextSecondary}>Add Hive Account</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+          </Pressable>
         </View>
 
         {socialSlots.map((slot, idx) => (
           <View key={idx} style={[styles.card, { marginTop: theme.spacing.md }]}>
-            <View style={[styles.menuItem, { opacity: 0.5 }]}>
+             <View style={[styles.menuItem, { opacity: 0.5 }]}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name={slot.icon} size={22} color={theme.colors.text} />
                 <Text style={styles.menuItemText}>{slot.title}</Text>
@@ -359,12 +350,12 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           <Pressable style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutButtonText}>Log Out</Text>
           </Pressable>
-
+          
           <Pressable style={styles.removeButton} onPress={handleRemoveAccount}>
             <Text style={styles.removeButtonText}>Remove from Device</Text>
           </Pressable>
         </View>
-
+        
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -382,10 +373,10 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
-
-      <Animated.View
+      
+      <Animated.View 
         style={[
-          styles.drawer,
+          styles.drawer, 
           { transform: [{ translateX: slideAnim }] }
         ]}
       >
