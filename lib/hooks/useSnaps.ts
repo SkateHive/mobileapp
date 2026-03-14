@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
+import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG, getDiscussions } from '../hive-utils';
+import { Discussion } from '@hiveio/dhive';
+import { FeedFilterType } from '../FeedFilterContext';
 
 interface LastContainerInfo {
   permlink: string;
   date: string;
 }
 
-export function useSnaps() {
+export function useSnaps(filter: FeedFilterType = 'Recent', username: string | null = null) {
   const lastContainerRef = useRef<LastContainerInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
 
@@ -14,6 +16,14 @@ export function useSnaps() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [fetchTrigger, setFetchTrigger] = useState(0);
+
+  // Clear comments when filter changes
+  useEffect(() => {
+    setComments([]);
+    setHasMore(true);
+    lastContainerRef.current = null;
+    fetchedPermlinksRef.current = new Set();
+  }, [filter]);
 
   // Filter comments by tag
   function filterCommentsByTag(comments: ExtendedComment[], targetTag: string): ExtendedComment[] {
@@ -33,59 +43,90 @@ export function useSnaps() {
 
   // Fetch comments with progressive loading
   async function getMoreSnaps(): Promise<ExtendedComment[]> {
-    const tag = COMMUNITY_TAG;
-    const pageSize = 10;
-    const allFilteredComments: ExtendedComment[] = [];
-    let hasMoreData = true;
-    let permlink = lastContainerRef.current?.permlink || '';
-    let date = lastContainerRef.current?.date || new Date().toISOString();
-    let iterationCount = 0;
-    const maxIterations = 10;
-    const allPermlinks = new Set(fetchedPermlinksRef.current);
+    // MOCKED: For now, we only show the Curated feed regardless of filter
+    const effectiveFilter = 'Curated';
+    
+    if (effectiveFilter === 'Curated') {
+      const tag = COMMUNITY_TAG;
+      const pageSize = 10; // Target page size
+      const allFilteredComments: ExtendedComment[] = [];
+      let hasMoreData = true;
+      let permlink = lastContainerRef.current?.permlink || '';
+      let date = lastContainerRef.current?.date || new Date().toISOString();
+      let iterationCount = 0;
+      const maxIterations = 10; // Prevent infinite loops
+      
+      const allPermlinks = new Set(fetchedPermlinksRef.current);
 
-    while (allFilteredComments.length < pageSize && hasMoreData && iterationCount < maxIterations) {
-      iterationCount++;
-
-      try {
-        const result = await getSnapsContainers({
-          lastPermlink: permlink,
-          lastDate: date,
-        });
-
-        if (!result.length) {
-          hasMoreData = false;
-          break;
-        }
-
-        for (const resultItem of result) {
-          if (allPermlinks.has(resultItem.permlink)) continue;
-
-          const replies = await getContentReplies({
-            author: SNAPS_CONTAINER_AUTHOR,
-            permlink: resultItem.permlink,
+      while (allFilteredComments.length < pageSize && hasMoreData && iterationCount < maxIterations) {
+        iterationCount++;
+        
+        try {
+          const result = await getSnapsContainers({
+            lastPermlink: permlink,
+            lastDate: date,
           });
-
-          const filteredComments = filterCommentsByTag(replies, tag);
-
-          allPermlinks.add(resultItem.permlink);
-          filteredComments.forEach(c => allPermlinks.add(c.permlink));
-          allFilteredComments.push(...filteredComments);
-
-          permlink = resultItem.permlink;
-          date = resultItem.created;
-
-          if (allFilteredComments.length >= pageSize) break;
+          
+          if (!result.length) {
+            hasMoreData = false;
+            break;
+          }
+          
+          for (const resultItem of result) {
+            if (allPermlinks.has(resultItem.permlink)) continue;
+            
+            const replies = await getContentReplies({
+              author: SNAPS_CONTAINER_AUTHOR,
+              permlink: resultItem.permlink,
+            });
+            
+            const filteredComments = filterCommentsByTag(replies, tag);
+            
+            allPermlinks.add(resultItem.permlink);
+            filteredComments.forEach(c => allPermlinks.add(c.permlink));
+            allFilteredComments.push(...filteredComments);
+            permlink = resultItem.permlink;
+            date = resultItem.created;
+            
+            if (allFilteredComments.length >= pageSize) break;
+          }
+        } catch (error) {
+          console.error('Error fetching snaps:', error);
+          hasMoreData = false;
         }
-      } catch (error) {
-        console.error('Error fetching snaps:', error);
-        hasMoreData = false;
       }
-    }
+      
+      fetchedPermlinksRef.current = allPermlinks;
+      lastContainerRef.current = { permlink, date };
+      allFilteredComments.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      return allFilteredComments;
+    } else {
+      // Use getDiscussions for other filters
+      let type: 'created' | 'trending' | 'hot' | 'feed' = 'created';
+      let tag = COMMUNITY_TAG;
 
-    fetchedPermlinksRef.current = allPermlinks;
-    lastContainerRef.current = { permlink, date };
-    allFilteredComments.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-    return allFilteredComments;
+      if (filter === 'Trending') type = 'trending';
+      if (filter === 'Following') {
+        if (!username || username === 'SPECTATOR') return [];
+        type = 'feed';
+        tag = username;
+      }
+
+      const lastPost = comments.length > 0 ? comments[comments.length - 1] : null;
+      
+      const results = await getDiscussions(type, {
+        tag,
+        limit: 10,
+        start_author: lastPost?.author,
+        start_permlink: lastPost?.permlink
+      });
+
+      // Filter out duplicates if any (due to start_author/permlink being inclusive)
+      const uniqueResults = results.filter(r => !fetchedPermlinksRef.current.has(r.permlink));
+      uniqueResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
+      
+      return uniqueResults as unknown as ExtendedComment[];
+    }
   }
 
   // Single effect for all fetching

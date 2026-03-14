@@ -76,7 +76,7 @@ export function Conversation({ discussion, onClose }: ConversationProps) {
               {allReplies.map((reply, index) => (
                 <View key={`${reply.author}/${reply.permlink}-${index}`} style={styles.replyContainer}>
                   <PostCard 
-                    post={reply} 
+                    post={reply as any} 
                     currentUsername={username}
                   />
                   {/* Add separator between replies except for the last one */}
