@@ -10,7 +10,7 @@ interface LastContainerInfo {
 }
 
 export function useSnaps(filter: FeedFilterType = 'Recent', username: string | null = null) {
-  const { mutedList } = useAuth();
+  const { blockedList } = useAuth();
   const lastContainerRef = useRef<LastContainerInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
 
@@ -84,9 +84,13 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
             
             const filteredComments = filterCommentsByTag(replies, tag);
             
+            // Filter by blocked users
+            const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+            const safelyFilteredComments = filteredComments.filter(c => !blockedSet.has(c.author.toLowerCase()));
+            
             allPermlinks.add(resultItem.permlink);
-            filteredComments.forEach(c => allPermlinks.add(c.permlink));
-            allFilteredComments.push(...filteredComments);
+            safelyFilteredComments.forEach(c => allPermlinks.add(c.permlink));
+            allFilteredComments.push(...safelyFilteredComments);
             permlink = resultItem.permlink;
             date = resultItem.created;
             
@@ -123,10 +127,10 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
         start_permlink: lastPost?.permlink
       });
 
-      // Filter out muted users and duplicates
-      const mutedSet = new Set(mutedList.map(u => u.toLowerCase()));
+      // Filter out blocked users and duplicates
+      const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
       const filteredResults = results.filter(r => 
-        !mutedSet.has(r.author.toLowerCase()) && 
+        !blockedSet.has(r.author.toLowerCase()) && 
         !fetchedPermlinksRef.current.has(r.permlink)
       );
       

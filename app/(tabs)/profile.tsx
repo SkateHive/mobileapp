@@ -122,10 +122,10 @@ export default function ProfileScreen() {
   const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
   const [isFollowing, setIsFollowing] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
-  const [isMuteLoading, setIsMuteLoading] = useState(false);
-  const { followingList, mutedList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
+  const [isBlockLoading, setIsBlockLoading] = useState(false);
+  const { followingList, blockedList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
   const { showToast } = useToast();
 
   // Reset UI state when navigating between profiles
@@ -162,12 +162,12 @@ export default function ProfileScreen() {
       setIsFollowing(following);
     }
     
-    if (mutedList && profileUsername) {
+    if (blockedList && profileUsername) {
       const profileLower = profileUsername.toLowerCase();
-      const muted = mutedList.some((u: string) => u.toLowerCase() === profileLower);
-      setIsMuted(muted);
+      const blocked = blockedList.some((u: string) => u.toLowerCase() === profileLower);
+      setIsBlocked(blocked);
     }
-  }, [followingList, mutedList, profileUsername]);
+  }, [followingList, blockedList, profileUsername]);
 
   const handleFollow = async () => {
     if (!profileUsername || profileUsername === "SPECTATOR") return;
@@ -195,7 +195,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleMute = async () => {
+  const handleBlock = async () => {
     if (!profileUsername || profileUsername === "SPECTATOR") return;
     
     if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
@@ -204,23 +204,23 @@ export default function ProfileScreen() {
     }
 
     try {
-      setIsMuteLoading(true);
-      const action = isMuted ? '' : 'ignore';
+      setIsBlockLoading(true);
+      const action = isBlocked ? '' : 'ignore'; // Default to ignore for blocking
       
       const success = await updateUserRelationship(profileUsername, action);
       if (success) {
-        showToast(isMuted ? `Unmuted @${profileUsername}` : `Muted @${profileUsername}`, 'success');
-        // If we just muted them, we should also unfollow if we following
+        showToast(isBlocked ? `Unblocked @${profileUsername}` : `Blocked @${profileUsername}`, 'success');
+        // If we just blocked them, we should also unfollow if we following
         if (action === 'ignore' && isFollowing) {
            setIsFollowing(false);
         }
       } else {
-        showToast(`Failed to ${isMuted ? 'unmute' : 'mute'} user`, 'error');
+        showToast(`Failed to ${isBlocked ? 'unblock' : 'block'} user`, 'error');
       }
     } catch (error) {
       showToast('Error updating relationship', 'error');
     } finally {
-      setIsMuteLoading(false);
+      setIsBlockLoading(false);
     }
   };
 
@@ -231,7 +231,7 @@ export default function ProfileScreen() {
     loadNextPage,
     hasMore,
     refresh: refreshPosts,
-  } = useUserComments(profileUsername, mutedList);
+  } = useUserComments(profileUsername, blockedList);
 
   // Get thumbnail for a post — checks multiple sources
   const getPostThumbnail = useCallback((post: any): string | null => {
@@ -468,7 +468,6 @@ export default function ProfileScreen() {
           <View style={styles.profileImageContainer}>
             {renderProfileImage()}
           </View>
-
           <View style={styles.nameSection}>
             {/* Name row with gear icon */}
             <View style={styles.nameRow}>
@@ -490,47 +489,43 @@ export default function ProfileScreen() {
               <Text style={styles.username}>@{profileUsername}</Text>
               <View style={styles.headerActionsRaw}>
                 {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
-                  <>
-                    <Pressable
-                      style={[
-                        styles.followActionBtn,
-                        isFollowing ? styles.unfollowBtn : styles.followBtn
-                      ]}
-                      onPress={handleFollow}
-                      disabled={isFollowLoading}
-                    >
-                      {isFollowLoading ? (
-                        <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
-                      ) : (
-                        <Text style={[
-                          styles.followActionBtnText,
-                          isFollowing ? styles.unfollowBtnText : styles.followBtnText
-                        ]}>
-                          {isFollowing ? 'Unfollow' : 'Follow'}
-                        </Text>
-                      )}
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.followActionBtn,
-                        isMuted ? styles.mutedActionBtn : styles.unmuteActionBtn,
-                        { marginLeft: theme.spacing.xs }
-                      ]}
-                      onPress={handleMute}
-                      disabled={isMuteLoading}
-                    >
-                      {isMuteLoading ? (
-                        <ActivityIndicator size="small" color={theme.colors.text} />
-                      ) : (
-                        <Ionicons 
-                          name={isMuted ? "volume-mute" : "volume-high-outline"} 
-                          size={16} 
-                          color={isMuted ? theme.colors.danger : theme.colors.muted} 
-                        />
-                      )}
-                    </Pressable>
-                  </>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {isBlocked ? (
+                      <Pressable
+                        style={[styles.followActionBtn, styles.mutedActionBtn]}
+                        onPress={handleBlock}
+                        disabled={isBlockLoading}
+                      >
+                        {isBlockLoading ? (
+                          <ActivityIndicator size="small" color={theme.colors.danger} />
+                        ) : (
+                          <Text style={[styles.followActionBtnText, { color: theme.colors.danger }]}>
+                            Blocked
+                          </Text>
+                        )}
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={[
+                          styles.followActionBtn,
+                          isFollowing ? styles.unfollowBtn : styles.followBtn
+                        ]}
+                        onPress={handleFollow}
+                        disabled={isFollowLoading}
+                      >
+                        {isFollowLoading ? (
+                          <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
+                        ) : (
+                          <Text style={[
+                            styles.followActionBtnText,
+                            isFollowing ? styles.unfollowBtnText : styles.followBtnText
+                          ]}>
+                            {isFollowing ? 'Unfollow' : 'Follow'}
+                          </Text>
+                        )}
+                      </Pressable>
+                    )}
+                  </View>
                 )}
               </View>
             </View>

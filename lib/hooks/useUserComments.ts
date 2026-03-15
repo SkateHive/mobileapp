@@ -6,11 +6,11 @@ interface LastPostInfo {
   permlink: string;
 }
 
-export function useUserComments(username: string | null, mutedList: string[] = []) {
+export function useUserComments(username: string | null, blockedList: string[] = []) {
   const lastPostRef = useRef<LastPostInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
   const prevUsernameRef = useRef<string | null>(null);
-  const prevMutedListRef = useRef<string[]>(mutedList);
+  const prevBlockedListRef = useRef<string[]>(blockedList);
 
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -124,10 +124,10 @@ export function useUserComments(username: string | null, mutedList: string[] = [
 
         setPosts((prevPosts) => {
           const existingPermlinks = new Set(prevPosts.map((p) => p.permlink));
-          const mutedLower = mutedList.map(m => m.toLowerCase());
+          const blockedLower = blockedList.map(m => m.toLowerCase());
           const uniquePosts = newPosts.filter((p: any) => 
             !existingPermlinks.has(p.permlink) && 
-            !mutedLower.includes(p.author.toLowerCase())
+            !blockedLower.includes(p.author.toLowerCase())
           );
 
           if (uniquePosts.length === 0 && newPosts.length > 0) {
@@ -152,12 +152,12 @@ export function useUserComments(username: string | null, mutedList: string[] = [
     fetchPosts();
 
     return () => { cancelled = true; };
-  }, [fetchTrigger, username, mutedList]);
+  }, [fetchTrigger, username, blockedList]);
 
-  // Reset when mutedList changes significantly (e.g. login/logout or new mute)
+  // Reset when blockedList changes significantly (e.g. login/logout or new block)
   useEffect(() => {
-    if (JSON.stringify(prevMutedListRef.current) !== JSON.stringify(mutedList)) {
-      prevMutedListRef.current = mutedList;
+    if (JSON.stringify(prevBlockedListRef.current) !== JSON.stringify(blockedList)) {
+      prevBlockedListRef.current = blockedList;
       // Re-fetch and clear current posts
       lastPostRef.current = null;
       fetchedPermlinksRef.current = new Set();
@@ -165,7 +165,7 @@ export function useUserComments(username: string | null, mutedList: string[] = [
       setHasMore(true);
       setFetchTrigger((t) => t + 1);
     }
-  }, [mutedList]);
+  }, [blockedList]);
 
   // Load next page — just bump the trigger
   const loadNextPage = useCallback(() => {

@@ -74,6 +74,7 @@ interface AuthContextType {
   followingList: string[];
   mutedList: string[];
   blacklistedList: string[];
+  blockedList: string[];
   login: (username: string, postingKey: string, method: EncryptionMethod, pin?: string) => Promise<void>;
   loginStoredUser: (username: string, pin?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [followingList, setFollowingList] = useState<string[]>([]);
   const [mutedList, setMutedList] = useState<string[]>([]);
   const [blacklistedList, setBlacklistedList] = useState<string[]>([]);
+  const [blockedList, setBlockedList] = useState<string[]>([]);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { settings } = useAppSettings();
 
@@ -175,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
+      setBlockedList([]);
       return;
     }
 
@@ -188,6 +191,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cachedData.following) setFollowingList(cachedData.following);
         if (cachedData.muted) setMutedList(cachedData.muted);
         if (cachedData.blacklisted) setBlacklistedList(cachedData.blacklisted);
+        
+        // Compute blockedList from cache
+        const combined = Array.from(new Set([
+          ...(cachedData.muted || []),
+          ...(cachedData.blacklisted || [])
+        ]));
+        setBlockedList(combined);
+        
         console.log(`[Auth] Loaded cached relationships for @${targetUser}`);
       }
     } catch (cacheError) {
@@ -207,6 +218,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFollowingList(following);
       setMutedList(muted);
       setBlacklistedList(blacklisted);
+      
+      const combined = Array.from(new Set([...muted, ...blacklisted]));
+      setBlockedList(combined);
       
       // 3. Save the fresh data back to the disk cache
       try {
@@ -250,13 +264,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setFollowingList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
         } else if (relationship === 'ignore') {
           setMutedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setBlockedList(prev => Array.from(new Set([...prev.filter(u => u !== targetUsername), targetUsername])));
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
         } else if (relationship === 'blacklist') {
           setBlacklistedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setBlockedList(prev => Array.from(new Set([...prev.filter(u => u !== targetUsername), targetUsername])));
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
         } else if (relationship === '') {
-          // Unfollow
+          // Unmute/Unblacklist/Unfollow
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
+          setMutedList(prev => prev.filter(u => u !== targetUsername));
+          setBlacklistedList(prev => prev.filter(u => u !== targetUsername));
+          setBlockedList(prev => prev.filter(u => u !== targetUsername));
         }
       }
 
@@ -543,6 +562,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
+      setBlockedList([]);
       await SecureStore.deleteItemAsync(SESSION_KEY);
       await SecureStore.deleteItemAsync('lastLoggedInUser');
     } catch (error) {
@@ -594,6 +614,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         followingList,
         mutedList,
         blacklistedList,
+        blockedList,
         login,
         loginStoredUser,
         logout,

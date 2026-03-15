@@ -79,16 +79,16 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
 }
 
 export function useVideoFeed() {
-  const { mutedList } = useAuth();
+  const { blockedList } = useAuth();
   
   return useQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
     queryFn: fetchVideoFeed,
     staleTime: VIDEO_FEED_STALE_TIME,
     select: (data) => {
-      if (!mutedList || mutedList.length === 0) return data;
-      const mutedSet = new Set(mutedList.map(u => u.toLowerCase()));
-      return data.filter(post => !mutedSet.has((post.author || '').toLowerCase()));
+      if (!blockedList || blockedList.length === 0) return data;
+      const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+      return data.filter(post => !blockedSet.has((post.author || '').toLowerCase()));
     },
   });
 }
