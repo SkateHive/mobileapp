@@ -36,7 +36,8 @@ async function fetchVideoFeed({ pageParam = 1 }: { pageParam?: any }): Promise<V
   const posts = await getFeed(pageParam, 50);
   const videoList: VideoPost[] = [];
 
-  posts.forEach((post: Post) => {
+  posts?.forEach((post: Post) => {
+    if (!post || !post.body) return;
     const media = extractMediaFromBody(post.body);
     const videoMedia = media.filter((m) => m.type === 'video');
     const rawPost = post as any;
@@ -86,11 +87,16 @@ export function useVideoFeed() {
     queryFn: fetchVideoFeed,
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
-      // If we got some videos, there might be more on the next page
-      return lastPage.length > 0 ? allPages.length + 1 : undefined;
+      // If we've reached a high page count without finding enough, stop to avoid infinite loops
+      if (allPages.length >= 10) return undefined;
+      
+      // Even if lastPage was empty (no videos found in those 50 posts), 
+      // we try the next page of posts as there might be videos there.
+      return allPages.length + 1;
     },
     staleTime: VIDEO_FEED_STALE_TIME,
     select: (data) => {
+      if (!data || !data.pages) return [];
       const flattened = data.pages.flat();
       if (!blockedList || blockedList.length === 0) return flattened;
       const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
@@ -100,9 +106,10 @@ export function useVideoFeed() {
 }
 
 export function prefetchVideoFeed(queryClient: QueryClient) {
-  queryClient.prefetchQuery({
+  queryClient.prefetchInfiniteQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: () => fetchVideoFeed({ pageParam: 1 }),
+    queryFn: fetchVideoFeed,
+    initialPageParam: 1,
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 }
@@ -114,16 +121,18 @@ export function prefetchVideoFeed(queryClient: QueryClient) {
 export async function warmUpVideoAssets(queryClient: QueryClient) {
   const { Image } = require('react-native');
 
-  const data = await queryClient.ensureQueryData({
+  const data = await queryClient.ensureInfiniteQueryData({
     queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: () => fetchVideoFeed({ pageParam: 1 }),
+    queryFn: fetchVideoFeed,
+    initialPageParam: 1,
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 
-  if (!data || data.length === 0) return;
+  const firstPage = data?.pages?.[0] || [];
+  if (!firstPage || firstPage.length === 0) return;
 
   // Prefetch thumbnails for the first 2 videos
-  const thumbnailUrls = data
+  const thumbnailUrls = firstPage
     .slice(0, 2)
     .map((v: VideoPost) => v.thumbnailUrl)
     .filter(Boolean) as string[];
@@ -133,7 +142,7 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
   });
 
   // Prefetch avatar images
-  const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
+  const avatarUrls = [...new Set(firstPage.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
   avatarUrls.forEach((url: string) => {
     Image.prefetch(url).catch(() => {});
   });

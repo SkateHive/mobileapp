@@ -42,7 +42,9 @@ export default function VideosScreen() {
     isLoading, 
     fetchNextPage, 
     hasNextPage, 
-    isFetchingNextPage 
+    isFetchingNextPage,
+    refetch,
+    isError
   } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
@@ -57,7 +59,7 @@ export default function VideosScreen() {
 
   // Initialize liked and vote count states when videos load
   useEffect(() => {
-    if (videos.length === 0) return;
+    if (!videos || videos.length === 0) return;
     const initialLiked: Record<string, boolean> = {};
     const initialVoteCounts: Record<string, number> = {};
     videos.forEach((video) => {
@@ -82,7 +84,7 @@ export default function VideosScreen() {
 
   // Prefetch thumbnails and avatars for upcoming videos (look-ahead cache)
   useEffect(() => {
-    if (videos.length === 0) return;
+    if (!videos || videos.length === 0) return;
     const { Image: RNImage } = require('react-native');
     // Prefetch assets for the next 3 videos ahead
     for (let offset = 2; offset <= 4; offset++) {
@@ -358,6 +360,18 @@ export default function VideosScreen() {
     );
   }
 
+  if (isError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={64} color={theme.colors.danger || "#ff4444"} />
+        <Text style={styles.errorText}>Failed to load bangers</Text>
+        <Pressable style={styles.retryButton} onPress={() => refetch()}>
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {videos.length > 0 ? (
@@ -608,5 +622,27 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     marginTop: 10,
     fontFamily: theme.fonts.bold,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+    gap: 16,
+  },
+  errorText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  retryButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  retryText: {
+    color: "#000",
+    fontWeight: "700",
   },
 });
