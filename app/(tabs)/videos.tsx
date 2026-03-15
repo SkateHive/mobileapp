@@ -23,6 +23,7 @@ import { useScrollLock } from "~/lib/ScrollLockContext";
 import { theme } from "~/lib/theme";
 import { useAppSettings } from "~/lib/AppSettingsContext";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
+import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
 
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
@@ -37,11 +38,11 @@ export default function VideosScreen() {
   const { session, username } = useAuth();
   const { settings } = useAppSettings();
   const { showToast } = useToast();
-  const { 
-    data: videos = [], 
-    isLoading, 
-    fetchNextPage, 
-    hasNextPage, 
+  const {
+    data: videos = [],
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
     isFetchingNextPage,
     refetch,
     isError
@@ -92,9 +93,9 @@ export default function VideosScreen() {
       if (idx < videos.length) {
         const video = videos[idx];
         if (video.thumbnailUrl) {
-          RNImage.prefetch(video.thumbnailUrl).catch(() => {});
+          RNImage.prefetch(video.thumbnailUrl).catch(() => { });
         }
-        RNImage.prefetch(`https://images.hive.blog/u/${video.username}/avatar`).catch(() => {});
+        RNImage.prefetch(`https://images.hive.blog/u/${video.username}/avatar`).catch(() => { });
       }
     }
   }, [currentIndex, videos]);
@@ -404,6 +405,7 @@ export default function VideosScreen() {
           ListFooterComponent={
             isFetchingNextPage ? (
               <View style={[styles.loadingFooter, { height: SCREEN_HEIGHT }]}>
+                <MatrixRain opacity={0.3} />
                 <ActivityIndicator size="small" color={theme.colors.primary} />
                 <Text style={styles.loadingText}>Loading more bangers...</Text>
               </View>
