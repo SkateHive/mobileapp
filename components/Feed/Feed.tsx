@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingTop: theme.spacing.sm, // Add some top padding to ensure proper spacing
-    paddingHorizontal: theme.spacing.md, // Add horizontal padding for content
+    paddingHorizontal: 2, // Give more breathing room from screen edge (4px rhythm adjustment)
   },
   scrollTopButtonContainer: {
     position: 'absolute',

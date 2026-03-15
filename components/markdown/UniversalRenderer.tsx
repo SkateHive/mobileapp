@@ -93,7 +93,7 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
 
     parts.forEach((part, index) => {
       if (!part) return;
-      
+
       const trimmedPart = part.trim();
       if (trimmedPart.startsWith('[[') && trimmedPart.endsWith(']]')) {
         // If we have accumulated markdown, push it first

@@ -375,7 +375,6 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
           {/* Left column: Profile pic only */}
           <View style={[
             styles.leftColumn,
-            { marginLeft: theme.spacing.sm, marginRight: 0 }
             // settings.stance === 'goofy' ? {marginLeft: theme.spacing.sm, marginRight: 0 } : {marginRight: theme.spacing.sm, marginLeft: 0 }
           ]}>
             <Pressable onPress={handleProfilePress}>
@@ -680,7 +679,7 @@ const styles = StyleSheet.create({
   },
   leftColumn: {
     width: 40, // Match avatar size
-    marginRight: 8, // Follow 4px rhythm
+    marginRight: 8, // More breathing room (4px rhythm)
   },
   rightColumn: {
     flex: 1, // Takes remaining space
