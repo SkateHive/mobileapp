@@ -94,10 +94,14 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       // Don't filter out the user's own posts
       if (post.author === username) return true;
 
+      const authorLower = post.author.toLowerCase();
+      const mutedLowerList = mutedList.map((u) => u.toLowerCase());
+      const blacklistedLowerList = blacklistedList.map((u) => u.toLowerCase());
+
       // Filter out muted and blacklisted users
       return (
-        !mutedList.includes(post.author) &&
-        !blacklistedList.includes(post.author)
+        !mutedLowerList.includes(authorLower) &&
+        !blacklistedLowerList.includes(authorLower)
       );
     });
   }, [feedData, mutedList, blacklistedList, username]);

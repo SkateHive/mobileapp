@@ -7,6 +7,7 @@ import { Crown } from "lucide-react-native";
 import { useLeaderboard } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
+import { useAuth } from "~/lib/auth-provider";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
 
 interface LeaderboardProps {
@@ -21,14 +22,23 @@ interface LeaderboardUserInfo {
 }
 
 export function Leaderboard({ currentUsername }: LeaderboardProps) {
+  const { mutedList } = useAuth();
   const { data: leaderboardData, isLoading, error } = useLeaderboard();
 
+  const filteredLeaderboardData = useMemo(() => {
+    if (!leaderboardData) return [];
+    if (!mutedList || mutedList.length === 0) return leaderboardData;
+    
+    const mutedLower = mutedList.map((u: string) => u.toLowerCase());
+    return leaderboardData.filter(user => !mutedLower.includes(user.hive_author.toLowerCase()));
+  }, [leaderboardData, mutedList]);
+
   const { topSkaters, surroundingUsers, currentUserInfo } = useMemo(() => {
-    if (!leaderboardData)
+    if (!filteredLeaderboardData || filteredLeaderboardData.length === 0)
       return { topSkaters: [], surroundingUsers: [], currentUserInfo: null };
 
     // Updated the map and filter functions to include explicit type annotations for parameters
-    const top10 = leaderboardData.slice(0, 10).map((user, index: number) => ({
+    const top10 = filteredLeaderboardData.slice(0, 10).map((user, index: number) => ({
       position: index + 1,
       id: user.id,
       hive_author: user.hive_author,
@@ -39,23 +49,23 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
     let currentUserInfo = null;
 
     if (currentUsername) {
-          const currentUserIndex = leaderboardData.findIndex(
+          const currentUserIndex = filteredLeaderboardData.findIndex(
         (user) => user.hive_author === currentUsername
       );
 
       if (currentUserIndex !== -1) {
         currentUserInfo = {
           position: currentUserIndex + 1,
-          id: leaderboardData[currentUserIndex].id,
-          hive_author: leaderboardData[currentUserIndex].hive_author,
-          points: leaderboardData[currentUserIndex].points,
+          id: filteredLeaderboardData[currentUserIndex].id,
+          hive_author: filteredLeaderboardData[currentUserIndex].hive_author,
+          points: filteredLeaderboardData[currentUserIndex].points,
         };
 
         if (currentUserIndex > 9) {
           const startIndex = currentUserIndex > 14 ? currentUserIndex - 5 : 10;
-          const endIndex = Math.min(currentUserIndex + 5, leaderboardData.length - 1);
+          const endIndex = Math.min(currentUserIndex + 5, filteredLeaderboardData.length - 1);
 
-          surroundingUsers = leaderboardData
+          surroundingUsers = filteredLeaderboardData
             .slice(startIndex, endIndex + 1)
             .map((user, idx: number) => ({
               position: startIndex + idx + 1,
@@ -73,7 +83,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
     }
 
     return { topSkaters: top10, surroundingUsers, currentUserInfo };
-  }, [leaderboardData, currentUsername]);
+  }, [filteredLeaderboardData, currentUsername]);
 
   if (isLoading) {
     return (

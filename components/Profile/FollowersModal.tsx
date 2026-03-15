@@ -12,8 +12,9 @@ import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
-import { getFollowing, getFollowers, getMuted, setUserRelationship } from '~/lib/hive-utils';
+import { getFollowing, getFollowers, setUserRelationship } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
+import { getMutedList, getBlacklistedList } from '~/lib/api';
 
 interface FollowersModalProps {
   visible: boolean;
@@ -95,8 +96,12 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
         newUsers = await getFollowers(username, startFrom, 50);
       } else if (type === 'following') {
         newUsers = await getFollowing(username, startFrom, 50);
+      } else if (type === 'muted') {
+        newUsers = await getMutedList(username);
+        setHasMore(false); // getMutedList returns the whole list for now
       } else {
-        newUsers = await getMuted(username, startFrom, 50);
+        newUsers = await getBlacklistedList(username);
+        setHasMore(false);
       }
 
       if (append) {
@@ -105,8 +110,10 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
         setUsers(newUsers);
       }
 
-      // If we got less than 50, we've reached the end
-      setHasMore(newUsers.length === 50);
+      // If we got fewer results than the page size, we've reached the end
+      if (type === 'followers' || type === 'following') {
+        setHasMore(newUsers.length === 50);
+      }
     } catch (error) {
       console.error(`Error loading ${type}:`, error);
     } finally {

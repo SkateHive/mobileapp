@@ -122,8 +122,10 @@ export default function ProfileScreen() {
   const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
-  const { followingList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
+  const [isMuteLoading, setIsMuteLoading] = useState(false);
+  const { followingList, mutedList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
   const { showToast } = useToast();
 
   // Reset UI state when navigating between profiles
@@ -159,7 +161,13 @@ export default function ProfileScreen() {
       
       setIsFollowing(following);
     }
-  }, [followingList, profileUsername]);
+    
+    if (mutedList && profileUsername) {
+      const profileLower = profileUsername.toLowerCase();
+      const muted = mutedList.some((u: string) => u.toLowerCase() === profileLower);
+      setIsMuted(muted);
+    }
+  }, [followingList, mutedList, profileUsername]);
 
   const handleFollow = async () => {
     if (!profileUsername || profileUsername === "SPECTATOR") return;
@@ -187,6 +195,35 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleMute = async () => {
+    if (!profileUsername || profileUsername === "SPECTATOR") return;
+    
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsMuteLoading(true);
+      const action = isMuted ? '' : 'ignore';
+      
+      const success = await updateUserRelationship(profileUsername, action);
+      if (success) {
+        showToast(isMuted ? `Unmuted @${profileUsername}` : `Muted @${profileUsername}`, 'success');
+        // If we just muted them, we should also unfollow if we following
+        if (action === 'ignore' && isFollowing) {
+           setIsFollowing(false);
+        }
+      } else {
+        showToast(`Failed to ${isMuted ? 'unmute' : 'mute'} user`, 'error');
+      }
+    } catch (error) {
+      showToast('Error updating relationship', 'error');
+    } finally {
+      setIsMuteLoading(false);
+    }
+  };
+
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
   const {
     posts: userPosts,
@@ -194,7 +231,7 @@ export default function ProfileScreen() {
     loadNextPage,
     hasMore,
     refresh: refreshPosts,
-  } = useUserComments(profileUsername);
+  } = useUserComments(profileUsername, mutedList);
 
   // Get thumbnail for a post — checks multiple sources
   const getPostThumbnail = useCallback((post: any): string | null => {
@@ -422,7 +459,8 @@ export default function ProfileScreen() {
   }
 
   // Render the profile header section
-  const renderProfileHeader = () => (
+  const renderProfileHeader = () => {
+    return (
     <View>
       {/* Profile Section */}
       <View style={styles.profileSection}>
@@ -447,31 +485,54 @@ export default function ProfileScreen() {
                 </Pressable>
               )}
             </View>
-
-            {/* Username + Follow Button */}
+            {/* Username + Action Buttons */}
             <View style={styles.usernameRow}>
               <Text style={styles.username}>@{profileUsername}</Text>
-              {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
-                <Pressable
-                  style={[
-                    styles.followActionBtn,
-                    isFollowing ? styles.unfollowBtn : styles.followBtn
-                  ]}
-                  onPress={handleFollow}
-                  disabled={isFollowLoading}
-                >
-                  {isFollowLoading ? (
-                    <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
-                  ) : (
-                    <Text style={[
-                      styles.followActionBtnText,
-                      isFollowing ? styles.unfollowBtnText : styles.followBtnText
-                    ]}>
-                      {isFollowing ? 'Unfollow' : 'Follow'}
-                    </Text>
-                  )}
-                </Pressable>
-              )}
+              <View style={styles.headerActionsRaw}>
+                {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
+                  <>
+                    <Pressable
+                      style={[
+                        styles.followActionBtn,
+                        isFollowing ? styles.unfollowBtn : styles.followBtn
+                      ]}
+                      onPress={handleFollow}
+                      disabled={isFollowLoading}
+                    >
+                      {isFollowLoading ? (
+                        <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
+                      ) : (
+                        <Text style={[
+                          styles.followActionBtnText,
+                          isFollowing ? styles.unfollowBtnText : styles.followBtnText
+                        ]}>
+                          {isFollowing ? 'Unfollow' : 'Follow'}
+                        </Text>
+                      )}
+                    </Pressable>
+
+                    <Pressable
+                      style={[
+                        styles.followActionBtn,
+                        isMuted ? styles.mutedActionBtn : styles.unmuteActionBtn,
+                        { marginLeft: theme.spacing.xs }
+                      ]}
+                      onPress={handleMute}
+                      disabled={isMuteLoading}
+                    >
+                      {isMuteLoading ? (
+                        <ActivityIndicator size="small" color={theme.colors.text} />
+                      ) : (
+                        <Ionicons 
+                          name={isMuted ? "volume-mute" : "volume-high-outline"} 
+                          size={16} 
+                          color={isMuted ? theme.colors.danger : theme.colors.muted} 
+                        />
+                      )}
+                    </Pressable>
+                  </>
+                )}
+              </View>
             </View>
 
             {/* Stats + flag inline */}
@@ -542,7 +603,8 @@ export default function ProfileScreen() {
         </View>
       )}
     </View>
-  );
+    );
+  };
 
   // Render individual post item
   const renderPostItem = ({ item }: { item: any }) => (
@@ -702,6 +764,17 @@ export default function ProfileScreen() {
               style={styles.dialogItem}
               onPress={() => {
                 setSettingsMenuVisible(false);
+                handleMutedPress();
+              }}
+            >
+              <Ionicons name="volume-mute-outline" size={20} color={theme.colors.muted} />
+              <Text style={styles.dialogItemText}>Muted Users</Text>
+            </Pressable>
+            <View style={styles.dialogDivider} />
+            <Pressable
+              style={styles.dialogItem}
+              onPress={() => {
+                setSettingsMenuVisible(false);
                 handleLogout();
               }}
             >
@@ -824,6 +897,20 @@ const styles = StyleSheet.create({
   },
   unfollowBtnText: {
     color: theme.colors.text,
+  },
+  mutedActionBtn: {
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    borderColor: theme.colors.danger,
+    minWidth: 40,
+  },
+  unmuteActionBtn: {
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.border,
+    minWidth: 40,
+  },
+  headerActionsRaw: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statsRow: {
     flexDirection: 'row',

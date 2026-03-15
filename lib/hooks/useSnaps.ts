@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG, getDiscussions } from '../hive-utils';
 import { Discussion } from '@hiveio/dhive';
 import { FeedFilterType } from '../FeedFilterContext';
+import { useAuth } from '../auth-provider';
 
 interface LastContainerInfo {
   permlink: string;
@@ -9,6 +10,7 @@ interface LastContainerInfo {
 }
 
 export function useSnaps(filter: FeedFilterType = 'Recent', username: string | null = null) {
+  const { mutedList } = useAuth();
   const lastContainerRef = useRef<LastContainerInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
 
@@ -121,11 +123,16 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
         start_permlink: lastPost?.permlink
       });
 
-      // Filter out duplicates if any (due to start_author/permlink being inclusive)
-      const uniqueResults = results.filter(r => !fetchedPermlinksRef.current.has(r.permlink));
-      uniqueResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
+      // Filter out muted users and duplicates
+      const mutedSet = new Set(mutedList.map(u => u.toLowerCase()));
+      const filteredResults = results.filter(r => 
+        !mutedSet.has(r.author.toLowerCase()) && 
+        !fetchedPermlinksRef.current.has(r.permlink)
+      );
       
-      return uniqueResults as unknown as ExtendedComment[];
+      filteredResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
+      
+      return filteredResults as unknown as ExtendedComment[];
     }
   }
 
