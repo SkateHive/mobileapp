@@ -29,7 +29,7 @@ import {
   setUserRelationship
 } from './hive-utils';
 import { useAppSettings } from './AppSettingsContext';
-import { getFollowingList, getFollowersList } from './api';
+import { getFollowingList, getFollowersList, getMutedList, getBlacklistedList } from './api';
 
 const SESSION_KEY = 'current_auth_session';
 
@@ -198,8 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const [following, muted, blacklisted, followers] = await Promise.all([
         getFollowingList(targetUser),
-        getUserRelationshipList(targetUser, 'ignore'),
-        getUserRelationshipList(targetUser, 'blacklist'),
+        getMutedList(targetUser),
+        getBlacklistedList(targetUser),
         getFollowersList(targetUser),
       ]);
       

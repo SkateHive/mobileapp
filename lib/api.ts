@@ -6,8 +6,11 @@ import {
   fetchFollowingFromRPC,
   fetchFollowersFromAPI,
   fetchFollowersFromRPC,
+  fetchMutedFromAPI,
+  fetchBlacklistedFromAPI,
   resilientFetch
 } from './resilient-fetch';
+import { getUserRelationshipList } from './hive-utils';
 import type { Post } from './types';
 
 interface ApiResponse<T> {
@@ -112,5 +115,28 @@ export async function getFollowersList(username: string): Promise<string[]> {
     () => fetchFollowersFromAPI(username),
     () => fetchFollowersFromRPC(username),
     'Relationships'
+  );
+}
+
+/**
+ * Fetches user's muted list (usernames) from Skatehive API with fallback to bridge API
+ */
+export async function getMutedList(username: string): Promise<string[]> {
+  return resilientFetch(
+    () => fetchMutedFromAPI(username),
+    () => getUserRelationshipList(username, 'ignore'),
+    'Muted'
+  );
+}
+
+/**
+ * Fetches user's blacklisted list (usernames) from Skatehive API
+ * Note: No RPC fallback since bridge.get_following doesn't support 'blacklist'
+ */
+export async function getBlacklistedList(username: string): Promise<string[]> {
+  return resilientFetch(
+    () => fetchBlacklistedFromAPI(username),
+    () => Promise.resolve([]),
+    'Blacklisted'
   );
 }

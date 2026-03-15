@@ -99,6 +99,69 @@ export async function fetchFollowersFromAPI(username: string): Promise<string[]>
 
   return allFollowers;
 }
+
+/**
+ * Fetch muted users from Skatehive API v2 (with pagination up to exhaustion).
+ */
+export async function fetchMutedFromAPI(username: string): Promise<string[]> {
+  let allMuted: string[] = [];
+  let offset = 0;
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${API_BASE_URL}/muted/${username}?t=${Date.now()}&offset=${offset}`;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`API muted failed: ${response.status}`);
+    const json = await response.json();
+    if (!json.success) throw new Error('API muted returned success=false');
+    
+    // Check if the API returned an error message in data or if data is missing
+    if (!json.data || !Array.isArray(json.data)) return allMuted;
+
+    const pageData = json.data.map((item: any) => item.muted_name);
+    allMuted = [...allMuted, ...pageData];
+
+    if (pageData.length < limit) {
+      hasMore = false;
+    } else {
+      offset += limit;
+    }
+  }
+
+  return allMuted;
+}
+
+/**
+ * Fetch blacklisted users from Skatehive API v2 (with pagination up to exhaustion).
+ */
+export async function fetchBlacklistedFromAPI(username: string): Promise<string[]> {
+  let allBlacklisted: string[] = [];
+  let offset = 0;
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${API_BASE_URL}/blacklisted/${username}?t=${Date.now()}&offset=${offset}`;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`API blacklisted failed: ${response.status}`);
+    const json = await response.json();
+    if (!json.success) throw new Error('API blacklisted returned success=false');
+    
+    if (!json.data || !Array.isArray(json.data)) return allBlacklisted;
+
+    const pageData = json.data.map((item: any) => item.blacklisted_name);
+    allBlacklisted = [...allBlacklisted, ...pageData];
+
+    if (pageData.length < limit) {
+      hasMore = false;
+    } else {
+      offset += limit;
+    }
+  }
+
+  return allBlacklisted;
+}
 /**
  * Fetch following from Hive RPC (Bridge API) with pagination.
  */
