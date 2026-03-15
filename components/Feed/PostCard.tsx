@@ -109,18 +109,8 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
   const [payoutValue, setPayoutValue] = useState(initialPayoutValue);
   const { showToast } = useToast();
 
-  // Memoize media extraction
-  const media = useMemo(() => extractMediaFromBody(post.body), [post.body]);
-
-  // Memoize post content processing - remove iframes, images, and video links
-  const postContent = useMemo(() => {
-    let content = post.body;
-    // Remove iframes and images
-    content = content.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '');
-    // Remove plain video URLs (YouTube and Odysee)
-    content = removeVideoLinksFromBody(content);
-    return content.trim();
-  }, [post.body]);
+  // Use raw body as the new UniversalRenderer handles multimedia tokenization internally
+  const postContent = post.body;
 
   // Memoize formatted date
   const formattedDate = useMemo(() => {
@@ -432,7 +422,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
               )}
             </View>
 
-            {/* Content */}
+            {/* Content and Media handled by UniversalRenderer */}
             <Pressable onPress={handleBodyPress}>
               {postContent !== '' && (
                 <View style={styles.contentContainer}>
@@ -440,20 +430,6 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
                 </View>
               )}
             </Pressable>
-
-            {/* Media - outside Pressable so clicks don't open conversation */}
-            {media.length > 0 && (
-              <View style={styles.mediaContainer}>
-                <MediaPreview
-                  media={media}
-                  onMediaPress={handleMediaPress}
-                  selectedMedia={selectedMedia}
-                  isModalVisible={isModalVisible}
-                  onCloseModal={() => setIsModalVisible(false)}
-                  isVisible={isVisible}
-                />
-              </View>
-            )}
 
           </View>
         </View>
