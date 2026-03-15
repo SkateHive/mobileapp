@@ -7,6 +7,7 @@ export function mergeStyles(...styles: any[]) {
 }
 
 export function extractMediaFromBody(body: string): Media[] {
+  if (!body || typeof body !== 'string') return [];
   const media: Media[] = [];
   const processedUrls = new Set<string>(); // Track URLs to avoid duplicates
 
