@@ -35,7 +35,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 450, // Instagram embeds usually need a fixed height or dynamic calculation
     backgroundColor: theme.colors.card,
-    marginVertical: theme.spacing.md,
+    marginTop: 0,
+    marginBottom: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
     overflow: 'hidden',
     borderWidth: 1,

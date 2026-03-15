@@ -24,6 +24,11 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
       fontFamily: theme.fonts.default,
       fontSize: theme.fontSizes.md,
       lineHeight: 22,
+      marginTop: 0,
+    },
+    paragraph: {
+      marginTop: 0,
+      marginBottom: 8, // Rhythm
     },
     link: {
       color: theme.colors.green,

@@ -62,7 +62,8 @@ export const ImageEmbed = ({ url }: ImageEmbedProps) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginVertical: theme.spacing.sm,
+    marginTop: 0,
+    marginBottom: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.05)', // Subtle placeholder

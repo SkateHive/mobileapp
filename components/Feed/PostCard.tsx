@@ -679,8 +679,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   leftColumn: {
-    width: 42, // Fixed width for profile pic column
-    marginRight: 10,
+    width: 40, // Match avatar size
+    marginRight: 8, // Follow 4px rhythm
   },
   rightColumn: {
     flex: 1, // Takes remaining space
@@ -694,8 +694,8 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
-    marginBottom: 0,
+    gap: theme.spacing.xs, // 4px gap
+    marginBottom: 4, // username -> caption: 4px
   },
   authorText: {
     fontSize: theme.fontSizes.md, // Force consistent font size
