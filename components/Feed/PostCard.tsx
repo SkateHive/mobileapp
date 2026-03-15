@@ -428,7 +428,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
             <Pressable onPress={handleBodyPress}>
               {postContent !== '' && (
                 <View style={styles.contentContainer}>
-                  <EnhancedMarkdownRenderer content={postContent} />
+                  <EnhancedMarkdownRenderer content={postContent} isVisible={isVisible} />
                 </View>
               )}
             </Pressable>
