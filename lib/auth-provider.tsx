@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { STORED_USERS_KEY } from './constants';
 import {
@@ -73,6 +74,7 @@ interface AuthContextType {
   followingList: string[];
   mutedList: string[];
   blacklistedList: string[];
+  blockedList: string[];
   login: (username: string, postingKey: string, method: EncryptionMethod, pin?: string) => Promise<void>;
   loginStoredUser: (username: string, pin?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -96,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [followingList, setFollowingList] = useState<string[]>([]);
   const [mutedList, setMutedList] = useState<string[]>([]);
   const [blacklistedList, setBlacklistedList] = useState<string[]>([]);
+  const [blockedList, setBlockedList] = useState<string[]>([]);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { settings } = useAppSettings();
 
@@ -172,9 +175,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
+      setBlockedList([]);
       return;
     }
 
+    // 1. Instantly load from local disk cache to prevent UI flashing
+    try {
+      const cacheKey = `skatehive_relationships_${username}`;
+      const cachedDataStr = await AsyncStorage.getItem(cacheKey);
+      
+      if (cachedDataStr) {
+        const cachedData = JSON.parse(cachedDataStr);
+        if (cachedData.following) setFollowingList(cachedData.following);
+        if (cachedData.muted) setMutedList(cachedData.muted);
+        if (cachedData.blacklisted) setBlacklistedList(cachedData.blacklisted);
+        
+        // Compute blockedList from cache
+        const combined = Array.from(new Set([
+          ...(cachedData.muted || []),
+          ...(cachedData.blacklisted || [])
+        ]));
+        setBlockedList(combined);
+        
+        console.log(`[Auth] Loaded cached relationships for @${username}`);
+      }
+    } catch (cacheError) {
+      console.warn(`[Auth] Failed to load relationship cache for @${username}:`, cacheError);
+    }
+
+    // 2. Fetch fresh data silently in the background
     try {
       const [following, muted, blacklisted, followers] = await Promise.all([
         getFollowingList(username),
@@ -187,7 +216,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMutedList(muted);
       setBlacklistedList(blacklisted);
       
-      console.log(`[Auth] User relationships refreshed for @${username}:`);
+      const combined = Array.from(new Set([...muted, ...blacklisted]));
+      setBlockedList(combined);
+      
+      // 3. Save the fresh data back to the disk cache
+      try {
+        const cacheKey = `skatehive_relationships_${username}`;
+        const cacheDataToSave = JSON.stringify({ following, muted, blacklisted });
+        await AsyncStorage.setItem(cacheKey, cacheDataToSave);
+      } catch (saveError) {
+        console.warn(`[Auth] Failed to save relationship cache for @${username}:`, saveError);
+      }
+      
+      console.log(`[Auth] User relationships refreshed & cached for @${username}:`);
       console.log(` - Following: ${following.length} users (${following.slice(0, 5).join(', ')}...)`);
       console.log(` - Muted: ${muted.length} users`);
       console.log(` - Blacklisted: ${blacklisted.length} users`);
@@ -220,13 +261,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setFollowingList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
         } else if (relationship === 'ignore') {
           setMutedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setBlockedList(prev => Array.from(new Set([...prev.filter(u => u !== targetUsername), targetUsername])));
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
         } else if (relationship === 'blacklist') {
           setBlacklistedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setBlockedList(prev => Array.from(new Set([...prev.filter(u => u !== targetUsername), targetUsername])));
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
         } else if (relationship === '') {
-          // Unfollow
+          // Unmute/Unblacklist/Unfollow
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
+          setMutedList(prev => prev.filter(u => u !== targetUsername));
+          setBlacklistedList(prev => prev.filter(u => u !== targetUsername));
+          setBlockedList(prev => prev.filter(u => u !== targetUsername));
         }
       }
 
@@ -513,6 +559,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
+      setBlockedList([]);
       await SecureStore.deleteItemAsync(SESSION_KEY);
       await SecureStore.deleteItemAsync('lastLoggedInUser');
     } catch (error) {
@@ -564,6 +611,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         followingList,
         mutedList,
         blacklistedList,
+        blockedList,
         login,
         loginStoredUser,
         logout,

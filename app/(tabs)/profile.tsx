@@ -119,8 +119,10 @@ export default function ProfileScreen() {
   const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
-  const { followingList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
+  const [isBlockLoading, setIsBlockLoading] = useState(false);
+  const { followingList, blockedList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
   const { showToast } = useToast();
 
   // Reset UI state when navigating between profiles
@@ -156,7 +158,12 @@ export default function ProfileScreen() {
       
       setIsFollowing(following);
     }
-  }, [followingList, profileUsername]);
+    if (blockedList && profileUsername) {
+      const profileLower = profileUsername.toLowerCase();
+      const blocked = blockedList.some((u: string) => u.toLowerCase() === profileLower);
+      setIsBlocked(blocked);
+    }
+  }, [followingList, blockedList, profileUsername]);
 
   const handleFollow = async () => {
     if (!profileUsername || profileUsername === "SPECTATOR") return;
@@ -184,6 +191,34 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleBlock = async () => {
+    if (!profileUsername || profileUsername === "SPECTATOR") return;
+    
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsBlockLoading(true);
+      const action = isBlocked ? '' : 'ignore'; // Default to ignore for blocking
+      
+      const success = await updateUserRelationship(profileUsername, action);
+      if (success) {
+        showToast(isBlocked ? `Unblocked @${profileUsername}` : `Blocked @${profileUsername}`, 'success');
+        // If we just blocked them, we should also unfollow if we following
+        if (action === 'ignore' && isFollowing) {
+           setIsFollowing(false);
+        }
+      } else {
+        showToast(`Failed to ${isBlocked ? 'unblock' : 'block'} user`, 'error');
+      }
+    } catch (error) {
+      showToast('Error updating relationship', 'error');
+    } finally {
+      setIsBlockLoading(false);
+    }
+  };
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
   const {
     posts: userPosts,
@@ -191,7 +226,7 @@ export default function ProfileScreen() {
     loadNextPage,
     hasMore,
     refresh: refreshPosts,
-  } = useUserComments(profileUsername);
+  } = useUserComments(profileUsername, blockedList);
 
   // Get thumbnail for a post — checks multiple sources
   const getPostThumbnail = useCallback((post: any): string | null => {
@@ -427,7 +462,6 @@ export default function ProfileScreen() {
           <View style={styles.profileImageContainer}>
             {renderProfileImage()}
           </View>
-
           <View style={styles.nameSection}>
             {/* Name row with gear icon */}
             <View style={styles.nameRow}>
@@ -448,27 +482,47 @@ export default function ProfileScreen() {
             {/* Username + Follow Button */}
             <View style={styles.usernameRow}>
               <Text style={styles.username}>@{profileUsername}</Text>
-              {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
-                <Pressable
-                  style={[
-                    styles.followActionBtn,
-                    isFollowing ? styles.unfollowBtn : styles.followBtn
-                  ]}
-                  onPress={handleFollow}
-                  disabled={isFollowLoading}
-                >
-                  {isFollowLoading ? (
-                    <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
-                  ) : (
-                    <Text style={[
-                      styles.followActionBtnText,
-                      isFollowing ? styles.unfollowBtnText : styles.followBtnText
-                    ]}>
-                      {isFollowing ? 'Unfollow' : 'Follow'}
-                    </Text>
-                  )}
-                </Pressable>
-              )}
+              <View style={styles.headerActionsRaw}>
+                {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {isBlocked ? (
+                      <Pressable
+                        style={[styles.followActionBtn, styles.mutedActionBtn]}
+                        onPress={handleBlock}
+                        disabled={isBlockLoading}
+                      >
+                        {isBlockLoading ? (
+                          <ActivityIndicator size="small" color={theme.colors.danger} />
+                        ) : (
+                          <Text style={[styles.followActionBtnText, { color: theme.colors.danger }]}>
+                            Blocked
+                          </Text>
+                        )}
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={[
+                          styles.followActionBtn,
+                          isFollowing ? styles.unfollowBtn : styles.followBtn
+                        ]}
+                        onPress={handleFollow}
+                        disabled={isFollowLoading}
+                      >
+                        {isFollowLoading ? (
+                          <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
+                        ) : (
+                          <Text style={[
+                            styles.followActionBtnText,
+                            isFollowing ? styles.unfollowBtnText : styles.followBtnText
+                          ]}>
+                            {isFollowing ? 'Unfollow' : 'Follow'}
+                          </Text>
+                        )}
+                      </Pressable>
+                    )}
+                  </View>
+                )}
+              </View>
             </View>
 
             {/* Stats + flag inline */}
@@ -794,6 +848,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
+  },
+  headerActionsRaw: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  mutedActionBtn: {
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.danger,
+    borderWidth: 1,
   },
   followActionBtn: {
     paddingHorizontal: theme.spacing.md,

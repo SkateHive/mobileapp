@@ -12,6 +12,7 @@ import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { EditProfileModal } from "~/components/Profile/EditProfileModal";
+import { FollowersModal } from "~/components/Profile/FollowersModal";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
@@ -32,6 +33,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   
   const [currentView, setCurrentView] = useState<MenuView>("settings");
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
+  const [isBlockedModalVisible, setIsBlockedModalVisible] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const [versionColor, setVersionColor] = useState(theme.colors.muted);
   
@@ -205,6 +207,11 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           const nextIndex = (currentIndex + 1) % durations.length;
           updateSettings({ sessionDuration: durations[nextIndex] });
         },
+      },
+      {
+        title: "Blocked Users",
+        icon: "ban-outline" as const,
+        onPress: () => setIsBlockedModalVisible(true),
       },
     ],
     about: [
@@ -415,6 +422,15 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           refreshUserRelationships();
         }}
       />
+
+      {username && (
+        <FollowersModal
+          visible={isBlockedModalVisible}
+          onClose={() => setIsBlockedModalVisible(false)}
+          username={username}
+          type="blocked"
+        />
+      )}
     </View>
   );
 }

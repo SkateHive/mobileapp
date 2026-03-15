@@ -12,24 +12,24 @@ import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
-import { getFollowing, getFollowers, getMuted, setUserRelationship } from '~/lib/hive-utils';
+import { getFollowing, getFollowers, getUserRelationshipList, setUserRelationship } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
 
 interface FollowersModalProps {
   visible: boolean;
   onClose: () => void;
   username: string;
-  type: 'followers' | 'following' | 'muted';
+  type: 'followers' | 'following' | 'muted' | 'blocked';
 }
 
 interface UserItemProps {
   username: string;
   onPress: (username: string) => void;
-  showUnmuteButton?: boolean;
-  onUnmute?: (username: string) => void;
+  showUnblockButton?: boolean;
+  onUnblock?: (username: string) => void;
 }
 
-const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton, onUnmute }) => {
+const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnblockButton, onUnblock }) => {
   return (
     <Pressable
       style={styles.userItem}
@@ -42,15 +42,15 @@ const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton
       <View style={styles.userInfo}>
         <Text style={styles.username}>@{username}</Text>
       </View>
-      {showUnmuteButton && onUnmute ? (
+      {showUnblockButton && onUnblock ? (
         <Pressable
-          style={styles.unmuteButton}
+          style={styles.unblockButton}
           onPress={(e) => {
             e.stopPropagation();
-            onUnmute(username);
+            onUnblock(username);
           }}
         >
-          <Text style={styles.unmuteText}>Unmute</Text>
+          <Text style={styles.unblockText}>Unblock</Text>
         </Pressable>
       ) : (
         <FontAwesome 
@@ -73,7 +73,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const { session, username: currentUsername } = useAuth();
+  const { session, username: currentUsername, blockedList, updateUserRelationship } = useAuth();
 
   useEffect(() => {
     if (visible) {
@@ -95,8 +95,22 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
         newUsers = await getFollowers(username, startFrom, 50);
       } else if (type === 'following') {
         newUsers = await getFollowing(username, startFrom, 50);
+      } else if (type === 'muted' || type === 'blocked') {
+        if (username === currentUsername) {
+          // Use the cached list from AuthProvider for current user
+          newUsers = blockedList;
+        } else {
+          // Fallback to API for other users
+          const [muted, blacklisted] = await Promise.all([
+            getUserRelationshipList(username, 'ignore'),
+            getUserRelationshipList(username, 'blacklist')
+          ]);
+          newUsers = Array.from(new Set([...muted, ...blacklisted]));
+        }
+        setHasMore(false);
       } else {
-        newUsers = await getMuted(username, startFrom, 50);
+        newUsers = [];
+        setHasMore(false);
       }
 
       if (append) {
@@ -131,20 +145,17 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     });
   };
 
-  const handleUnmute = async (targetUsername: string) => {
-    if (!session?.decryptedKey || !currentUsername) {
-      console.error('No authenticated session found');
-      return;
-    }
-
+  const handleUnblock = async (targetUsername: string) => {
     try {
-      // Remove from muted list by setting relationship to empty string
-      await setUserRelationship(session.decryptedKey, currentUsername, targetUsername, '');
+      // Remove all relationships (unblock)
+      const success = await updateUserRelationship(targetUsername, '');
       
-      // Remove from local state
-      setUsers(prevUsers => prevUsers.filter(user => user !== targetUsername));
+      if (success) {
+        // Remove from local state
+        setUsers(prevUsers => prevUsers.filter(user => user !== targetUsername));
+      }
     } catch (error) {
-      console.error('Error unmuting user:', error);
+      console.error('Error unblocking user:', error);
     }
   };
 
@@ -152,8 +163,8 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     <UserItem 
       username={item} 
       onPress={handleUserPress}
-      showUnmuteButton={type === 'muted'}
-      onUnmute={type === 'muted' ? handleUnmute : undefined}
+      showUnblockButton={type === 'muted' || type === 'blocked'}
+      onUnblock={(type === 'muted' || type === 'blocked') ? handleUnblock : undefined}
     />
   );
 
@@ -189,7 +200,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Muted'}
+              {type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Blocked Users'}
             </Text>
             <Pressable onPress={onClose} style={styles.closeButton}>
               <FontAwesome name="times" size={20} color={theme.colors.text} />
@@ -200,7 +211,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.green} />
-              <Text style={styles.loadingText}>Loading {type === 'muted' ? 'muted users' : type}...</Text>
+              <Text style={styles.loadingText}>Loading {type === 'muted' || type === 'blocked' ? 'blocked users' : type}...</Text>
             </View>
           ) : (
             <FlatList
@@ -302,13 +313,13 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
     textAlign: 'center',
   },
-  unmuteButton: {
+  unblockButton: {
     backgroundColor: theme.colors.primary,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.sm,
   },
-  unmuteText: {
+  unblockText: {
     color: theme.colors.background,
     fontSize: theme.fontSizes.sm,
     fontFamily: theme.fonts.bold,

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../auth-provider';
 import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG, getDiscussions } from '../hive-utils';
 import { Discussion } from '@hiveio/dhive';
 import { FeedFilterType } from '../FeedFilterContext';
@@ -9,6 +10,7 @@ interface LastContainerInfo {
 }
 
 export function useSnaps(filter: FeedFilterType = 'Recent', username: string | null = null) {
+  const { blockedList } = useAuth();
   const lastContainerRef = useRef<LastContainerInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
 
@@ -83,9 +85,13 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
             
             const filteredComments = filterCommentsByTag(comments, tag);
             
+            // Filter by blocked users
+            const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+            const safelyFilteredComments = filteredComments.filter(c => !blockedSet.has(c.author.toLowerCase()));
+            
             allPermlinks.add(resultItem.permlink);
-            filteredComments.forEach(c => allPermlinks.add(c.permlink));
-            allFilteredComments.push(...filteredComments);
+            safelyFilteredComments.forEach(c => allPermlinks.add(c.permlink));
+            allFilteredComments.push(...safelyFilteredComments);
             permlink = resultItem.permlink;
             date = resultItem.created;
             
@@ -122,11 +128,15 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
         start_permlink: lastPost?.permlink
       });
 
-      // Filter out duplicates if any (due to start_author/permlink being inclusive)
-      const uniqueResults = results.filter(r => !fetchedPermlinksRef.current.has(r.permlink));
-      uniqueResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
+      // Filter out blocked users and duplicates
+      const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+      const filteredResults = results.filter(r => 
+        !blockedSet.has(r.author.toLowerCase()) && 
+        !fetchedPermlinksRef.current.has(r.permlink)
+      );
+      filteredResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
       
-      return uniqueResults as unknown as ExtendedComment[];
+      return filteredResults as unknown as ExtendedComment[];
     }
   }
 

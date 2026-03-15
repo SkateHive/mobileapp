@@ -37,7 +37,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const { filter } = useFeedFilter();
   const { isScrollLocked } = useScrollLock();
   const router = useRouter();
-  const { username, mutedList, blacklistedList } = useAuth();
+  const { username, blockedList } = useAuth();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps(filter, username);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
@@ -104,7 +104,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   // Map blockchain comments (Discussion) to Post for PostCard compatibility
   const feedData: Discussion[] = comments as unknown as Discussion[];
 
-  // Filter out posts from muted and blacklisted users
+  // Filter out posts from blocked users
   const filteredFeedData = React.useMemo(() => {
     if (!feedData || feedData.length === 0) return [];
 
@@ -112,13 +112,13 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       // Don't filter out the user's own posts
       if (post.author === username) return true;
 
-      // Filter out muted and blacklisted users
-      return (
-        !mutedList.includes(post.author) &&
-        !blacklistedList.includes(post.author)
-      );
+      const authorLower = post.author.toLowerCase();
+      const blockedLowerList = blockedList.map((u) => u.toLowerCase());
+
+      // Filter out blocked users
+      return !blockedLowerList.includes(authorLower);
     });
-  }, [feedData, mutedList, blacklistedList, username]);
+  }, [feedData, blockedList, username]);
 
   const renderItem = React.useCallback(
     ({ item }: { item: Discussion }) => (

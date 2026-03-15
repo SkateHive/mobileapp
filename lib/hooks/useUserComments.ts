@@ -6,10 +6,11 @@ interface LastPostInfo {
   permlink: string;
 }
 
-export function useUserComments(username: string | null) {
+export function useUserComments(username: string | null, blockedList: string[] = []) {
   const lastPostRef = useRef<LastPostInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
   const prevUsernameRef = useRef<string | null>(null);
+  const prevBlockedListRef = useRef<string[]>(blockedList);
 
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -123,7 +124,11 @@ export function useUserComments(username: string | null) {
 
         setPosts((prevPosts) => {
           const existingPermlinks = new Set(prevPosts.map((p) => p.permlink));
-          const uniquePosts = newPosts.filter((p: any) => !existingPermlinks.has(p.permlink));
+          const blockedLower = blockedList.map(m => m.toLowerCase());
+          const uniquePosts = newPosts.filter((p: any) => 
+            !existingPermlinks.has(p.permlink) && 
+            !blockedLower.includes(p.author.toLowerCase())
+          );
 
           if (uniquePosts.length === 0) {
             setHasMore(false);
@@ -142,7 +147,20 @@ export function useUserComments(username: string | null) {
     fetchPosts();
 
     return () => { cancelled = true; };
-  }, [fetchTrigger, username]);
+  }, [fetchTrigger, username, blockedList]);
+
+  // Reset when blockedList changes significantly (e.g. login/logout or new block)
+  useEffect(() => {
+    if (JSON.stringify(prevBlockedListRef.current) !== JSON.stringify(blockedList)) {
+      prevBlockedListRef.current = blockedList;
+      // Re-fetch and clear current posts
+      lastPostRef.current = null;
+      fetchedPermlinksRef.current = new Set();
+      setPosts([]);
+      setHasMore(true);
+      setFetchTrigger((t) => t + 1);
+    }
+  }, [blockedList]);
 
   // Load next page — just bump the trigger
   const loadNextPage = useCallback(() => {
