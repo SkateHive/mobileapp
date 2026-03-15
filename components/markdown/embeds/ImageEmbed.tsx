@@ -11,7 +11,7 @@ interface ImageEmbedProps {
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export const ImageEmbed = ({ url }: ImageEmbedProps) => {
-  const [aspectRatio, setAspectRatio] = React.useState(16 / 9);
+  const [aspectRatio, setAspectRatio] = React.useState<number>(1.0); // Predictable initial
   const [isModalVisible, setIsModalVisible] = React.useState(false);
 
   return (
@@ -19,9 +19,13 @@ export const ImageEmbed = ({ url }: ImageEmbedProps) => {
       <Pressable onPress={() => setIsModalVisible(true)}>
         <Image
           source={{ uri: url }}
-          style={[styles.image, { aspectRatio }]}
+          style={[
+            styles.image, 
+            { aspectRatio: aspectRatio }
+          ]}
           contentFit="cover"
-          transition={200}
+          transition={0} // Disable transition to stop flickering
+          cachePolicy="memory-disk"
           onLoad={(e) => {
             if (e.source.width && e.source.height) {
               setAspectRatio(e.source.width / e.source.height);
@@ -61,14 +65,15 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
     overflow: 'hidden',
-    backgroundColor: theme.colors.muted,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)', // Subtle placeholder
   },
   image: {
     width: '100%',
+    backgroundColor: 'transparent',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -82,5 +87,7 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 10,
     padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
   }
 });

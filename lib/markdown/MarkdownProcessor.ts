@@ -3,6 +3,8 @@ export interface ProcessedMarkdown {
   contentWithPlaceholders: string;
 }
 
+import { Registry } from './providers';
+
 export class MarkdownProcessor {
   /**
    * Processes markdown content to replace specific media links with placeholders
@@ -13,82 +15,54 @@ export class MarkdownProcessor {
 
     let processedContent = content;
 
-    // 1. YouTube direct links and embeds
-    processedContent = processedContent.replace(
-      /^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})[\S]*/gim,
-      '[[YOUTUBE:$1]]'
-    );
-    processedContent = processedContent.replace(
-      /<iframe[^>]*src=["'](?:https?:)?\/\/(?:www\.)?(?:youtube\.com|youtu.be)\/embed\/([a-zA-Z0-9_-]{11})[^"']*["'][^>]*><\/iframe>/gim,
-      '[[YOUTUBE:$1]]'
-    );
+    // A. Use Modular Providers (Registry)
+    // We iterate through all registered providers and apply their patterns
+    Registry.getAllProviders().forEach(provider => {
+      provider.patterns.forEach(pattern => {
+        processedContent = processedContent.replace(pattern, (match) => {
+          const id = provider.resolve(match);
+          return `[[${provider.name}:${id}]]`;
+        });
+      });
+    });
 
-    // 2. Vimeo direct links and embeds
-    processedContent = processedContent.replace(
-      /^https?:\/\/(?:www\.)?(?:vimeo.com\/(?:channels\/[\w]+\/)?|player.vimeo.com\/video\/)([0-9]+)[\S]*/gim,
-      '[[VIMEO:$1]]'
-    );
-    processedContent = processedContent.replace(
-      /<iframe[^>]*src=["'](?:https?:)?\/\/(?:player\.)?vimeo.com\/video\/([0-9]+)[^"']*["'][^>]*><\/iframe>/gim,
-      '[[VIMEO:$1]]'
-    );
+    // B. Generic Media Cleanup (for tags that clutter the rendering)
 
-    // 3. Odysee embeds and direct links
-    processedContent = processedContent.replace(
-      /^https?:\/\/odysee\.com\/\$\/embed\/[\w@:%._\+~#=\/-]+/gim,
-      '[[ODYSEE:$0]]'
-    );
-    processedContent = processedContent.replace(
-      /<iframe[^>]*src=["'](https?:\/\/odysee\.com\/[^"']+)["'][^>]*><\/iframe>/gim,
-      '[[ODYSEE:$1]]'
-    );
-
-    // 4. 3Speak links
-    processedContent = processedContent.replace(
-       /\[!\[.*?\]\(.*?\)\]\((https?:\/\/3speak\.tv\/watch\?v=([\w\-/]+))\)/g,
-       '[[THREESPEAK:$2]]'
-    );
 
     // 5. Instagram links
     processedContent = processedContent.replace(
-      /^https?:\/\/(www\.)?instagram\.com\/p\/([\w-]+)\/?[^\s]*$/gim,
-      '[[INSTAGRAM:$0]]'
+      /(?:^|\s)https?:\/\/(www\.)?instagram\.com\/p\/([\w-]+)\/?[^\s]*(?=\s|$)/gim,
+      '[[INSTAGRAM:$2]]'
     );
 
     // 6. Zora Coin/NFT links
     processedContent = processedContent.replace(
-      /^https?:\/\/(?:www\.)?(?:zora\.co|skatehive\.app)\/coin\/(0x[a-fA-F0-9]{40}(?::\d+)?).*$/gim,
+      /(?:^|\s)https?:\/\/(?:www\.)?(?:zora\.co|skatehive\.app)\/coin\/(0x[a-fA-F0-9]{40}(?::\d+)?).*?(?=\s|$)/gim,
       '[[ZORACOIN:$1]]'
     );
 
     // 7. Snapshot Proposals
     processedContent = processedContent.replace(
-      /^https?:\/\/(?:www\.)?(?:snapshot\.(?:org|box)|demo\.snapshot\.org)\/.*\/proposal\/(0x[a-fA-F0-9]{64})$/gim,
-      '[[SNAPSHOT:$0]]'
+      /(?:^|\s)https?:\/\/(?:www\.)?(?:snapshot\.(?:org|box)|demo\.snapshot\.org)\/.*\/proposal\/(0x[a-fA-F0-9]{64})(?=\s|$)/gim,
+      '[[SNAPSHOT:$1]]'
     );
 
-    // 8. IPFS Video tags
-    processedContent = processedContent.replace(
-      /<div class="video-embed" data-ipfs-hash="([^"]+)">[\s\S]*?<\/div>/g,
-      '[[IPFSVIDEO:$1]]'
-    );
+    // 10. Deep Clean HTML tags that clutter or break rendering
+    // Strip specific Hive/PeakD schema wrappers
+    processedContent = processedContent.replace(/<div itemscope itemtype="https:\/\/schema\.org\/VideoObject">/gi, '');
     
-    // 9. Images (IPFS and external)
-    // IPFS Images
-    processedContent = processedContent.replace(
-      /!\[.*?\]\((https?:\/\/(?:gateway\.pinata\.cloud|ipfs\.skatehive\.app)\/ipfs\/([\w-]+)(\.[a-zA-Z0-9]+)?)[^)]*\)/gi,
-      '[[IMAGE:$1]]'
-    );
-    // Standard Markdown Images
-    processedContent = processedContent.replace(
-      /!\[.*?\]\((https?:\/\/[^\s)]+\.(?:gif|jpg|jpeg|png|webp)(?:\?[^\s)]*)?)\)/gi,
-      '[[IMAGE:$1]]'
-    );
-    // Standalone Image URLs
-    processedContent = processedContent.replace(
-      /^(https?:\/\/[^\s]+\.(?:gif|jpg|jpeg|png|webp)(?:\?[^\s]*)?)$/gmi,
-      '[[IMAGE:$1]]'
-    );
+    processedContent = processedContent.replace(/<center>/gi, '\n\n');
+    processedContent = processedContent.replace(/<\/center>/gi, '\n\n');
+    processedContent = processedContent.replace(/<div[^>]*>/gi, '\n');
+    processedContent = processedContent.replace(/<\/div>/gi, '\n');
+    processedContent = processedContent.replace(/<meta[^>]*>/gi, ''); 
+    processedContent = processedContent.replace(/<link[^>]*>/gi, ''); 
+    processedContent = processedContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''); 
+    processedContent = processedContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ''); 
+
+    // Final cleanup: remove excessive newlines and whitespace around tokens
+    processedContent = processedContent.replace(/\n{3,}/g, '\n\n');
+    processedContent = processedContent.trim();
 
     return {
       originalContent: content,
