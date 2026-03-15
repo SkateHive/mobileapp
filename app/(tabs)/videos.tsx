@@ -37,7 +37,13 @@ export default function VideosScreen() {
   const { session, username } = useAuth();
   const { settings } = useAppSettings();
   const { showToast } = useToast();
-  const { data: videos = [], isLoading } = useVideoFeed();
+  const { 
+    data: videos = [], 
+    isLoading, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage 
+  } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
   const [likedStates, setLikedStates] = useState<Record<string, boolean>>({});
@@ -164,13 +170,11 @@ export default function VideosScreen() {
   );
 
   // Handle comment button - navigate to conversation
-  const handleComment = useCallback(
-    (video: VideoPost) => {
-      setSelectedVideo(video);
-      setIsCommentsVisible(true);
-    },
-    []
-  );
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Handle share button
   const handleShare = useCallback(async (video: VideoPost) => {
@@ -186,6 +190,14 @@ export default function VideosScreen() {
       // User cancelled or error
     }
   }, []);
+
+  const handleComment = useCallback(
+    (video: VideoPost) => {
+      setSelectedVideo(video);
+      setIsCommentsVisible(true);
+    },
+    []
+  );
 
   const renderVideo = ({ item, index }: { item: VideoPost; index: number }) => {
     const isActive = index === currentIndex;
@@ -360,9 +372,12 @@ export default function VideosScreen() {
           snapToAlignment="start"
           snapToInterval={SCREEN_HEIGHT}
           decelerationRate="fast"
+          disableIntervalMomentum={true} // Forces one-at-a-time scrolling
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          removeClippedSubviews={true} // Re-enabled to help with memory/OOM crashes
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={true}
           maxToRenderPerBatch={3}
           windowSize={5}
           initialNumToRender={2}
@@ -372,6 +387,14 @@ export default function VideosScreen() {
             offset: SCREEN_HEIGHT * index,
             index,
           })}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={[styles.loadingFooter, { height: SCREEN_HEIGHT }]}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={styles.loadingText}>Loading more bangers...</Text>
+              </View>
+            ) : null
+          }
         />
       ) : (
         <View style={styles.emptyContainer}>
@@ -575,5 +598,15 @@ const styles = StyleSheet.create({
   emptyText: {
     color: theme.colors.gray,
     fontSize: 16,
+  },
+  loadingFooter: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  loadingText: {
+    color: theme.colors.primary,
+    marginTop: 10,
+    fontFamily: theme.fonts.bold,
   },
 });

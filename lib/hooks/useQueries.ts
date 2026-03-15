@@ -1,4 +1,4 @@
-import { useQuery, QueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, QueryClient } from '@tanstack/react-query';
 import {
   getFeed,
   getBalance,
@@ -32,8 +32,8 @@ export interface VideoPost {
 const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
 const VIDEO_FEED_STALE_TIME = 1000 * 60 * 2; // 2 minutes
 
-async function fetchVideoFeed(): Promise<VideoPost[]> {
-  const posts = await getFeed(1, 50);
+async function fetchVideoFeed({ pageParam = 1 }: { pageParam?: any }): Promise<VideoPost[]> {
+  const posts = await getFeed(pageParam, 50);
   const videoList: VideoPost[] = [];
 
   posts.forEach((post: Post) => {
@@ -81,14 +81,20 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
 export function useVideoFeed() {
   const { blockedList } = useAuth();
   
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
     queryFn: fetchVideoFeed,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      // If we got some videos, there might be more on the next page
+      return lastPage.length > 0 ? allPages.length + 1 : undefined;
+    },
     staleTime: VIDEO_FEED_STALE_TIME,
     select: (data) => {
-      if (!blockedList || blockedList.length === 0) return data;
+      const flattened = data.pages.flat();
+      if (!blockedList || blockedList.length === 0) return flattened;
       const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
-      return data.filter(post => !blockedSet.has((post.author || '').toLowerCase()));
+      return flattened.filter(post => !blockedSet.has((post.author || '').toLowerCase()));
     },
   });
 }
@@ -96,7 +102,7 @@ export function useVideoFeed() {
 export function prefetchVideoFeed(queryClient: QueryClient) {
   queryClient.prefetchQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: fetchVideoFeed,
+    queryFn: () => fetchVideoFeed({ pageParam: 1 }),
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 }
@@ -110,7 +116,7 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
 
   const data = await queryClient.ensureQueryData({
     queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: fetchVideoFeed,
+    queryFn: () => fetchVideoFeed({ pageParam: 1 }),
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 
