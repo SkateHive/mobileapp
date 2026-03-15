@@ -17,6 +17,7 @@ import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
 import { useAuth } from "~/lib/auth-provider";
+import { Post } from '~/lib/types';
 import { useFeedFilter } from '~/lib/FeedFilterContext';
 import { useScrollDirection } from '~/lib/ScrollDirectionContext';
 import { useSnaps } from '~/lib/hooks/useSnaps';
@@ -161,10 +162,9 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   );
 
   // Map blockchain comments (Discussion) to Post for PostCard compatibility
-  const feedData: Discussion[] = comments as unknown as Discussion[];
-
   // Filter out posts from blocked users
   const filteredFeedData = React.useMemo(() => {
+    const feedData = comments as unknown as Post[];
     if (!feedData || feedData.length === 0) return [];
 
     return feedData.filter((post) => {
@@ -177,10 +177,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       // Filter out blocked users
       return !blockedLowerList.includes(authorLower);
     });
-  }, [feedData, blockedList, username]);
+  }, [comments, blockedList, username]);
 
   const renderItem = React.useCallback(
-    ({ item }: { item: Discussion }) => (
+    ({ item }: { item: Post }) => (
       <PostCard
         key={item.permlink}
         post={item}
@@ -192,9 +192,9 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   );
 
   const keyExtractor = React.useCallback(
-    (item: Discussion) => item.permlink,
+    (item: Post) => item.permlink,
     []
-  );
+);
 
   const ItemSeparatorComponent = React.useCallback(
     () => <View style={styles.separator} />,
@@ -214,7 +214,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
   return (
     <View style={styles.container}>
-      <AnimatedFlatList
+      <AnimatedFlatList<Post>
         ref={flatListRef as any}
         data={filteredFeedData}
         showsVerticalScrollIndicator={false}

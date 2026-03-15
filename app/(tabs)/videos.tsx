@@ -386,8 +386,14 @@ export default function VideosScreen() {
         {/* Top header with user info */}
         <Animated.View style={[styles.topHeader, { opacity: uiOpacity }]}>
           <Pressable style={styles.userInfo} onPress={handleUserPress}>
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} fadeDuration={0} />
-            <Text style={styles.username}>@{item.username}</Text>
+            <Image 
+              source={{ uri: item.soft_post_avatar || avatarUrl }} 
+              style={styles.avatar} 
+              fadeDuration={0} 
+            />
+            <Text style={styles.username}>
+              {item.soft_post_display_name ? item.soft_post_display_name : `@${item.username}`}
+            </Text>
           </Pressable>
 
           <View style={styles.headerSpacer} />

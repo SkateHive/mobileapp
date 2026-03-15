@@ -23,7 +23,7 @@ const ConversationDrawer = React.lazy(() =>
 );
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
-import type { Media } from '../../lib/types';
+import type { Media, Post } from '../../lib/types';
 import type { Discussion } from '@hiveio/dhive';
 import { extractMediaFromBody, removeVideoLinksFromBody } from '~/lib/utils';
 
@@ -51,10 +51,10 @@ const formatTimeAbbreviated = (date: Date): string => {
 };
 
 interface PostCardProps {
-  post: Discussion;
+  post: Post;
   currentUsername: string | null;
   isStatic?: boolean;
-  onOpenConversation?: (post: Discussion) => void;
+  onOpenConversation?: (post: Post) => void;
 }
 
 
@@ -379,9 +379,9 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
           ]}>
             <Pressable onPress={handleProfilePress}>
               <Image
-                source={{ uri: `https://images.hive.blog/u/${post.author}/avatar/small` }}
+                source={{ uri: post.soft_post_avatar || `https://images.hive.blog/u/${post.author}/avatar/small` }}
                 style={styles.profileImage}
-                alt={`${post.author}'s avatar`}
+                alt={`${post.soft_post_display_name || post.author}'s avatar`}
                 transition={200}
               />
             </Pressable>
@@ -392,7 +392,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
             {/* Header with author and date */}
             <View style={styles.headerContainer}>
               <Pressable onPress={handleProfilePress}>
-                <Text style={styles.authorText}>{post.author}</Text>
+                <Text style={styles.authorText}>{post.soft_post_display_name || post.author}</Text>
               </Pressable>
               <Text style={styles.dateText}>
                 {formattedDate}
