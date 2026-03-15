@@ -8,6 +8,9 @@ export interface AppSettings {
   stance: 'regular' | 'goofy';
   isWalletUnlocked: boolean;
   isAdvancedWallet: boolean;
+  initialScreen: 'videos' | 'feed';
+  sessionDuration: number;
+  isColorsUnlocked: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -15,6 +18,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   stance: 'regular',
   isWalletUnlocked: false,
   isAdvancedWallet: true,
+  initialScreen: 'videos',
+  sessionDuration: 1440,
+  isColorsUnlocked: false,
 };
 
 interface AppSettingsContextType {

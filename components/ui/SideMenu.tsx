@@ -187,6 +187,25 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); },
       },
       { title: "Feeds", icon: "list-outline" as const, value: "System", hideChevron: true, onPress: () => {} },
+      {
+        title: "Startup Screen",
+        icon: "rocket-outline" as const,
+        value: settings.initialScreen === 'videos' ? 'Videos' : 'Feed',
+        onPress: () => { updateSettings({ initialScreen: settings.initialScreen === 'videos' ? 'feed' : 'videos' }); },
+      },
+    ],
+    security: [
+      {
+        title: "Session Lock",
+        icon: "lock-closed-outline" as const,
+        value: settings.sessionDuration === 0 ? "Auto" : (settings.sessionDuration < 60 ? `${settings.sessionDuration}m` : `${settings.sessionDuration / 60}h`),
+        onPress: () => {
+          const durations = [0, 5, 60, 480, 1440];
+          const currentIndex = durations.indexOf(settings.sessionDuration);
+          const nextIndex = (currentIndex + 1) % durations.length;
+          updateSettings({ sessionDuration: durations[nextIndex] });
+        },
+      },
     ],
     about: [
       { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },

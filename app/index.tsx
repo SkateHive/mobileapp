@@ -18,13 +18,14 @@ import {
   AuthError,
   useAuth,
 } from "~/lib/auth-provider";
+import { useAppSettings } from "~/lib/AppSettingsContext";
 import {
   AccountNotFoundError,
   HiveError,
   InvalidKeyError,
   InvalidKeyFormatError,
 } from "~/lib/hive-utils";
-import { prefetchVideoFeed, warmUpVideoAssets } from "~/lib/hooks/useQueries";
+import { prefetchVideoFeed, warmUpVideoAssets, prefetchProfile, prefetchBalance } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 
 // Enable LayoutAnimation for Android
@@ -73,7 +74,9 @@ export default function Index() {
   const [message, setMessage] = React.useState("");
   const [isFormVisible, setIsFormVisible] = React.useState(false);
 
-  // Prefetch video feed + warm HTTP cache while user is on login screen
+  const { settings } = useAppSettings();
+
+  // Prefetch video feed + community feed + warm HTTP cache while user is on login screen
   React.useEffect(() => {
     prefetchVideoFeed(queryClient);
     warmUpVideoAssets(queryClient);
@@ -81,9 +84,9 @@ export default function Index() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.push("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, settings.initialScreen]);
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -101,7 +104,7 @@ export default function Index() {
   const handleSpectator = async () => {
     try {
       await enterSpectatorMode();
-      router.replace("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error) {
       console.error("Error entering spectator mode:", error);
       setMessage("Error entering spectator mode");
@@ -115,7 +118,10 @@ export default function Index() {
         return;
       }
       await login(username, password, method, pin);
-      router.replace("/(tabs)/videos");
+      // Prefetch user data after successful login
+      prefetchProfile(queryClient, username);
+      prefetchBalance(queryClient, username);
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error: any) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -138,7 +144,10 @@ export default function Index() {
   ) => {
     try {
       await loginStoredUser(selectedUsername, pin);
-      router.replace("/(tabs)/videos");
+      // Prefetch user data after successful quick login
+      prefetchProfile(queryClient, selectedUsername);
+      prefetchBalance(queryClient, selectedUsername);
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||

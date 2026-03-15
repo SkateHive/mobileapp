@@ -25,8 +25,8 @@ interface TabItem {
 const TAB_ITEMS: TabItem[] = [
   {
     name: "videos",
-    title: "Skatehive",
-    icon: "home-outline",
+    title: "Videos",
+    icon: "videocam-outline",
     iconFamily: "Ionicons",
   },
   {
@@ -170,7 +170,7 @@ export default function TabLayout() {
     
     switch (currentTab) {
       case "videos":
-        return "Skatehive";
+        return "Videos";
       case "feed":
         return "Skatehive";
       case "create":
