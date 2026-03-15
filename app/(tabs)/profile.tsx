@@ -103,12 +103,17 @@ function countryToFlag(location: string): string {
     IN: '🇮🇳', INDIA: '🇮🇳',
     PH: '🇵🇭', PHILIPPINES: '🇵🇭',
   };
-  // Try exact match first, then check if location contains a known key
+  
+  // Try exact match first
   if (map[loc]) return map[loc];
+  
+  // Try finding a known country/code as a full word in the string
   for (const [key, flag] of Object.entries(map)) {
-    if (loc.includes(key)) return flag;
+    const regex = new RegExp(`\\b${key}\\b`, 'i');
+    if (regex.test(loc)) return flag;
   }
-  return '📍';
+  
+  return '🌎';
 }
 
 export default function ProfileScreen() {
