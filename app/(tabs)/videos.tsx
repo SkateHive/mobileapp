@@ -11,7 +11,7 @@ import {
   Share,
   Animated,
 } from "react-native";
-import { PanGestureHandler, State } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -115,19 +115,29 @@ export default function VideosScreen() {
     } catch (e) {}
   };
 
-  const onGestureEvent = Animated.event(
-    [{ nativeEvent: { translationX: swipeTranslateX } }],
-    { useNativeDriver: true }
-  );
-
-  const handleSwipeStateChange = (event: any) => {
-    if (event.nativeEvent.state === State.END) {
-      const { translationX, velocityX } = event.nativeEvent;
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-30, 30])
+    .failOffsetY([-15, 15])
+    .runOnJS(true)
+    .onUpdate((event) => {
+      swipeTranslateX.setValue(event.translationX);
+    })
+    .onEnd((event) => {
+      const { translationX, velocityX } = event;
       // Fast flick OR long swipe triggers navigation
       if (translationX < -80 || velocityX < -600) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        router.push('/(tabs)/feed');
-        setTimeout(() => swipeTranslateX.setValue(0), 500);
+        Animated.timing(swipeTranslateX, {
+          toValue: -SCREEN_WIDTH,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push('/(tabs)/feed');
+          // Reset after a short delay to ensure navigation transition finishes
+          setTimeout(() => {
+            swipeTranslateX.setValue(0);
+          }, 300);
+        });
       } else {
         Animated.spring(swipeTranslateX, {
           toValue: 0,
@@ -136,15 +146,7 @@ export default function VideosScreen() {
           friction: 7,
         }).start();
       }
-    } else if (event.nativeEvent.state === State.CANCELLED || event.nativeEvent.state === State.FAILED) {
-      Animated.spring(swipeTranslateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 40,
-        friction: 7,
-      }).start();
-    }
-  };
+    });
 
   // Initialize liked and vote count states when videos load
   useEffect(() => {
@@ -503,11 +505,7 @@ export default function VideosScreen() {
   }
 
   return (
-    <PanGestureHandler
-      onGestureEvent={onGestureEvent}
-      onHandlerStateChange={handleSwipeStateChange}
-      activeOffsetX={[-20, 20]} // Required to let FlatList handle vertical gestures natively
-    >
+    <GestureDetector gesture={panGesture}>
       <Animated.View 
         style={[styles.container, { transform: [{ translateX: swipeTranslateX }] }]}
       >
@@ -619,7 +617,7 @@ export default function VideosScreen() {
           </View>
         )}
       </Animated.View>
-    </PanGestureHandler>
+    </GestureDetector>
   );
 }
 
