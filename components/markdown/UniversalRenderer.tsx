@@ -4,6 +4,7 @@ import Markdown from 'react-native-markdown-display';
 import { MarkdownProcessor } from '~/lib/markdown/MarkdownProcessor';
 import { EmbedFactory } from './EmbedFactory';
 import { theme } from '~/lib/theme';
+import { Image } from 'expo-image';
 
 interface UniversalRendererProps {
   content: string;
@@ -73,8 +74,24 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
       width: '100%',
       height: 200,
       borderRadius: theme.borderRadius.md,
+      marginVertical: theme.spacing.sm,
     }
   }), []);
+
+  const markdownRules = useMemo(() => ({
+    image: (node: any) => {
+      const { src, alt } = node.attributes;
+      return (
+        <Image
+          key={node.key}
+          source={{ uri: src }}
+          style={markdownStyles.image}
+          contentFit="cover"
+          accessibilityLabel={alt}
+        />
+      );
+    },
+  }), [markdownStyles]);
 
   // Simple hash for stable keys
   const getStableKey = (str: string) => {
@@ -136,7 +153,7 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
           return <EmbedFactory key={item.key} token={item.content} isVisible={isVisible} />;
         }
         return (
-          <Markdown key={item.key} style={markdownStyles}>
+          <Markdown key={item.key} style={markdownStyles} rules={markdownRules}>
             {item.content}
           </Markdown>
         );
