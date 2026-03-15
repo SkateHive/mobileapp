@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   stance: 'regular',
   isWalletUnlocked: false,
   isAdvancedWallet: true,
+  isColorsUnlocked: false,
   sessionDuration: 1440,
 };
 
