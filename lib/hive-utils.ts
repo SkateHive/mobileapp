@@ -997,18 +997,20 @@ export async function getUserRelationshipList(
 
     // Paginate through all results
     while (true) {
-      const result = await HiveClient.call('follow_api', 'get_following', [
-        username,
-        lastUsername,
-        type,
-        pageSize,
-      ]);
+      // Use bridge API instead of deprecated follow_api
+      const result = await HiveClient.call('bridge', 'get_following', {
+        account: username,
+        start: lastUsername,
+        type: type,
+        limit: pageSize,
+      });
 
       if (!result || result.length === 0) break;
 
       const usernames: string[] = result.map((item: any) => item.following);
 
-      // If we provided a startFollowing, the first result is inclusive (skip it to avoid duplicates)
+      // If we provided a startFollowing (or this is a paginated fetch), 
+      // the first result is inclusive (skip it to avoid duplicates)
       const newUsernames = lastUsername ? usernames.slice(1) : usernames;
 
       if (newUsernames.length === 0) break;
@@ -1022,7 +1024,7 @@ export async function getUserRelationshipList(
 
     return allUsernames;
   } catch (error) {
-    console.error('Error fetching user relationship list:', error);
+    console.error(`Error fetching user relationship list (${type}):`, error);
     return [];
   }
 }
