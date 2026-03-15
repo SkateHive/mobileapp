@@ -13,6 +13,7 @@ import { NotificationProvider } from '~/lib/notifications-context';
 import { ScrollLockProvider } from '~/lib/ScrollLockContext';
 import { AppSettingsProvider } from '~/lib/AppSettingsContext';
 import { theme } from '~/lib/theme';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const styles = StyleSheet.create({
   container: {
@@ -83,8 +84,9 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppSettingsProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <AppSettingsProvider>
       <AuthProvider>
         <ScrollLockProvider>
           <NavigationGuard>
@@ -150,8 +152,9 @@ export default function RootLayout() {
             </NotificationProvider>
           </NavigationGuard>
         </ScrollLockProvider>
-      </AuthProvider>
-      </AppSettingsProvider>
-    </QueryClientProvider>
+        </AuthProvider>
+        </AppSettingsProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

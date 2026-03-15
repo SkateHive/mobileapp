@@ -10,6 +10,8 @@ interface VideoPlayerProps {
   showControls?: boolean;
   showMuteButton?: boolean;
   initialMuted?: boolean;
+  muted?: boolean; // Controlled mute state (from parent)
+  onMuteToggle?: (muted: boolean) => void; // Callback for external mute control
   loop?: boolean;
   onPlaybackStarted?: () => void;
 }
@@ -22,10 +24,14 @@ export const VideoPlayer = React.memo(
     showControls = true,
     showMuteButton,
     initialMuted = true,
+    muted: controlledMuted,
+    onMuteToggle,
     loop = true,
     onPlaybackStarted,
   }: VideoPlayerProps) => {
-    const [isMuted, setIsMuted] = useState(initialMuted);
+    const isControlled = controlledMuted !== undefined;
+    const [internalMuted, setInternalMuted] = useState(initialMuted);
+    const isMuted = isControlled ? controlledMuted : internalMuted;
     const isUpdatingFromPlayer = useRef(false);
     const hasNotifiedPlayback = useRef(false);
     const onPlaybackStartedRef = useRef(onPlaybackStarted);
@@ -83,7 +89,11 @@ export const VideoPlayer = React.memo(
         "mutedChange",
         (event: { muted: boolean }) => {
           isUpdatingFromPlayer.current = true;
-          setIsMuted(event.muted);
+          if (isControlled) {
+            onMuteToggle?.(event.muted);
+          } else {
+            setInternalMuted(event.muted);
+          }
         }
       );
 
@@ -93,7 +103,12 @@ export const VideoPlayer = React.memo(
     }, [player, showControls]);
 
     const toggleMute = () => {
-      setIsMuted((prev) => !prev);
+      const newMuted = !isMuted;
+      if (isControlled) {
+        onMuteToggle?.(newMuted);
+      } else {
+        setInternalMuted(newMuted);
+      }
     };
 
     return (
