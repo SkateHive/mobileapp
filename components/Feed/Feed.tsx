@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
@@ -24,6 +25,7 @@ import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
 import { useScrollLock } from "~/lib/ScrollLockContext";
 import { ConversationDrawer } from "./ConversationDrawer";
+import { useScrollToTop } from "@react-navigation/native";
 import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
@@ -40,6 +42,22 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
+
+  const flatListRef = React.useRef<FlatList>(null);
+  const navigation = useNavigation();
+
+  React.useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
+      // Check if we are already focused on the feed
+      const isFocused = navigation.isFocused();
+      if (isFocused) {
+        // If already on feed, scroll to top
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   // Conversation drawer state (lifted out of PostCard)
   const [conversationPost, setConversationPost] = React.useState<Discussion | null>(null);
@@ -138,6 +156,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   return (
     <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={filteredFeedData}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isScrollLocked}
