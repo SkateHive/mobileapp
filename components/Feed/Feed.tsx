@@ -2,14 +2,17 @@ import React from "react";
 import {
   View,
   FlatList,
+  FlatListProps,
   StyleSheet,
   RefreshControl,
   ViewToken,
   Pressable,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
@@ -33,6 +36,8 @@ interface FeedProps {
   onRefresh?: () => void;
 }
 
+const AnimatedFlatList = Animated.FlatList;
+
 function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const { filter } = useFeedFilter();
   const { isScrollLocked } = useScrollLock();
@@ -42,6 +47,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+  const scrollY = React.useRef(new Animated.Value(0)).current;
+  const lastScrollY = React.useRef(0);
+  const upScrollDistance = React.useRef(0);
 
   const flatListRef = React.useRef<FlatList>(null);
   const navigation = useNavigation();
@@ -58,6 +67,51 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
     return unsubscribe;
   }, [navigation]);
+
+  const handleScrollToTop = React.useCallback(async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const onScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const currentY = event.nativeEvent.contentOffset.y;
+        const diff = lastScrollY.current - currentY;
+
+        if (diff > 0) {
+          // Scrolling up
+          upScrollDistance.current += diff;
+        } else {
+          // Scrolling down
+          upScrollDistance.current = 0;
+          if (showScrollTop) setShowScrollTop(false);
+        }
+
+        if (currentY > 2600 && upScrollDistance.current > 800) {
+          if (!showScrollTop) setShowScrollTop(true);
+        }
+
+        if (currentY < 100 && showScrollTop) {
+          setShowScrollTop(false);
+        }
+
+        lastScrollY.current = currentY;
+      },
+    }
+  );
+
+  const scrollTopOpacity = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(scrollTopOpacity, {
+      toValue: showScrollTop ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showScrollTop]);
 
   // Conversation drawer state (lifted out of PostCard)
   const [conversationPost, setConversationPost] = React.useState<Discussion | null>(null);
@@ -155,8 +209,8 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
+      <AnimatedFlatList
+        ref={flatListRef as any}
         data={filteredFeedData}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isScrollLocked}
@@ -185,8 +239,29 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         maxToRenderPerBatch={5}
         windowSize={11}
         updateCellsBatchingPeriod={50}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       />
+
+      {showScrollTop && (
+        <Animated.View
+          style={[
+            styles.scrollTopButtonContainer,
+            { opacity: scrollTopOpacity }
+          ]}
+        >
+          <Pressable
+            onPress={handleScrollToTop}
+            style={({ pressed }) => [
+              styles.scrollTopButton,
+              pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] }
+            ]}
+          >
+            <Ionicons name="arrow-up" size={20} color={theme.colors.background} />
+            <Text style={styles.scrollTopText}>POPPING UP 🛹</Text>
+          </Pressable>
+        </Animated.View>
+      )}
 
       {/* Single shared conversation drawer */}
       {conversationPost && (
@@ -231,5 +306,33 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingTop: theme.spacing.sm, // Add some top padding to ensure proper spacing
     paddingHorizontal: theme.spacing.md, // Add horizontal padding for content
+  },
+  scrollTopButtonContainer: {
+    position: 'absolute',
+    top: theme.spacing.lg,
+    alignSelf: 'center',
+    zIndex: 1000,
+  },
+  scrollTopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    gap: theme.spacing.xs,
+    elevation: 8,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  scrollTopText: {
+    color: theme.colors.background,
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.bold,
+    letterSpacing: 1,
   },
 });
