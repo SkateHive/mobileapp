@@ -5,6 +5,7 @@ import { MarkdownProcessor } from '~/lib/markdown/MarkdownProcessor';
 import { EmbedFactory } from './EmbedFactory';
 import { theme } from '~/lib/theme';
 import { Image } from 'expo-image';
+import { ImageCarousel } from './embeds/ImageCarousel';
 
 interface UniversalRendererProps {
   content: string;
@@ -103,9 +104,9 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
     return `part-${hash}`;
   };
 
-  // Create renderable items by grouping consecutive text parts
+  // Create renderable items by grouping consecutive text parts and consecutive images
   const renderItems = useMemo(() => {
-    const items: { type: 'token' | 'markdown'; content: string; key: string }[] = [];
+    const items: { type: 'token' | 'markdown' | 'carousel'; content: string | string[]; key: string }[] = [];
     let currentMarkdown = '';
 
     parts.forEach((part, index) => {
@@ -122,12 +123,30 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
           });
           currentMarkdown = '';
         }
-        // Push the token
-        items.push({
-          type: 'token',
-          content: trimmedPart,
-          key: `token-${index}-${getStableKey(trimmedPart)}`
-        });
+
+        // Check for IMAGE token
+        const imageMatch = trimmedPart.match(/^\[\[(?:IMAGE|IAMGE):([^\]]+)\]\]$/i);
+        if (imageMatch) {
+          const imageUrl = imageMatch[1].trim();
+          const lastItem = items[items.length - 1];
+
+          if (lastItem && lastItem.type === 'carousel') {
+            (lastItem.content as string[]).push(imageUrl);
+          } else {
+            items.push({
+              type: 'carousel',
+              content: [imageUrl],
+              key: `carousel-${index}-${getStableKey(imageUrl)}`
+            });
+          }
+        } else {
+          // Push other tokens normally
+          items.push({
+            type: 'token',
+            content: trimmedPart,
+            key: `token-${index}-${getStableKey(trimmedPart)}`
+          });
+        }
       } else {
         // Accumulate text/markdown including whitespace
         currentMarkdown += part;
@@ -150,11 +169,14 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
     <View style={styles.container}>
       {renderItems.map((item) => {
         if (item.type === 'token') {
-          return <EmbedFactory key={item.key} token={item.content} isVisible={isVisible} />;
+          return <EmbedFactory key={item.key} token={item.content as string} isVisible={isVisible} />;
+        }
+        if (item.type === 'carousel') {
+          return <ImageCarousel key={item.key} urls={item.content as string[]} />;
         }
         return (
           <Markdown key={item.key} style={markdownStyles} rules={markdownRules}>
-            {item.content}
+            {item.content as string}
           </Markdown>
         );
       })}

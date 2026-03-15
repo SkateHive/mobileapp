@@ -50,7 +50,7 @@ export const VideoEmbed = ({ type, id, isVisible }: VideoEmbedProps) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    aspectRatio: 1,
     backgroundColor: '#000',
     marginVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,

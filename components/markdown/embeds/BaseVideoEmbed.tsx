@@ -64,7 +64,7 @@ export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    aspectRatio: 1, // Square as a better middle ground for vertical/horizontal
     backgroundColor: '#000',
     marginTop: 0,
     marginBottom: theme.spacing.sm,
