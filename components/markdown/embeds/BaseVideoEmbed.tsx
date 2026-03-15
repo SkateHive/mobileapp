@@ -16,16 +16,16 @@ export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
   // Lazy mounting: Only render WebView if visible
   if (!isVisible) {
     return (
-      <Pressable style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loading}>
           <ActivityIndicator color={theme.colors.green} size="small" />
         </View>
-      </Pressable>
+      </View>
     );
   }
 
   return (
-    <Pressable style={styles.container}>
+    <View style={styles.container}>
       <WebView
         source={{ uri: url }}
         style={styles.webview}
@@ -57,7 +57,7 @@ export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
           <ActivityIndicator color={theme.colors.green} />
         </View>
       )}
-    </Pressable>
+    </View>
   );
 };
 

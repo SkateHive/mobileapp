@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { MarkdownProcessor } from '~/lib/markdown/MarkdownProcessor';
 import { EmbedFactory } from './EmbedFactory';
@@ -10,9 +10,10 @@ import { ImageCarousel } from './embeds/ImageCarousel';
 interface UniversalRendererProps {
   content: string;
   isVisible?: boolean;
+  onPress?: () => void;
 }
 
-export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps) => {
+export const UniversalRenderer = ({ content, isVisible, onPress }: UniversalRendererProps) => {
   const processed = useMemo(() => MarkdownProcessor.process(content), [content]);
 
   // Split by internal token placeholders [[TYPE:ID]]
@@ -175,9 +176,16 @@ export const UniversalRenderer = ({ content, isVisible }: UniversalRendererProps
           return <ImageCarousel key={item.key} urls={item.content as string[]} />;
         }
         return (
-          <Markdown key={item.key} style={markdownStyles} rules={markdownRules}>
-            {item.content as string}
-          </Markdown>
+          <Pressable 
+            key={item.key} 
+            onPress={onPress}
+            // Ensure Pressable doesn't have an opaque background or border that blocks touches
+            style={{ width: '100%' }}
+          >
+            <Markdown style={markdownStyles} rules={markdownRules}>
+              {item.content as string}
+            </Markdown>
+          </Pressable>
         );
       })}
     </View>

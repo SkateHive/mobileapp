@@ -41,7 +41,6 @@
     "expo-local-authentication": "~17.0.8",
     "expo-media-library": "~18.2.1",
     "expo-navigation-bar": "~5.0.10",
-    "expo-random": "~14.0.0",
     "expo-router": "~6.0.23",
     "expo-secure-store": "~15.0.8",
     "expo-splash-screen": "~31.0.13",

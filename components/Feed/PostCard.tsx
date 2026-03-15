@@ -424,13 +424,15 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
             </View>
 
             {/* Content and Media handled by UniversalRenderer */}
-            <Pressable onPress={handleBodyPress}>
-              {postContent !== '' && (
-                <View style={styles.contentContainer}>
-                  <EnhancedMarkdownRenderer content={postContent} isVisible={isVisible} />
-                </View>
-              )}
-            </Pressable>
+            {postContent !== '' && (
+              <View style={styles.contentContainer}>
+                <EnhancedMarkdownRenderer 
+                  content={postContent} 
+                  isVisible={isVisible} 
+                  onPress={handleBodyPress}
+                />
+              </View>
+            )}
 
           </View>
         </View>
