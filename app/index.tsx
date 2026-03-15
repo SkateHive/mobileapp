@@ -19,6 +19,7 @@ import {
   AuthError,
   useAuth,
 } from "~/lib/auth-provider";
+import { useAppSettings } from "~/lib/AppSettingsContext";
 import {
   AccountNotFoundError,
   HiveError,
@@ -200,6 +201,8 @@ export default function Index() {
   const [message, setMessage] = React.useState("");
   const [isFormVisible, setIsFormVisible] = React.useState(false);
 
+  const { settings } = useAppSettings();
+
   // Prefetch video feed + community feed + warm HTTP cache while user is on login screen
   React.useEffect(() => {
     prefetchVideoFeed(queryClient);
@@ -209,9 +212,9 @@ export default function Index() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.replace("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}`);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, settings.initialScreen]);
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -229,7 +232,7 @@ export default function Index() {
   const handleSpectator = async () => {
     try {
       await enterSpectatorMode();
-      router.replace("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error) {
       console.error("Error entering spectator mode:", error);
       setMessage("Error entering spectator mode");
@@ -246,7 +249,7 @@ export default function Index() {
       // Prefetch user data after successful login
       prefetchProfile(queryClient, username);
       prefetchBalance(queryClient, username);
-      router.replace("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error: any) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -275,7 +278,7 @@ export default function Index() {
       // Prefetch user data after successful quick login
       prefetchProfile(queryClient, selectedUsername);
       prefetchBalance(queryClient, selectedUsername);
-      router.replace("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||

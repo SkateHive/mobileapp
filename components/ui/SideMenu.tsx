@@ -192,6 +192,12 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         value: settings.stance === 'regular' ? 'Regular' : 'Goofy',
         onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); },
       },
+      {
+        title: "Startup Screen",
+        icon: "rocket-outline" as const,
+        value: settings.initialScreen === 'videos' ? 'Videos' : 'Feed',
+        onPress: () => { updateSettings({ initialScreen: settings.initialScreen === 'videos' ? 'feed' : 'videos' }); },
+      },
     ],
     security: [
       {
