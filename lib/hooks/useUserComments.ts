@@ -6,10 +6,11 @@ interface LastPostInfo {
   permlink: string;
 }
 
-export function useUserComments(username: string | null) {
+export function useUserComments(username: string | null, mutedList: string[] = []) {
   const lastPostRef = useRef<LastPostInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
   const prevUsernameRef = useRef<string | null>(null);
+  const prevMutedListRef = useRef<string[]>(mutedList);
 
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -123,9 +124,18 @@ export function useUserComments(username: string | null) {
 
         setPosts((prevPosts) => {
           const existingPermlinks = new Set(prevPosts.map((p) => p.permlink));
-          const uniquePosts = newPosts.filter((p: any) => !existingPermlinks.has(p.permlink));
+          const mutedLower = mutedList.map(m => m.toLowerCase());
+          const uniquePosts = newPosts.filter((p: any) => 
+            !existingPermlinks.has(p.permlink) && 
+            !mutedLower.includes(p.author.toLowerCase())
+          );
 
-          if (uniquePosts.length === 0) {
+          if (uniquePosts.length === 0 && newPosts.length > 0) {
+            // All new posts were filtered out by mutes, try to get more
+            setFetchTrigger(t => t + 1);
+          }
+
+          if (uniquePosts.length === 0 && newPosts.length === 0) {
             setHasMore(false);
           }
 
@@ -142,7 +152,20 @@ export function useUserComments(username: string | null) {
     fetchPosts();
 
     return () => { cancelled = true; };
-  }, [fetchTrigger, username]);
+  }, [fetchTrigger, username, mutedList]);
+
+  // Reset when mutedList changes significantly (e.g. login/logout or new mute)
+  useEffect(() => {
+    if (JSON.stringify(prevMutedListRef.current) !== JSON.stringify(mutedList)) {
+      prevMutedListRef.current = mutedList;
+      // Re-fetch and clear current posts
+      lastPostRef.current = null;
+      fetchedPermlinksRef.current = new Set();
+      setPosts([]);
+      setHasMore(true);
+      setFetchTrigger((t) => t + 1);
+    }
+  }, [mutedList]);
 
   // Load next page — just bump the trigger
   const loadNextPage = useCallback(() => {
