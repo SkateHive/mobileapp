@@ -1,8 +1,9 @@
-import { useQuery, QueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, QueryClient } from '@tanstack/react-query';
 import {
   getFeed,
   getBalance,
   getRewards } from '../api';
+import { useAuth } from '../auth-provider';
 import { API_BASE_URL, LEADERBOARD_API_URL } from '../constants';
 import { extractMediaFromBody } from '../utils';
 import type { Post } from '../types';
@@ -31,8 +32,8 @@ export interface VideoPost {
 const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
 const VIDEO_FEED_STALE_TIME = 1000 * 60 * 2; // 2 minutes
 
-async function fetchVideoFeed(): Promise<VideoPost[]> {
-  const posts = await getFeed(1, 50);
+async function fetchVideoFeed({ pageParam = 1 }: { pageParam?: any }): Promise<VideoPost[]> {
+  const posts = await getFeed(pageParam, 50);
   const videoList: VideoPost[] = [];
 
   posts.forEach((post: Post) => {
@@ -78,17 +79,30 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
 }
 
 export function useVideoFeed() {
-  return useQuery({
+  const { blockedList } = useAuth();
+  
+  return useInfiniteQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
     queryFn: fetchVideoFeed,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      // If we got some videos, there might be more on the next page
+      return lastPage.length > 0 ? allPages.length + 1 : undefined;
+    },
     staleTime: VIDEO_FEED_STALE_TIME,
+    select: (data) => {
+      const flattened = data.pages.flat();
+      if (!blockedList || blockedList.length === 0) return flattened;
+      const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+      return flattened.filter(post => !blockedSet.has((post.author || '').toLowerCase()));
+    },
   });
 }
 
 export function prefetchVideoFeed(queryClient: QueryClient) {
   queryClient.prefetchQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: fetchVideoFeed,
+    queryFn: () => fetchVideoFeed({ pageParam: 1 }),
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 }
@@ -102,7 +116,7 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
 
   const data = await queryClient.ensureQueryData({
     queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: fetchVideoFeed,
+    queryFn: () => fetchVideoFeed({ pageParam: 1 }),
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 
@@ -122,6 +136,48 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
   const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
   avatarUrls.forEach((url: string) => {
     Image.prefetch(url).catch(() => {});
+  });
+}
+
+// ============================================================================
+// LOGIN-SCREEN PREFETCH — warm caches before user enters the app
+// ============================================================================
+
+/**
+ * Prefetch the main community feed (first page).
+ * Called on the login screen so the home tab loads instantly.
+ */
+export function prefetchCommunityFeed(queryClient: QueryClient) {
+  queryClient.prefetchQuery({
+    queryKey: ['feed', 1],
+    queryFn: () => getFeed(1, 10),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+/**
+ * Prefetch a user's profile after successful login.
+ */
+export function prefetchProfile(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['profile', username],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/profile/${username}`);
+      const json = await response.json();
+      return json.success ? json.data : null;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+/**
+ * Prefetch a user's balance data after successful login.
+ */
+export function prefetchBalance(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['balance', username],
+    queryFn: () => getBalance(username),
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 
