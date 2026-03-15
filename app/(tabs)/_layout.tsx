@@ -2,12 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter, useSegments } from "expo-router";
 import { StyleSheet, View, PanResponder } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { theme } from "~/lib/theme";
 import { GlobalHeader } from "~/components/ui/GlobalHeader";
 import { SideMenu } from "~/components/ui/SideMenu";
 import { FeedFilterProvider, useFeedFilter } from "~/lib/FeedFilterContext";
-import { Pressable, Text as RNText, Modal } from "react-native";
+import { ScrollDirectionProvider, useScrollDirection } from "~/lib/ScrollDirectionContext";
+import { Pressable, Text as RNText, Modal, Animated } from "react-native";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
 import { useAppSettings } from "~/lib/AppSettingsContext";
@@ -65,19 +66,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerButtonContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.background,
-    borderWidth: 3,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    borderWidth: 2,
     borderColor: theme.colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 12, // Lowered to look proportional
     shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 8,
   },
   avatarContainer: {
@@ -150,11 +151,55 @@ function FeedHeaderTitle() {
 }
 
 export default function TabLayout() {
+  return (
+    <ScrollDirectionProvider>
+      <FeedFilterProvider>
+        <TabLayoutInner />
+      </FeedFilterProvider>
+    </ScrollDirectionProvider>
+  );
+}
+
+function TabLayoutInner() {
   const router = useRouter();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const segments = useSegments();
   const { username } = useAuth();
   const { hiveAccount } = useHiveAccount(username || "");
+  const { scrollDirection } = useScrollDirection();
+
+  // Animation values
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
+  const headerOpacity = useRef(new Animated.Value(1)).current;
+  const tabBarTranslateY = useRef(new Animated.Value(0)).current;
+  const tabBarOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const isHidden = scrollDirection === 'down';
+    
+    Animated.parallel([
+      Animated.timing(headerTranslateY, {
+        toValue: isHidden ? -100 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(headerOpacity, {
+        toValue: isHidden ? 0 : 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tabBarTranslateY, {
+        toValue: isHidden ? 100 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tabBarOpacity, {
+        toValue: isHidden ? 0 : 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [scrollDirection]);
 
   const currentTab = segments[segments.length - 1];
   const isVideosTab = currentTab === "videos";
@@ -163,39 +208,16 @@ export default function TabLayout() {
   const userAvatarUrl = username && username !== "SPECTATOR" 
     ? (hiveAccount?.metadata?.profile?.profile_image || `https://images.hive.blog/u/${username}/avatar/small`)
     : null;
-  
-  // Determine header title based on active tab
-  const getHeaderTitle = () => {
-    const currentTab = segments[segments.length - 1];
-    
-    switch (currentTab) {
-      case "videos":
-        return "Videos";
-      case "feed":
-        return "Skatehive";
-      case "create":
-        return "Skatehive Create";
-      case "leaderboard":
-        return "Leaderboard";
-      case "profile":
-        return "Profile";
-      default:
-        return "Skatehive";
-    }
-  };
 
-  // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond to horizontal swipes
         return (
           Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
           Math.abs(gestureState.dx) > 20
         );
       },
       onPanResponderRelease: (evt, gestureState) => {
-        // Detect swipe from left to right
         if (gestureState.dx > 100 && gestureState.vx > 0.5) {
           router.push("/(tabs)/create");
         }
@@ -204,25 +226,40 @@ export default function TabLayout() {
   ).current;
 
   return (
-    <FeedFilterProvider>
-      <View style={styles.container}>
-        {!isVideosTab && (
+    <View style={styles.container}>
+      {!isVideosTab && (
+        <Animated.View style={{ 
+          transform: [{ translateY: headerTranslateY }],
+          opacity: headerOpacity,
+          zIndex: 10,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0
+        }}>
           <GlobalHeader 
             onOpenMenu={() => setIsMenuVisible(true)} 
-            // title={getHeaderTitle()}
-            // centerComponent={currentTab === "feed" ? <FeedHeaderTitle /> : undefined} // Future feature: Filter dropdown
             showSettings={isProfileTab}
           />
-        )}
-        <View style={styles.gestureContainer} {...panResponder.panHandlers}>
+        </Animated.View>
+      )}
+      <View style={styles.gestureContainer} {...panResponder.panHandlers}>
+        <Animated.View style={{ flex: 1 }}>
           <Tabs
             screenOptions={{
               headerShown: false,
               tabBarStyle: {
-                backgroundColor: theme.colors.background,
-                borderTopColor: theme.colors.border,
+                backgroundColor: 'rgba(0,0,0,0.85)',
+                borderTopColor: 'rgba(255,255,255,0.05)',
                 height: 60,
                 paddingBottom: 8,
+                transform: [{ translateY: tabBarTranslateY }],
+                opacity: tabBarOpacity,
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                elevation: 0, // Remove shadow for smooth animation
               },
               tabBarActiveTintColor: theme.colors.primary,
               tabBarInactiveTintColor: theme.colors.gray,
@@ -242,7 +279,7 @@ export default function TabLayout() {
                       <View style={styles.centerButtonContainer}>
                         <Ionicons
                           name="add"
-                          size={32}
+                          size={24}
                           color={theme.colors.primary}
                         />
                       </View>
@@ -282,10 +319,10 @@ export default function TabLayout() {
               }}
             />
           </Tabs>
-        </View>
-        <SideMenu isVisible={isMenuVisible} onClose={() => setIsMenuVisible(false)} />
+        </Animated.View>
       </View>
-    </FeedFilterProvider>
+      <SideMenu isVisible={isMenuVisible} onClose={() => setIsMenuVisible(false)} />
+    </View>
   );
 }
 

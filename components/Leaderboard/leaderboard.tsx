@@ -209,7 +209,8 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     width: '100%',
-    paddingVertical: theme.spacing.md,
+    paddingTop: 100, // Space for absolute header
+    paddingBottom: 100, // Space for absolute tab bar
   },
   loadingContainer: {
     flex: 1,

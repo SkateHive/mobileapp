@@ -639,6 +639,7 @@ export default function ProfileScreen() {
       {profileUsername === "SPECTATOR" ? (
         <ScrollView
           style={styles.container}
+          contentContainerStyle={{ paddingTop: 100, paddingBottom: 100 }}
           refreshControl={
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
@@ -678,7 +679,7 @@ export default function ProfileScreen() {
           initialNumToRender={6}
           maxToRenderPerBatch={3}
           windowSize={3}
-          contentContainerStyle={{ gap: GRID_GAP }}
+          contentContainerStyle={{ gap: GRID_GAP, paddingTop: 100, paddingBottom: 100 }}
         />
       ) : (
         <FlatList
@@ -795,6 +796,8 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
+    paddingTop: 100, // Space for absolute header
+    paddingBottom: 100, // Space for absolute tab bar
   },
   // Profile Section Styles
   profileSection: {

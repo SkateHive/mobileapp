@@ -17,8 +17,9 @@ import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
 import { useAuth } from "~/lib/auth-provider";
-import { useFeedFilter } from "~/lib/FeedFilterContext";
-import { useSnaps } from "~/lib/hooks/useSnaps";
+import { useFeedFilter } from '~/lib/FeedFilterContext';
+import { useScrollDirection } from '~/lib/ScrollDirectionContext';
+import { useSnaps } from '~/lib/hooks/useSnaps';
 import { theme } from "~/lib/theme";
 import {
   ViewportTrackerProvider,
@@ -53,6 +54,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const upScrollDistance = React.useRef(0);
 
   const flatListRef = React.useRef<FlatList>(null);
+  const { setScrollDirection } = useScrollDirection();
   const navigation = useNavigation();
 
   React.useEffect(() => {
@@ -84,9 +86,11 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         if (diff > 0) {
           // Scrolling up
           upScrollDistance.current += diff;
-        } else {
+          if (diff > 5) setScrollDirection('up'); // Sensitivity threshold
+        } else if (diff < 0) {
           // Scrolling down
           upScrollDistance.current = 0;
+          if (Math.abs(diff) > 5) setScrollDirection('down');
           if (showScrollTop) setShowScrollTop(false);
         }
 
@@ -94,8 +98,9 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
           if (!showScrollTop) setShowScrollTop(true);
         }
 
-        if (currentY < 100 && showScrollTop) {
-          setShowScrollTop(false);
+        if (currentY < 100) {
+          if (showScrollTop) setShowScrollTop(false);
+          setScrollDirection('up'); // Keep visible at top
         }
 
         lastScrollY.current = currentY;
@@ -197,7 +202,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   );
 
   const ListHeaderComponent = React.useCallback(
-    () => <View style={{ height: theme.spacing.md }} />,
+    () => <View style={{ height: 100 }} />,
     []
   );
 
@@ -219,7 +224,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         ListHeaderComponent={ListHeaderComponent}
         ItemSeparatorComponent={ItemSeparatorComponent}
         ListFooterComponent={ListFooterComponent}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingBottom: 100 } // Space for absolute tab bar
+        ]}
         onEndReached={hasMore ? loadNextPage : undefined}
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}

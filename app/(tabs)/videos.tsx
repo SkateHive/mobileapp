@@ -20,21 +20,19 @@ import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
 import { ConversationDrawer } from "~/components/Feed/ConversationDrawer";
 import { useScrollLock } from "~/lib/ScrollLockContext";
+import { useScrollDirection } from "~/lib/ScrollDirectionContext";
 import { theme } from "~/lib/theme";
 import { useAppSettings } from "~/lib/AppSettingsContext";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
 
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 const { height: WINDOW_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function VideosScreen() {
   const { isScrollLocked } = useScrollLock();
   const router = useRouter();
-  // Get tab bar height to calculate exact screen height for each video
-  const tabBarHeight = 60; // Hardcoded fallback based on _layout.tsx
-  const SCREEN_HEIGHT = WINDOW_HEIGHT - tabBarHeight;
+  const SCREEN_HEIGHT = WINDOW_HEIGHT;
   const { session, username } = useAuth();
   const { settings } = useAppSettings();
   const { showToast } = useToast();
@@ -57,6 +55,8 @@ export default function VideosScreen() {
   const [selectedVideo, setSelectedVideo] = useState<VideoPost | null>(null);
   const [isCommentsVisible, setIsCommentsVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const { setScrollDirection } = useScrollDirection();
+  const lastVideoScrollY = useRef(0);
 
   // Initialize liked and vote count states when videos load
   useEffect(() => {
@@ -392,6 +392,16 @@ export default function VideosScreen() {
           viewabilityConfig={viewabilityConfig}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
+          onScroll={(e) => {
+            const currentY = e.nativeEvent.contentOffset.y;
+            if (currentY > lastVideoScrollY.current + 20) {
+              setScrollDirection('down');
+            } else if (currentY < lastVideoScrollY.current - 20) {
+              setScrollDirection('up');
+            }
+            lastVideoScrollY.current = currentY;
+          }}
+          scrollEventThrottle={16}
           removeClippedSubviews={true}
           maxToRenderPerBatch={3}
           windowSize={5}
@@ -515,7 +525,7 @@ const styles = StyleSheet.create({
   // Bottom overlay styles
   bottomOverlay: {
     position: "absolute",
-    bottom: 120,
+    bottom: 80,
     left: 16,
     right: 80,
   },
@@ -578,7 +588,7 @@ const styles = StyleSheet.create({
   // Left side action buttons
   actionsContainer: {
     position: "absolute",
-    bottom: 200,
+    bottom: 140,
     alignItems: "center",
     gap: 20,
     zIndex: 10,

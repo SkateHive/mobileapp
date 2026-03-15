@@ -155,6 +155,8 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: theme.spacing.md,
+    paddingTop: 100, // Space for absolute header
+    paddingBottom: 100, // Space for absolute tab bar
     flexGrow: 1,
   },
   header: {

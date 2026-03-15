@@ -34,6 +34,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    paddingTop: 100, // Space for absolute header
+    paddingBottom: 100, // Space for absolute tab bar
   },
   searchHeader: {
     padding: theme.spacing.md,

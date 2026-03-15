@@ -79,9 +79,9 @@ export function GlobalHeader({ onOpenMenu, title = "Skatehive", centerComponent,
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: 'rgba(0,0,0,0.85)',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   container: {
     flexDirection: "row",
