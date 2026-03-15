@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { theme } from '~/lib/theme';
 
@@ -16,16 +16,16 @@ export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
   // Lazy mounting: Only render WebView if visible
   if (!isVisible) {
     return (
-      <View style={styles.container}>
+      <Pressable style={styles.container}>
         <View style={styles.loading}>
           <ActivityIndicator color={theme.colors.green} size="small" />
         </View>
-      </View>
+      </Pressable>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <Pressable style={styles.container}>
       <WebView
         source={{ uri: url }}
         style={styles.webview}
@@ -57,7 +57,7 @@ export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
           <ActivityIndicator color={theme.colors.green} />
         </View>
       )}
-    </View>
+    </Pressable>
   );
 };
 
