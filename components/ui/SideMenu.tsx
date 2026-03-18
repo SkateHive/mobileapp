@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, StyleSheet, Pressable, Dimensions, Animated, Easing, ScrollView, Alert, Clipboard } from "react-native";
+import { View, StyleSheet, Pressable, Dimensions, Animated, Easing, ScrollView, Alert } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -29,10 +30,10 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   const { settings, updateSettings } = useAppSettings();
   const { showToast } = useToast();
   const { hiveAccount } = useHiveAccount(username || "");
-  
+
   const [currentView, setCurrentView] = useState<MenuView>("settings");
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
-  
+
   // Animation values
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -98,8 +99,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       `Are you sure you want to remove @${username} from this device? You will need your posting key to log in again.`,
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Remove", 
+        {
+          text: "Remove",
           style: "destructive",
           onPress: async () => {
             try {
@@ -116,10 +117,15 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     );
   };
 
-  const copyToClipboard = (text: string, label: string) => {
-    Clipboard.setString(text);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    showToast(`${label} copied!`, "success");
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await Clipboard.setStringAsync(text);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`${label} copied!`, "success");
+    } catch (error) {
+      console.error(`Error copying ${label}:`, error);
+      showToast(`Failed to copy ${label}.`, "error");
+    }
   };
 
   // Helper for rendering account avatar
@@ -127,9 +133,9 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     const profileImage = hiveAccount?.metadata?.profile?.profile_image;
     const hiveAvatarUrl = `https://images.hive.blog/u/${username}/avatar/small`;
     return (
-      <Image 
-        source={{ uri: profileImage || hiveAvatarUrl }} 
-        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.colors.secondaryCard }} 
+      <Image
+        source={{ uri: profileImage || hiveAvatarUrl }}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.colors.secondaryCard }}
         transition={200}
       />
     );
@@ -139,8 +145,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
     <View style={styles.card}>
       {items.map((item, index) => (
         <React.Fragment key={index}>
-          <Pressable 
-            style={[styles.menuItem, item.disabled && { opacity: 0.5 }]} 
+          <Pressable
+            style={[styles.menuItem, item.disabled && { opacity: 0.5 }]}
             onPress={item.onPress}
             disabled={item.disabled}
           >
@@ -161,28 +167,28 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
 
   const settingsItems = {
     service: [
-      { title: "Scan", icon: "qr-code-outline" as const, onPress: () => {} },
-      { title: "Multi-Device Login", icon: "phone-portrait-outline" as const, disabled: true, onPress: () => {} },
-      { title: "Lucky Drop History", icon: "gift-outline" as const, disabled: true, onPress: () => {} },
-      { title: "Viewing History", icon: "time-outline" as const, onPress: () => {} },
-      { title: "Bookmarks", icon: "bookmark-outline" as const, onPress: () => {} },
-      { title: "Mute List", icon: "volume-mute-outline" as const, onPress: () => {} },
-      { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => {} },
+      { title: "Scan", icon: "qr-code-outline" as const, onPress: () => { } },
+      { title: "Multi-Device Login", icon: "phone-portrait-outline" as const, disabled: true, onPress: () => { } },
+      { title: "Lucky Drop History", icon: "gift-outline" as const, disabled: true, onPress: () => { } },
+      { title: "Viewing History", icon: "time-outline" as const, onPress: () => { } },
+      { title: "Bookmarks", icon: "bookmark-outline" as const, onPress: () => { } },
+      { title: "Mute List", icon: "volume-mute-outline" as const, onPress: () => { } },
+      { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => { } },
     ],
     appearance: [
-      { title: "Theme", icon: "color-palette-outline" as const, value: "System", onPress: () => {} },
-      { title: "Language", icon: "language-outline" as const, value: "System", onPress: () => {} },
-      { 
-        title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons", 
-        icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const, 
-        onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); } 
+      { title: "Theme", icon: "color-palette-outline" as const, value: "System", onPress: () => { } },
+      { title: "Language", icon: "language-outline" as const, value: "System", onPress: () => { } },
+      {
+        title: settings.useVoteSlider ? "Vote: Slider" : "Vote: Preset Buttons",
+        icon: settings.useVoteSlider ? "options-outline" as const : "grid-outline" as const,
+        onPress: () => { updateSettings({ useVoteSlider: !settings.useVoteSlider }); }
       },
-      { 
-        title: `Stance: ${settings.stance.charAt(0).toUpperCase() + settings.stance.slice(1)}`, 
-        icon: "body-outline" as const, 
-        onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); } 
+      {
+        title: `Stance: ${settings.stance.charAt(0).toUpperCase() + settings.stance.slice(1)}`,
+        icon: "body-outline" as const,
+        onPress: () => { updateSettings({ stance: settings.stance === 'regular' ? 'goofy' : 'regular' }); }
       },
-      { title: "Feeds", icon: "list-outline" as const, value: "System", onPress: () => {} },
+      { title: "Feeds", icon: "list-outline" as const, value: "System", onPress: () => { } },
     ],
     about: [
       { title: "About Skatehive", icon: "information-circle-outline" as const, onPress: () => { onClose(); router.push("/about"); } },
@@ -222,7 +228,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
         </Pressable>
 
-        <Pressable style={styles.card} onPress={() => {}}>
+        <Pressable style={styles.card} onPress={() => { }}>
           <View style={styles.menuItem}>
             <View style={styles.menuItemLeft}>
               <Ionicons name="wallet-outline" size={22} color={theme.colors.text} />
@@ -241,7 +247,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
 
         <Text style={styles.groupLabel}>About</Text>
         {renderCard(settingsItems.about)}
-        
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -254,8 +260,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Accounts</Text>
-        <Pressable 
-          onPress={() => setIsEditProfileVisible(true)} 
+        <Pressable
+          onPress={() => setIsEditProfileVisible(true)}
           style={styles.editButton}
         >
           <Text style={styles.editButtonText}>Edit</Text>
@@ -265,7 +271,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.accountsHeader}>
           {renderAvatar(80)}
-          <Pressable 
+          <Pressable
             onPress={() => copyToClipboard(username || "", "Username")}
             style={styles.accountDetailInfo}
           >
@@ -310,7 +316,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
 
         {socialSlots.map((slot, idx) => (
           <View key={idx} style={[styles.card, { marginTop: theme.spacing.md }]}>
-             <View style={[styles.menuItem, { opacity: 0.5 }]}>
+            <View style={[styles.menuItem, { opacity: 0.5 }]}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name={slot.icon} size={22} color={theme.colors.text} />
                 <Text style={styles.menuItemText}>{slot.title}</Text>
@@ -324,12 +330,12 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           <Pressable style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutButtonText}>Log Out</Text>
           </Pressable>
-          
+
           <Pressable style={styles.removeButton} onPress={handleRemoveAccount}>
             <Text style={styles.removeButtonText}>Remove from Device</Text>
           </Pressable>
         </View>
-        
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -347,10 +353,10 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
-      
-      <Animated.View 
+
+      <Animated.View
         style={[
-          styles.drawer, 
+          styles.drawer,
           { transform: [{ translateX: slideAnim }] }
         ]}
       >

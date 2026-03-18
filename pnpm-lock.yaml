@@ -50,6 +50,9 @@ importers:
       expo-camera:
         specifier: ~17.0.10
         version: 17.0.10(expo@54.0.33)(react-native-web@0.20.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
+      expo-clipboard:
+        specifier: ^55.0.9
+        version: 55.0.9(expo@54.0.33)(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       expo-constants:
         specifier: ~18.0.13
         version: 18.0.13(expo@54.0.33)(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))
@@ -1911,6 +1914,13 @@ packages:
       react-native-web:
         optional: true
 
+  expo-clipboard@55.0.9:
+    resolution: {integrity: sha512-WJ9ougE8fEDu3/RV5Vz3gE5aNgnj1C0WByXCz3WUj8y/06bJyaIUDMq8FDLv3n0AO3guiErmkUunsD0EzSDUUw==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+
   expo-constants@18.0.13:
     resolution: {integrity: sha512-FnZn12E1dRYKDHlAdIyNFhBurKTS3F9CrfrBDJI5m3D7U17KBHMQ6JEfYlSj7LG7t+Ulr+IKaj58L1k5gBwTcQ==}
     peerDependencies:
@@ -2503,24 +2513,28 @@ packages:
     engines: {node: '>= 12.0.0'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   lightningcss-linux-arm64-musl@1.30.1:
     resolution: {integrity: sha512-jmUQVx4331m6LIX+0wUhBbmMX7TCfjF5FoOH6SD1CttzuYlGNVpA7QnrmLxrsub43ClTINfGSYyHe2HWeLl5CQ==}
     engines: {node: '>= 12.0.0'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   lightningcss-linux-x64-gnu@1.30.1:
     resolution: {integrity: sha512-piWx3z4wN8J8z3+O5kO74+yr6ze/dKmPnI7vLqfSqI8bccaTGY5xiSGVIJBDd5K5BHlvVLpUB3S2YCfelyJ1bw==}
     engines: {node: '>= 12.0.0'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   lightningcss-linux-x64-musl@1.30.1:
     resolution: {integrity: sha512-rRomAK7eIkL+tHY0YPxbc5Dra2gXlI63HL+v1Pdi1a3sC+tJTcFrHX+E86sulgAXeI7rSzDYhPSeHHjqFhqfeQ==}
     engines: {node: '>= 12.0.0'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   lightningcss-win32-arm64-msvc@1.30.1:
     resolution: {integrity: sha512-mSL4rqPi4iXq5YVqzSsJgMVFENoa4nGTT/GjO2c0Yl9OuQfPsIfncvLrEW6RbbB24WtZ3xP/2CCmI3tNkNV4oA==}
@@ -5842,6 +5856,12 @@ snapshots:
       react-native: 0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0)
     optionalDependencies:
       react-native-web: 0.20.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+
+  expo-clipboard@55.0.9(expo@54.0.33)(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      expo: 54.0.33(@babel/core@7.26.10)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native-webview@13.15.0(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0)
 
   expo-constants@18.0.13(expo@54.0.33)(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0)):
     dependencies:

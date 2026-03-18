@@ -58,10 +58,8 @@ yarn-error.*
 
 # local env files
 .env
-/.env
-.env*.local
+.env.local
 .env.production
-.env*
 
 # typescript
 *.tsbuildinfo
