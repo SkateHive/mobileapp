@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
+import { useAppSettings } from '~/lib/AppSettingsContext';
 import { useScrollLock } from '~/lib/ScrollLockContext';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
 import { useViewportTracker } from '~/lib/ViewportTracker';
@@ -16,14 +17,9 @@ import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
 import { CommentBottomSheet } from '../ui/CommentBottomSheet';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
-// Lazy imports break the require cycle:
 // PostCard → ConversationDrawer → PostCard
-// PostCard → FullConversationDrawer → PostCard
 const ConversationDrawer = React.lazy(() =>
   import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
-);
-const FullConversationDrawer = React.lazy(() =>
-  import('./FullConversationDrawer').then(m => ({ default: m.FullConversationDrawer }))
 );
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
@@ -63,6 +59,7 @@ interface PostCardProps {
 export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
   const { isScrollLocked, setScrollLocked } = useScrollLock();
   const { session, followingList, updateUserRelationship } = useAuth();
+  const { settings } = useAppSettings();
   const [isFollowing, setIsFollowing] = useState(false);
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
@@ -549,13 +546,13 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         }}
       />
 
-      {/* Full Conversation Drawer - Entire conversation thread */}
+      {/* Conversation Drawer - Entire conversation thread */}
       {isFullConversationVisible && (
         <React.Suspense fallback={null}>
-          <FullConversationDrawer
-            visible={isFullConversationVisible}
+          <ConversationDrawer
+            isVisible={isFullConversationVisible}
             onClose={() => setIsFullConversationVisible(false)}
-            discussion={post}
+            post={post}
           />
         </React.Suspense>
       )}
