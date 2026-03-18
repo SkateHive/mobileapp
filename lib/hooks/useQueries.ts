@@ -3,6 +3,7 @@ import {
   getFeed,
   getBalance,
   getRewards } from '../api';
+import { useAuth } from '../auth-provider';
 import { API_BASE_URL, LEADERBOARD_API_URL } from '../constants';
 import { extractMediaFromBody } from '../utils';
 import type { Post } from '../types';
@@ -78,10 +79,17 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
 }
 
 export function useVideoFeed() {
+  const { mutedList } = useAuth();
+  
   return useQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
     queryFn: fetchVideoFeed,
     staleTime: VIDEO_FEED_STALE_TIME,
+    select: (data) => {
+      if (!mutedList || mutedList.length === 0) return data;
+      const mutedSet = new Set(mutedList.map(u => u.toLowerCase()));
+      return data.filter(post => !mutedSet.has((post.author || '').toLowerCase()));
+    },
   });
 }
 
@@ -108,9 +116,9 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
 
   if (!data || data.length === 0) return;
 
-  // Prefetch thumbnails for the first 5 videos
+  // Prefetch thumbnails for the first 2 videos
   const thumbnailUrls = data
-    .slice(0, 5)
+    .slice(0, 2)
     .map((v: VideoPost) => v.thumbnailUrl)
     .filter(Boolean) as string[];
 
@@ -119,9 +127,51 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
   });
 
   // Prefetch avatar images
-  const avatarUrls = [...new Set(data.slice(0, 5).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
+  const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
   avatarUrls.forEach((url: string) => {
     Image.prefetch(url).catch(() => {});
+  });
+}
+
+// ============================================================================
+// LOGIN-SCREEN PREFETCH — warm caches before user enters the app
+// ============================================================================
+
+/**
+ * Prefetch the main community feed (first page).
+ * Called on the login screen so the home tab loads instantly.
+ */
+export function prefetchCommunityFeed(queryClient: QueryClient) {
+  queryClient.prefetchQuery({
+    queryKey: ['feed', 1],
+    queryFn: () => getFeed(1, 10),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+/**
+ * Prefetch a user's profile after successful login.
+ */
+export function prefetchProfile(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['profile', username],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/profile/${username}`);
+      const json = await response.json();
+      return json.success ? json.data : null;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+/**
+ * Prefetch a user's balance data after successful login.
+ */
+export function prefetchBalance(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['balance', username],
+    queryFn: () => getBalance(username),
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 

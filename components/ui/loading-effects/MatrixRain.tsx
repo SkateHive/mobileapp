@@ -33,14 +33,21 @@ interface MatrixRainProps {
   speed?: number; // Animation speed multiplier
   color?: string; // Override default color
   opacity?: number; // Override default opacity
+  containerWidth?: number;
+  containerHeight?: number;
 }
 
 export function MatrixRain({ 
   intensity = 1,
   speed = 1,
   color,
-  opacity: customOpacity
+  opacity: customOpacity,
+  containerWidth: propWidth,
+  containerHeight: propHeight
 }: MatrixRainProps = {}) {
+  const finalWidth = propWidth || width;
+  const finalHeight = propHeight || height;
+
   const rainDrops = useRef<RainDrop[]>([]);
   const [animationReady, setAnimationReady] = useState(false);
   const maxDrops = Math.floor(MAX_DROPS * intensity);
@@ -53,8 +60,9 @@ export function MatrixRain({
   // Initialize drops with full-screen distribution to simulate already-running animation
   if (rainDrops.current.length === 0) {
     // Ensure drops cover the entire width evenly
-    const columnPositions = Array(NUM_COLUMNS).fill(0)
-      .map((_, i) => i * (width / NUM_COLUMNS))
+    const numCols = Math.floor(finalWidth / (BASE_FONT_SIZE * COLUMN_SPACING));
+    const columnPositions = Array(numCols).fill(0)
+      .map((_, i) => i * (finalWidth / numCols))
       // Add some randomness to column positions for more natural look
       .map(pos => pos + (Math.random() * BASE_FONT_SIZE * 0.5));
     
@@ -65,7 +73,7 @@ export function MatrixRain({
       
       // Distribute drops randomly throughout the entire screen height
       // This simulates that the animation has already been running
-      const initialPosition = Math.random() * (height + fontSize * dropLength * 2) - fontSize * dropLength;
+      const initialPosition = Math.random() * (finalHeight + fontSize * dropLength * 2) - fontSize * dropLength;
       
       return {
         // Assign position from columns, then add randomness for repeated positions
@@ -107,7 +115,7 @@ export function MatrixRain({
         Animated.sequence([
           Animated.delay(drop.startDelay),
           Animated.timing(drop.y, {
-            toValue: height + drop.fontSize * drop.length,
+            toValue: finalHeight + drop.fontSize * drop.length,
             duration: cycleTime,
             useNativeDriver: true,
           }),

@@ -19,7 +19,7 @@ export function RewardsSpectatorInfo() {
     {
       icon: "journal-outline" as IconName,
       title: "Magazine Rewards",
-      text: "Participate in SkateHive's Magazine and earn extra incentives for your contributions.",
+      text: "Participate in Skatehive's Magazine and earn extra incentives for your contributions.",
     },
     {
       icon: "ribbon-outline" as IconName,
@@ -33,7 +33,7 @@ export function RewardsSpectatorInfo() {
       icon="megaphone-outline"
       iconColor="#34C759"
       title="Rewards"
-      description="Learn how you can earn rewards in the SkateHive community!"
+      description="Learn how you can earn rewards in the Skatehive community!"
       infoItems={rewardsInfoItems}
     />
   );

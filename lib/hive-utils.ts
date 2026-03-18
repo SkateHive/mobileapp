@@ -285,6 +285,32 @@ export async function getContentReplies({
 }
 
 /**
+ * Get discussions (posts) by filter and tag
+ */
+export async function getDiscussions(
+  type: 'created' | 'trending' | 'hot' | 'feed',
+  query: { 
+    tag?: string; 
+    limit?: number; 
+    start_author?: string; 
+    start_permlink?: string;
+  }
+): Promise<Discussion[]> {
+  const params: any = {
+    limit: query.limit || 10,
+    tag: query.tag || COMMUNITY_TAG,
+  };
+  
+  if (query.start_author && query.start_permlink) {
+    params.start_author = query.start_author;
+    params.start_permlink = query.start_permlink;
+  }
+
+  // get_discussions_by_feed requires account name in 'tag' field
+  return HiveClient.database.call(`get_discussions_by_${type}`, [params]);
+}
+
+/**
  * Get a single post/comment content by author and permlink
  */
 export async function getContent(author: string, permlink: string): Promise<Discussion | null> {
@@ -962,21 +988,43 @@ export async function getUserRelationshipList(
   username: string,
   type: 'blog' | 'ignore' | 'blacklist',
   startFollowing: string = '',
-  limit: number = 100
+  limit: number = 1000
 ): Promise<string[]> {
   try {
-    // Use the traditional follow_api for getting full lists
-    const result = await HiveClient.call('follow_api', 'get_following', [
-      username,
-      startFollowing,
-      type,
-      limit,
-    ]);
+    const allUsernames: string[] = [];
+    let lastUsername = startFollowing;
+    const pageSize = Math.min(limit, 1000); // Hive API caps at 1000
 
-    // Extract usernames from the result
-    return result.map((item: any) => item.following);
+    // Paginate through all results
+    while (true) {
+      // Use bridge API instead of deprecated follow_api
+      const result = await HiveClient.call('bridge', 'get_following', {
+        account: username,
+        start: lastUsername,
+        type: type,
+        limit: pageSize,
+      });
+
+      if (!result || result.length === 0) break;
+
+      const usernames: string[] = result.map((item: any) => item.following);
+
+      // If we provided a startFollowing (or this is a paginated fetch), 
+      // the first result is inclusive (skip it to avoid duplicates)
+      const newUsernames = lastUsername ? usernames.slice(1) : usernames;
+
+      if (newUsernames.length === 0) break;
+
+      allUsernames.push(...newUsernames);
+      lastUsername = usernames[usernames.length - 1];
+
+      // If we got fewer results than the page size, we've reached the end
+      if (result.length < pageSize) break;
+    }
+
+    return allUsernames;
   } catch (error) {
-    console.error('Error fetching user relationship list:', error);
+    console.error(`Error fetching user relationship list (${type}):`, error);
     return [];
   }
 }
