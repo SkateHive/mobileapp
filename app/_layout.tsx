@@ -84,67 +84,67 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppSettingsProvider>
-        <ScrollLockProvider>
-          <NavigationGuard>
-            <NotificationProvider>
-              <ToastProvider>
-                <ViewportTrackerProvider>
-                  <SafeAreaProvider>
-                    <ActivityWrapper>
-                      <View style={styles.container}>
-                        <Stack
-                          screenOptions={{
-                            headerShown: false,
-                            animation: 'none',
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                          initialRouteName="index"
-                        >
-                          <Stack.Screen 
-                            name="index" 
-                            options={{
-                              contentStyle: { backgroundColor: theme.colors.background },
-                            }}
-                          />
-                          <Stack.Screen 
-                            name="login"
-                            options={{
-                              contentStyle: { backgroundColor: theme.colors.background },
-                            }}
-                          />
-                          <Stack.Screen 
-                            name="about"
-                            options={{
-                              contentStyle: { backgroundColor: theme.colors.background },
-                            }}
-                          />
-                          <Stack.Screen 
-                            name="conversation"
-                            options={{
-                              contentStyle: { backgroundColor: theme.colors.background },
-                            }}
-                          />
-                          <Stack.Screen 
-                            name="(tabs)"
-                            options={{
+      <AppSettingsProvider>
+        <AuthProvider>
+          <ScrollLockProvider>
+            <NavigationGuard>
+              <NotificationProvider>
+                <ToastProvider>
+                  <ViewportTrackerProvider>
+                    <SafeAreaProvider>
+                      <ActivityWrapper>
+                        <View style={styles.container}>
+                          <Stack
+                            screenOptions={{
+                              headerShown: false,
                               animation: 'none',
                               contentStyle: { backgroundColor: theme.colors.background },
-                              gestureEnabled: false,
                             }}
-                          />
-                        </Stack>
-                      </View>
-                    </ActivityWrapper>
-                  </SafeAreaProvider>
-                </ViewportTrackerProvider>
-              </ToastProvider>
-            </NotificationProvider>
-          </NavigationGuard>
-        </ScrollLockProvider>
-        </AppSettingsProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+                            initialRouteName="index"
+                          >
+                            <Stack.Screen
+                              name="index"
+                              options={{
+                                contentStyle: { backgroundColor: theme.colors.background },
+                              }}
+                            />
+                            <Stack.Screen
+                              name="login"
+                              options={{
+                                contentStyle: { backgroundColor: theme.colors.background },
+                              }}
+                            />
+                            <Stack.Screen
+                              name="about"
+                              options={{
+                                contentStyle: { backgroundColor: theme.colors.background },
+                              }}
+                            />
+                            <Stack.Screen
+                              name="conversation"
+                              options={{
+                                contentStyle: { backgroundColor: theme.colors.background },
+                              }}
+                            />
+                            <Stack.Screen
+                              name="(tabs)"
+                              options={{
+                                animation: 'none',
+                                contentStyle: { backgroundColor: theme.colors.background },
+                                gestureEnabled: false,
+                              }}
+                            />
+                          </Stack>
+                        </View>
+                      </ActivityWrapper>
+                    </SafeAreaProvider>
+                  </ViewportTrackerProvider>
+                </ToastProvider>
+              </NotificationProvider>
+            </NavigationGuard>
+          </ScrollLockProvider>
+        </AuthProvider>
+      </AppSettingsProvider>
+    </QueryClientProvider >
   );
 }
