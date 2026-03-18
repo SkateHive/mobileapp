@@ -21,11 +21,6 @@ const styles = StyleSheet.create({
   },
 });
 
-// Keep splash screen visible while fonts are loading
-useEffect(() => {
-  SplashScreen.preventAutoHideAsync();
-}, []);
-
 // Initialize the query client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,9 +70,19 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
+    const init = async () => {
+      try {
+        await SplashScreen.preventAutoHideAsync();
+
+        if (fontsLoaded) {
+          await SplashScreen.hideAsync();
+        }
+      } catch (error) {
+        console.warn("Splash error:", error);
+      }
+    };
+
+    init();
   }, [fontsLoaded]);
 
   if (!fontsLoaded) {
