@@ -1026,20 +1026,32 @@ export async function getUserRelationshipList(
 
     // Paginate through all results
     while (true) {
-      // Use bridge API instead of deprecated follow_api
-      const result = await HiveClient.call('bridge', 'get_following', {
-        account: username,
-        start: lastUsername,
-        type: type,
-        limit: pageSize,
-      });
+      let result;
+      if (type === 'ignore') {
+        // bridge.get_following does not support 'ignore', so we use condenser_api
+        result = await HiveClient.call('condenser_api', 'get_following', [
+          username,
+          lastUsername,
+          'ignore',
+          pageSize
+        ]);
+      } else {
+        // Use bridge API for 'blog' (following) as it is the modern method
+        result = await HiveClient.call('bridge', 'get_following', {
+          account: username,
+          start: lastUsername,
+          type: type,
+          limit: pageSize,
+        });
+      }
 
       if (!result || result.length === 0) break;
 
-      const usernames: string[] = result.map((item: any) => item.following);
+      const usernames: string[] = result.map((item: any) => 
+        type === 'ignore' ? item.following : item.following
+      );
 
-      // If we provided a startFollowing (or this is a paginated fetch), 
-      // the first result is inclusive (skip it to avoid duplicates)
+      // If we provided a lastUsername, the first result is inclusive (skip it)
       const newUsernames = lastUsername ? usernames.slice(1) : usernames;
 
       if (newUsernames.length === 0) break;
