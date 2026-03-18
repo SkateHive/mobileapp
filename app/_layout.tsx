@@ -70,19 +70,27 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    const init = async () => {
+    const prepare = async () => {
       try {
         await SplashScreen.preventAutoHideAsync();
-
-        if (fontsLoaded) {
-          await SplashScreen.hideAsync();
-        }
       } catch (error) {
-        console.warn("Splash error:", error);
+        console.warn('Splash prevent error:', error);
       }
     };
+    prepare();
+  }, []);
 
-    init();
+  useEffect(() => {
+    const hide = async () => {
+      if (fontsLoaded) {
+        try {
+          await SplashScreen.hideAsync();
+        } catch (error) {
+          console.warn('Splash hide error:', error);
+        }
+      }
+    };
+    hide();
   }, [fontsLoaded]);
 
   if (!fontsLoaded) {
