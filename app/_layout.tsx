@@ -84,8 +84,8 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppSettingsProvider>
+      <AppSettingsProvider>
+        <AuthProvider>
         <ScrollLockProvider>
           <NavigationGuard>
             <NotificationProvider>
@@ -150,8 +150,8 @@ export default function RootLayout() {
             </NotificationProvider>
           </NavigationGuard>
         </ScrollLockProvider>
-        </AppSettingsProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </AppSettingsProvider>
     </QueryClientProvider>
   );
 }
