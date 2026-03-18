@@ -14,7 +14,7 @@ import * as Haptics from "expo-haptics";
 import { useAppSettings } from "~/lib/AppSettingsContext";
 import { Switch } from "react-native";
 
-export default function WalletScreen() {
+function WalletScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { username } = useAuth();
@@ -681,3 +681,5 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
   },
 });
+
+export default WalletScreen;
