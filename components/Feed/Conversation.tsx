@@ -49,7 +49,7 @@ export function Conversation({ discussion, onClose }: ConversationProps) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Main Post */}
         <View style={styles.mainPostContainer}>
-          <PostCard post={discussion} currentUsername={username} />
+          <PostCard post={discussion as any} currentUsername={username} />
         </View>
 
         {/* Divider */}

@@ -186,7 +186,7 @@ export function ConversationDrawer({
                   </View>
                 ) : post ? (
                   <PostCard 
-                    post={post} 
+                    post={post as any} 
                     currentUsername={username} 
                     isStatic
                   />
