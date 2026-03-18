@@ -22,7 +22,9 @@ const styles = StyleSheet.create({
 });
 
 // Keep splash screen visible while fonts are loading
-SplashScreen.preventAutoHideAsync();
+useEffect(() => {
+  SplashScreen.preventAutoHideAsync();
+}, []);
 
 // Initialize the query client
 const queryClient = new QueryClient({
@@ -98,39 +100,17 @@ export default function RootLayout() {
                             screenOptions={{
                               headerShown: false,
                               animation: 'none',
-                              contentStyle: { backgroundColor: theme.colors.background },
                             }}
                             initialRouteName="index"
                           >
-                            <Stack.Screen
-                              name="index"
-                              options={{
-                                contentStyle: { backgroundColor: theme.colors.background },
-                              }}
-                            />
-                            <Stack.Screen
-                              name="login"
-                              options={{
-                                contentStyle: { backgroundColor: theme.colors.background },
-                              }}
-                            />
-                            <Stack.Screen
-                              name="about"
-                              options={{
-                                contentStyle: { backgroundColor: theme.colors.background },
-                              }}
-                            />
-                            <Stack.Screen
-                              name="conversation"
-                              options={{
-                                contentStyle: { backgroundColor: theme.colors.background },
-                              }}
-                            />
+                            <Stack.Screen name="index" />
+                            <Stack.Screen name="login" />
+                            <Stack.Screen name="about" />
+                            <Stack.Screen name="conversation" />
                             <Stack.Screen
                               name="(tabs)"
                               options={{
                                 animation: 'none',
-                                contentStyle: { backgroundColor: theme.colors.background },
                                 gestureEnabled: false,
                               }}
                             />
