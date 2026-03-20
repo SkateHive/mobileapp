@@ -258,12 +258,12 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
   };
 
   const socialSlots = [
-    { title: "X", icon: "logo-twitter" as const, value: "Coming Soon", disabled: true },
+    // { title: "X", icon: "logo-twitter" as const, value: "Coming Soon", disabled: true },
     { title: "Farcaster", icon: "cube-outline" as const, value: "Coming Soon", disabled: true },
-    { title: "Lens", icon: "leaf-outline" as const, value: "Coming Soon", disabled: true },
-    { title: "Bluesky", icon: "cloud-outline" as const, value: "Coming Soon", disabled: true },
-    { title: "Google", icon: "logo-google" as const, value: "Coming Soon", disabled: true },
-    { title: "Telegram", icon: "paper-plane-outline" as const, value: "Coming Soon", disabled: true },
+    // { title: "Lens", icon: "leaf-outline" as const, value: "Coming Soon", disabled: true },
+    // { title: "Bluesky", icon: "cloud-outline" as const, value: "Coming Soon", disabled: true },
+    // { title: "Google", icon: "logo-google" as const, value: "Coming Soon", disabled: true },
+    // { title: "Telegram", icon: "paper-plane-outline" as const, value: "Coming Soon", disabled: true },
     { title: "Email", icon: "mail-outline" as const, value: "Coming Soon", disabled: true },
   ];
 
@@ -284,7 +284,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             {renderAvatar(50)}
             <View style={styles.accountInfo}>
               <Text style={styles.displayName}>{hiveAccount?.metadata?.profile?.name || username}</Text>
-              <Text style={styles.uid}>UID:{hiveAccount?.id || "---"}</Text>
+              {/* <Text style={styles.uid}>UID:{hiveAccount?.id || "---"}</Text> */}
             </View>
           </View>
           <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
@@ -343,7 +343,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             style={styles.accountDetailInfo}
           >
             <Text style={styles.accountsDisplayName}>{hiveAccount?.metadata?.profile?.name || username}</Text>
-            <Text style={styles.accountsUid}>UID:{hiveAccount?.id || "---"}</Text>
+            {/* <Text style={styles.accountsUid}>UID:{hiveAccount?.id || "---"}</Text> */}
           </Pressable>
         </View>
 
