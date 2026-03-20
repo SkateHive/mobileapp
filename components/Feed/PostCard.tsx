@@ -61,11 +61,12 @@ interface PostCardProps {
   post: Post;
   currentUsername: string | null;
   isStatic?: boolean;
+  isMinimized?: boolean;
   onOpenConversation?: (post: Post) => void;
 }
 
 
-export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenConversation }: PostCardProps) => {
+export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimized, onOpenConversation }: PostCardProps) => {
   const { isScrollLocked, setScrollLocked } = useScrollLock();
   const { session, followingList, updateUserRelationship } = useAuth();
   const { settings } = useAppSettings();
@@ -429,6 +430,55 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
   // Check if snap was optimistically deleted
   if (isDeleted) {
     return null;
+  }
+
+  if (isMinimized) {
+    const media = extractMediaFromBody(post.body);
+    const firstMedia = media.length > 0 ? media[0] : null;
+    const cleanBody = post.body.replace(/\[\[.*?\]\]/gi, '').trim();
+
+    return (
+      <View style={styles.minimizedContainer}>
+        <View style={styles.minimizedRow}>
+          <View style={styles.minimizedAvatarContainer}>
+            <Image
+              source={{ uri: post.soft_post_avatar || `https://images.hive.blog/u/${post.author}/avatar/small` }}
+              style={styles.minimizedAvatar}
+              alt={`${post.author}'s avatar`}
+            />
+          </View>
+          
+          <View style={styles.minimizedContent}>
+            <View style={styles.minimizedHeader}>
+              <Text style={styles.minimizedAuthor}>@{post.author}</Text>
+              <Text style={styles.minimizedDate}>{formattedDate}</Text>
+            </View>
+            
+            <View style={styles.minimizedBodyRow}>
+              <Text numberOfLines={2} style={styles.minimizedText}>
+                {cleanBody || "Media post"}
+              </Text>
+              
+              {firstMedia && (
+                <View style={styles.minimizedMediaPreview}>
+                  {firstMedia.type === 'image' ? (
+                    <Image 
+                      source={{ uri: firstMedia.url }} 
+                      style={styles.minimizedThumbnail} 
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={styles.minimizedVideoPlaceholder}>
+                      <Ionicons name="play-circle" size={20} color={theme.colors.gray} />
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -801,6 +851,74 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     lineHeight: 20,
     fontFamily: theme.fonts.default,
+  },
+  minimizedContainer: {
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  minimizedRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  minimizedAvatarContainer: {
+    paddingTop: 2,
+  },
+  minimizedAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  minimizedContent: {
+    flex: 1,
+  },
+  minimizedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  minimizedAuthor: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontFamily: theme.fonts.bold,
+  },
+  minimizedDate: {
+    fontSize: 12,
+    color: theme.colors.muted,
+  },
+  minimizedBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  minimizedText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.text,
+    fontFamily: theme.fonts.default,
+  },
+  minimizedMediaPreview: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.card,
+  },
+  minimizedThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  minimizedVideoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.card,
   },
   linkText: {
     fontSize: theme.fontSizes.md, // Force consistent font size

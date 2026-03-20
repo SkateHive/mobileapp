@@ -189,6 +189,7 @@ export function ConversationDrawer({
                     post={post as any} 
                     currentUsername={username} 
                     isStatic
+                    isMinimized
                   />
                 ) : null}
               </View>
@@ -315,9 +316,8 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   postContext: {
-    maxHeight: 200, // Limit height of the sticky post context
-    overflow: 'hidden',
     paddingHorizontal: 8,
+    paddingBottom: 4,
   },
   container: {
     flex: 1,
