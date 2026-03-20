@@ -32,9 +32,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.background,
     paddingHorizontal: 12,
+    paddingVertical: 0,
     fontSize: 16,
     color: theme.colors.text,
     fontFamily: theme.fonts.regular,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   disabled: {
     opacity: 0.5,

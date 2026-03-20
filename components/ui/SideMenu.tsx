@@ -155,8 +155,8 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             disabled={item.disabled}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name={item.icon} size={22} color={theme.colors.primary} />
-              <Text style={styles.menuItemText}>{item.title}</Text>
+              <Ionicons name={item.icon} size={22} color={item.color || theme.colors.primary} />
+              <Text style={[styles.menuItemText, item.color && { color: item.color }]}>{item.title}</Text>
             </View>
             <View style={styles.menuItemRight}>
               {item.value && <Text style={[styles.menuItemValue, item.valueColor && { color: item.valueColor }]}>{item.value}</Text>}
@@ -260,6 +260,13 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             }
           }
         }
+      },
+      {
+        title: "Log Out",
+        icon: "log-out-outline" as const,
+        onPress: handleLogout,
+        color: theme.colors.gray,
+        hideChevron: true,
       },
     ]
   };
