@@ -1,5 +1,5 @@
 import {
-  API_BASE_URL,
+  API_BASE_URL, API_SEARCH_URL,
 } from './constants';
 import {
   fetchFollowingFromAPI,
@@ -139,4 +139,44 @@ export async function getBlacklistedList(username: string): Promise<string[]> {
     () => Promise.resolve([]),
     'Blacklisted'
   );
+}
+
+// search fetcher
+export async function search(params: {
+  q: string;
+  type?: 'all' | 'users' | 'snaps';
+  time?: '1m' | '3m' | '1y' | 'all';
+  community?: string;
+  page?: number;
+  limit?: number;
+}): Promise<any> {
+  const { q, type = 'all', time = '1y', community = 'hive-173115', page = 1, limit = 20 } = params;
+  
+  const queryParams = new URLSearchParams({
+    q,
+    type,
+    time,
+    community,
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+
+  try {
+    const response = await fetch(`${API_SEARCH_URL}/search?${queryParams.toString()}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.warn('Search request timed out');
+      return { success: false, error: 'Search timed out' };
+    }
+    console.error('Error in search:', error);
+    return { success: false, error: 'Failed to perform search' };
+  }
 }

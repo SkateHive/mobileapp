@@ -238,7 +238,7 @@ function TabLayoutInner() {
 
   return (
     <View style={styles.container}>
-      {!isVideosTab && (
+      {!isVideosTab && currentTab !== 'search' && (
         <Animated.View style={{
           transform: [{ translateY: headerTranslateY }],
           opacity: headerOpacity,
