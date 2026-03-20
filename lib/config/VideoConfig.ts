@@ -40,11 +40,11 @@ export const VideoConfig: VideoSettings = Platform.select({
   android: {
     ...commonSettings,
     preferredRenderer: 'webview', // Fallback to WebView for Android to avoid reported crashes
-    enablePrefetch: false, // Disable prefetching on Android for stability
+    enablePrefetch: true, // Disable prefetching on Android for stability
   },
   default: {
     ...commonSettings,
     preferredRenderer: 'webview',
-    enablePrefetch: false,
+    enablePrefetch: true,
   },
 })!;
