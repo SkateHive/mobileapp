@@ -6,7 +6,13 @@ import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInp
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
-import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
+import {
+  vote as hiveVote,
+  submitEncryptedReport,
+  hardDeleteSnap,
+  softDeleteSnap
+} from '~/lib/hive-utils';
+import { Alert } from 'react-native';
 import { useAuth } from '~/lib/auth-provider';
 import { useScrollLock } from '~/lib/ScrollLockContext';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
@@ -78,6 +84,8 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
   const [selectedReportReason, setSelectedReportReason] = useState('');
   const [reportAdditionalInfo, setReportAdditionalInfo] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Register/unregister with viewport tracker
   useEffect(() => {
@@ -299,21 +307,73 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
           break;
         case 'mute':
           relationship = 'ignore';
-          successMessage = `Muted ${post.author}`;
+          successMessage = `Muted and blocked ${post.author}`;
           break;
       }
 
       const success = await updateUserRelationship(post.author, relationship);
       if (success) {
         showToast(successMessage, 'success');
-      } else {
-        showToast('Failed to update relationship', 'error');
+        setShowUserMenu(false);
       }
     } catch (error) {
-      showToast('Failed to update relationship', 'error');
-    } finally {
-      setShowUserMenu(false);
+      showToast('Action failed', 'error');
     }
+  };
+
+  const handleDeleteSnap = async () => {
+    if (!session || !session.decryptedKey || session.username !== post.author) {
+      showToast('Authentication error', 'error');
+      return;
+    }
+
+    const hasActivity = (post.children || 0) > 0 || (post.active_votes || []).length > 0;
+
+    Alert.alert(
+      "Delete",
+      hasActivity
+        //? "This snap has votes or replies. It will be 'cleared' (soft-deleted) but will remain on the blockchain history. Continue?"
+        ? "Are you sure you want to delete this?"
+        //: "This snap will be 'permanently' deleted. Continue?"
+        : "Are you sure you want to delete this?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              setShowUserMenu(false);
+
+              const result = hasActivity
+                ? await softDeleteSnap(
+                  session.decryptedKey!,
+                  post.author,
+                  post.permlink,
+                  post.parent_author,
+                  post.parent_permlink,
+                  post.title,
+                  post.json_metadata
+                )
+                : await hardDeleteSnap(session.decryptedKey!, post.author, post.permlink);
+
+              if (result && !result.error) {
+                showToast('Snap deleted successfully!', 'success');
+                setIsDeleted(true); // Optimistic UI update
+              } else {
+                throw new Error(result?.message || 'Deletion failed');
+              }
+            } catch (error: any) {
+              console.error('Error deleting snap:', error);
+              showToast(error.message || 'Failed to delete snap', 'error');
+            } finally {
+              setIsDeleting(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleReportPost = () => {
@@ -364,6 +424,11 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
   };
 
   // Create dynamic styles based on theme with Fira Code font
+
+  // Check if snap was optimistically deleted
+  if (isDeleted) {
+    return null;
+  }
 
   return (
     <>
@@ -427,9 +492,9 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
             {/* Content and Media handled by UniversalRenderer */}
             {postContent !== '' && (
               <View style={styles.contentContainer}>
-                <EnhancedMarkdownRenderer 
-                  content={postContent} 
-                  isVisible={isVisible} 
+                <EnhancedMarkdownRenderer
+                  content={postContent}
+                  isVisible={isVisible}
                   isPrefetch={isPrefetch}
                   onPress={handleBodyPress}
                 />
@@ -589,6 +654,20 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
             >
               <Text style={styles.userMenuButtonText}>Report Post</Text>
             </Pressable>
+
+            {currentUsername === post.author && (
+              <Pressable
+                style={[styles.userMenuButton, isDeleting && styles.disabledButton]}
+                onPress={handleDeleteSnap}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color={theme.colors.error} />
+                ) : (
+                  <Text style={[styles.userMenuButtonText, { color: theme.colors.error }]}>Delete Snap</Text>
+                )}
+              </Pressable>
+            )}
           </View>
         </Pressable>
       </Modal>

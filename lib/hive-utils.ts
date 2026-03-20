@@ -326,12 +326,122 @@ export async function getContent(author: string, permlink: string): Promise<Disc
   }
 }
 
+/**
+ * Verifies if a list of posts are deleted on the blockchain.
+ * This is used as a fallback to catch deletions that HAFSQL might have missed.
+ * Returns only the posts that are NOT deleted.
+ */
+export async function filterDeletedPosts(posts: any[]): Promise<any[]> {
+  if (!posts || posts.length === 0) return [];
+
+  console.log(`[Hive Utils] Checking deletion status for ${posts.length} posts...`);
+
+  try {
+    const verifiedPosts = await Promise.all(
+      posts.map(async (post) => {
+        try {
+          // Fetch current state directly from a Hive node
+          const content = await getContent(post.author, post.permlink);
+          
+          // If content not found or author is empty, it's likely hard deleted
+          if (!content || !content.author || content.author === "") {
+            return null;
+          }
+          
+          // Check for "soft delete" where body is set to "deleted"
+          // This is the pattern used in skatehive3.0
+          if (content.body === "deleted") {
+            return null;
+          }
+          
+          // Check json_metadata for a deleted flag
+          let metadata: any = {};
+          try {
+            metadata = typeof content.json_metadata === 'string' 
+              ? JSON.parse(content.json_metadata) 
+              : content.json_metadata;
+          } catch (e) {}
+          
+          if (metadata?.deleted === true || metadata?.deleted === 1) {
+            return null;
+          }
+
+          // Return the original post object but with updated body if it's the official source
+          return {
+            ...post,
+            body: content.body,
+            json_metadata: content.json_metadata,
+            active_votes: content.active_votes || post.active_votes
+          };
+        } catch (e) {
+          // If single fetch fails, keep the original as fallback
+          return post;
+        }
+      })
+    );
+
+    const result = verifiedPosts.filter((p): p is any => p !== null);
+    console.log(`[Hive Utils] Filtered out ${posts.length - result.length} deleted posts.`);
+    return result;
+  } catch (error) {
+    console.error("Error in filterDeletedPosts:", error);
+    return posts; // Return original if everything fails
+  }
+}
+
 // Define custom error classes for better error handling
 export class HiveError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'HiveError';
   }
+}
+
+/**
+ * Hard delete a post/comment using the delete_comment operation.
+ * Only works if there are no replies and no votes.
+ */
+export async function hardDeleteSnap(
+  privateKey: string,
+  author: string,
+  permlink: string
+): Promise<any> {
+  const operation: any = [
+    'delete_comment',
+    {
+      author,
+      permlink,
+    },
+  ];
+  return sendOperation(privateKey, [operation]);
+}
+
+/**
+ * Soft delete a post/comment by updating its body to "deleted".
+ * Works even if there are replies or votes.
+ */
+export async function softDeleteSnap(
+  privateKey: string,
+  author: string,
+  permlink: string,
+  parentAuthor: string = '',
+  parentPermlink: string = '',
+  title: string = '',
+  jsonMetadata: any = {}
+): Promise<any> {
+  const operation: any = [
+    'comment',
+    {
+      parent_author: parentAuthor,
+      parent_permlink: parentPermlink,
+      author: author,
+      permlink: permlink,
+      title: title,
+      body: 'deleted',
+      json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata),
+    },
+  ];
+  return sendOperation(privateKey, [operation]);
 }
 
 export class InvalidKeyFormatError extends HiveError {

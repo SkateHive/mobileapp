@@ -27,11 +27,14 @@ const { width } = Dimensions.get('window');
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useToast } from "~/lib/toast-provider";
+import { API_BASE_URL } from '~/lib/constants';
 import { useUserComments } from '~/lib/hooks/useUserComments';
+import { SnapConfig } from '~/lib/config/SnapConfig';
+import { filterDeletedPosts } from '~/lib/hive-utils';
 import { useScrollLock } from '~/lib/ScrollLockContext';
 import { ConversationDrawer } from '~/components/Feed/ConversationDrawer';
 import type { Discussion } from '@hiveio/dhive';
-import { extractMediaFromBody } from "~/lib/utils";
+import { extractMediaFromBody } from '~/lib/utils';
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
 
@@ -232,13 +235,109 @@ export default function ProfileScreen() {
   };
 
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
-  const {
-    posts: userPosts,
-    isLoading: isLoadingPosts,
-    loadNextPage,
-    hasMore,
-    refresh: refreshPosts,
-  } = useUserComments(profileUsername, blockedList);
+
+  // --- Fetching Logic (API vs RPC) ---
+  
+  // 1. RPC Fallback (original hook)
+  // We only pass the username if the API is disabled to save resources
+  const { 
+    posts: rpcPosts, 
+    isLoading: isRpcLoading, 
+    loadNextPage: loadNextPageRpc, 
+    hasMore: rpcHasMore, 
+    refresh: refreshRpc 
+  } = useUserComments(SnapConfig.useApi ? null : profileUsername, blockedList);
+
+  // 2. API Logic (New migration)
+  const [apiPosts, setApiPosts] = useState<any[]>([]);
+  const [isApiLoading, setIsApiLoading] = useState(false);
+  const [apiHasMore, setApiHasMore] = useState(true);
+  const [apiPage, setApiPage] = useState(1);
+  const API_LIMIT = 20;
+
+  // Use refs to avoid dependency loops in useCallback
+  const isFetchingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+
+  const fetchUserSnaps = useCallback(async (page: number, refresh: boolean = false) => {
+    // Avoid redundant fetches using refs for stability
+    if (isFetchingRef.current || (!refresh && !hasMoreRef.current)) {
+      return;
+    }
+
+    try {
+      isFetchingRef.current = true;
+      setIsApiLoading(true);
+      console.log(`[Profile Snaps] Fetching page ${page} for @${profileUsername} (refresh: ${refresh})`);
+      
+      const url = `${API_BASE_URL}/skatesnaps/${profileUsername}?page=${page}&limit=${API_LIMIT}`;
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(`[Profile Snaps] Successfully fetched ${result.data.length} snaps for @${profileUsername}`);
+        // Map fields for compatibility with PostCard and other components
+        const mappedPosts = result.data.map((p: any) => ({
+          ...p,
+          // API fields mapped to Hive/PostCard expectations
+          json_metadata: p.post_json_metadata || p.json_metadata,
+          active_votes: p.votes || [],
+        }));
+
+        // Filter by blockedList (if profile user is blocked, show no snaps)
+        const isProfileBlocked = blockedList?.some(u => u.toLowerCase() === profileUsername.toLowerCase());
+        const finalPosts = isProfileBlocked ? [] : mappedPosts;
+
+        // Apply secondary deletion check from blockchain if enabled
+        let verifiedPosts = finalPosts;
+        if (SnapConfig.verifyDeletion && finalPosts.length > 0) {
+          verifiedPosts = await filterDeletedPosts(finalPosts);
+        }
+
+        setApiPosts(prev => refresh ? verifiedPosts : [...prev, ...verifiedPosts]);
+        setApiHasMore(result.pagination.hasNextPage);
+        hasMoreRef.current = result.pagination.hasNextPage;
+        setApiPage(page);
+      }
+    } catch (error) {
+      console.error("Error fetching user snaps from API:", error);
+    } finally {
+      setIsApiLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, [profileUsername, blockedList]);
+
+  // Handle pagination and refresh for API
+  const loadNextPageApi = useCallback(() => {
+    if (apiHasMore && !isApiLoading) {
+      fetchUserSnaps(apiPage + 1);
+    }
+  }, [apiHasMore, isApiLoading, apiPage, fetchUserSnaps]);
+
+  const refreshPostsApi = useCallback(async () => {
+    await fetchUserSnaps(1, true);
+  }, [fetchUserSnaps]);
+
+  // Initial load or username change (for API only)
+  useEffect(() => {
+    if (!SnapConfig.useApi) return;
+    
+    console.log(`[Profile Snaps] Resetting and initial load for @${profileUsername}`);
+    setApiPosts([]);
+    setApiPage(1);
+    setIsApiLoading(false);
+    setApiHasMore(true);
+    isFetchingRef.current = false;
+    hasMoreRef.current = true;
+    fetchUserSnaps(1, true);
+  }, [profileUsername, fetchUserSnaps]);
+
+  // Unified compatibility aliases for the rest of the file
+  const userPosts = SnapConfig.useApi ? apiPosts : rpcPosts;
+  const isLoadingPosts = SnapConfig.useApi ? (isApiLoading && apiPosts.length === 0) : isRpcLoading;
+  const hasMore = SnapConfig.useApi ? apiHasMore : rpcHasMore;
+  const loadNextPage = SnapConfig.useApi ? loadNextPageApi : loadNextPageRpc;
+  const refreshPosts = SnapConfig.useApi ? refreshPostsApi : refreshRpc;
 
   // Get thumbnail for a post — checks multiple sources
   const getPostThumbnail = useCallback((post: any): string | null => {
