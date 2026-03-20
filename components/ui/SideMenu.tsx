@@ -180,7 +180,14 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       { title: "Push Notifications", icon: "notifications-outline" as const, onPress: () => { } },
     ],
     appearance: [
-      { title: "Theme", icon: "color-palette-outline" as const, value: "Skatehive", hideChevron: true, onPress: () => { } },
+      {
+        title: "Theme",
+        icon: "color-palette-outline" as const,
+        value: settings.loginBackground === 'video' ? 'Skatehive' : 'Matrix',
+        onPress: () => {
+          updateSettings({ loginBackground: settings.loginBackground === 'video' ? 'matrix' : 'video' });
+        }
+      },
       { title: "Language", icon: "language-outline" as const, value: "English", hideChevron: true, onPress: () => { } },
       {
         title: "Voter",

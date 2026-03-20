@@ -28,7 +28,6 @@ import {
 } from "~/lib/hive-utils";
 import { prefetchVideoFeed, warmUpVideoAssets, prefetchCommunityFeed, prefetchProfile, prefetchBalance } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
-import { LOGIN_BACKGROUND_TYPE } from "~/lib/constants";
 import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
 import { Text } from "~/components/ui/text";
 
@@ -110,7 +109,8 @@ const BackgroundVideo = () => {
 };
 
 const LoginBackground = () => {
-  const isMatrix = LOGIN_BACKGROUND_TYPE === "matrix";
+  const { settings } = useAppSettings();
+  const isMatrix = settings.loginBackground === "matrix";
   const glitchX = React.useRef(new Animated.Value(0)).current;
   const revealAnim = React.useRef(new Animated.Value(0)).current;
 

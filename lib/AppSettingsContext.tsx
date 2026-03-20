@@ -11,6 +11,7 @@ export interface AppSettings {
   sessionDuration: number; // minutes: 0 (Auto), 5, 60, 480, 1440
   initialScreen: 'videos' | 'feed';
   isColorsUnlocked: boolean;
+  loginBackground: 'video' | 'matrix';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   isColorsUnlocked: false,
   sessionDuration: 1440,
   initialScreen: 'videos',
+  loginBackground: 'video',
 };
 
 interface AppSettingsContextType {
