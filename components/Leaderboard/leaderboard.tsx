@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { Text } from "~/components/ui/text";
 import { Ionicons } from "@expo/vector-icons";
 import { Crown } from "lucide-react-native";
@@ -150,6 +151,15 @@ const LeaderboardItem = ({
   isTop?: boolean;
   isCurrentUser?: boolean;
 }) => {
+  const router = useRouter();
+
+  const handlePress = () => {
+    router.push({
+      pathname: "/(tabs)/profile",
+      params: { username: skater.hive_author },
+    });
+  };
+
   const itemStyle = [
     styles.itemContainer,
     isTop && styles.topItemContainer,
@@ -172,7 +182,7 @@ const LeaderboardItem = ({
   ];
 
   return (
-    <View style={itemStyle}>
+    <Pressable style={itemStyle} onPress={handlePress}>
       <Text style={positionStyle}>
         #{skater.position}
       </Text>
@@ -198,7 +208,7 @@ const LeaderboardItem = ({
       <Text style={pointsStyle}>
         {skater.points.toFixed(0)}
       </Text>
-    </View>
+    </Pressable>
   );
 };
 
