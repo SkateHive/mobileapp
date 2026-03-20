@@ -1,11 +1,13 @@
 import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState, useRef } from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet, StyleProp, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 interface VideoPlayerProps {
   url: string;
   playing?: boolean;
+  shouldPreload?: boolean;
+  style?: StyleProp<ViewStyle>;
   contentFit?: "contain" | "cover" | "fill";
   showControls?: boolean;
   showMuteButton?: boolean;
@@ -20,6 +22,8 @@ export const VideoPlayer = React.memo(
   ({
     url,
     playing = true,
+    shouldPreload = false,
+    style,
     contentFit = "contain",
     showControls = true,
     showMuteButton,
@@ -112,7 +116,7 @@ export const VideoPlayer = React.memo(
     };
 
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, style]}>
         <VideoView
           style={styles.video}
           contentFit={contentFit}

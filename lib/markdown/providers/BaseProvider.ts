@@ -21,5 +21,5 @@ export interface MediaProvider {
   /**
    * The React component responsible for rendering this media.
    */
-  Component: React.FC<{ id: string; isVisible?: boolean }>;
+  Component: React.FC<{ id: string; isVisible?: boolean; isPrefetch?: boolean }>;
 }

@@ -31,6 +31,7 @@ import { useNotificationContext } from "~/lib/notifications-context";
 import { useScrollLock } from "~/lib/ScrollLockContext";
 import { ConversationDrawer } from "./ConversationDrawer";
 import { useScrollToTop } from "@react-navigation/native";
+import { VideoConfig } from "~/lib/config/VideoConfig";
 import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
@@ -47,7 +48,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const { username, blockedList } = useAuth();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps(filter, username);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const { updateVisibleItems } = useViewportTracker();
+  const { updateVisibleItems, updatePrefetchItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
   const [showScrollTop, setShowScrollTop] = React.useState(false);
   const scrollY = React.useRef(new Animated.Value(0)).current;
@@ -141,26 +142,6 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     setIsRefreshing(false);
   }, [refresh, onRefresh]);
 
-  // Handle viewable items change for video autoplay
-  const onViewableItemsChanged = React.useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const visiblePermlinks = viewableItems
-        .filter((item) => item.isViewable && item.item)
-        .map((item) => (item.item as Discussion).permlink);
-      updateVisibleItems(visiblePermlinks);
-    },
-    [updateVisibleItems]
-  );
-
-  // Viewability config - item is considered viewable when 60% is visible
-  const viewabilityConfig = React.useMemo(
-    () => ({
-      viewAreaCoveragePercentThreshold: 60,
-      minimumViewTime: 100,
-    }),
-    []
-  );
-
   // Map blockchain comments (Discussion) to Post for PostCard compatibility
   // Filter out posts from blocked users
   const filteredFeedData = React.useMemo(() => {
@@ -178,6 +159,43 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       return !blockedLowerList.includes(authorLower);
     });
   }, [comments, blockedList, username]);
+
+  // Handle viewable items change for video autoplay and prefetching
+  const onViewableItemsChanged = React.useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const visiblePermlinks = viewableItems
+        .filter((item) => item.isViewable && item.item)
+        .map((item) => (item.item as Discussion).permlink);
+      
+      updateVisibleItems(visiblePermlinks);
+
+      // Prefetching logic: find the items after the last visible one
+      if (viewableItems.length > 0) {
+        const lastVisibleIndex = viewableItems[viewableItems.length - 1].index ?? 0;
+        const prefetchDistance = VideoConfig.prefetchDistance;
+        const prefetchPermlinks: string[] = [];
+
+        for (let i = 1; i <= prefetchDistance; i++) {
+          const nextItem = filteredFeedData[lastVisibleIndex + i];
+          if (nextItem) {
+            prefetchPermlinks.push(nextItem.permlink);
+          }
+        }
+        
+        updatePrefetchItems(prefetchPermlinks);
+      }
+    },
+    [updateVisibleItems, updatePrefetchItems, filteredFeedData]
+  );
+
+  // Viewability config - item is considered viewable when 60% is visible
+  const viewabilityConfig = React.useMemo(
+    () => ({
+      viewAreaCoveragePercentThreshold: 60,
+      minimumViewTime: 100,
+    }),
+    []
+  );
 
   const renderItem = React.useCallback(
     ({ item }: { item: Post }) => (

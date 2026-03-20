@@ -10,10 +10,11 @@ import { ImageCarousel } from './embeds/ImageCarousel';
 interface UniversalRendererProps {
   content: string;
   isVisible?: boolean;
+  isPrefetch?: boolean;
   onPress?: () => void;
 }
 
-export const UniversalRenderer = ({ content, isVisible, onPress }: UniversalRendererProps) => {
+export const UniversalRenderer = ({ content, isVisible, isPrefetch, onPress }: UniversalRendererProps) => {
   const processed = useMemo(() => MarkdownProcessor.process(content), [content]);
 
   // Split by internal token placeholders [[TYPE:ID]]
@@ -170,7 +171,7 @@ export const UniversalRenderer = ({ content, isVisible, onPress }: UniversalRend
     <View style={styles.container}>
       {renderItems.map((item) => {
         if (item.type === 'token') {
-          return <EmbedFactory key={item.key} token={item.content as string} isVisible={isVisible} />;
+          return <EmbedFactory key={item.key} token={item.content as string} isVisible={isVisible} isPrefetch={isPrefetch} />;
         }
         if (item.type === 'carousel') {
           return <ImageCarousel key={item.key} urls={item.content as string[]} />;

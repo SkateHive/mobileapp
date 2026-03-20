@@ -65,7 +65,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
-  const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
+  const { isItemVisible, isItemPrefetch, registerItem, unregisterItem } = useViewportTracker();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [isVoting, setIsVoting] = useState(false);
@@ -85,8 +85,9 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
     return () => unregisterItem(post.permlink);
   }, [post.permlink, registerItem, unregisterItem]);
 
-  // Check if this post is currently visible
+  // Check if this post is currently visible or in prefetch range
   const isVisible = isItemVisible(post.permlink);
+  const isPrefetch = isItemPrefetch(post.permlink);
 
   // Memoize expensive calculations
   const initialVoteCount = useMemo(() =>
@@ -429,6 +430,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
                 <EnhancedMarkdownRenderer 
                   content={postContent} 
                   isVisible={isVisible} 
+                  isPrefetch={isPrefetch}
                   onPress={handleBodyPress}
                 />
               </View>

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ActivityIndicator, Pressable, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { theme } from '~/lib/theme';
+import { VideoConfig } from '~/lib/config/VideoConfig';
 
 interface BaseVideoEmbedProps {
   url: string;
@@ -65,7 +66,7 @@ export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 0.75, // 3:4 ratio - perfect for vertical snaps without being too tall for horizontal videos
+    aspectRatio: VideoConfig.aspectRatio,
     backgroundColor: '#000',
     marginTop: 0,
     marginBottom: theme.spacing.sm,

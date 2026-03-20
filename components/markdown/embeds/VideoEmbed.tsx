@@ -10,9 +10,10 @@ interface VideoEmbedProps {
   type: VideoType;
   id: string;
   isVisible?: boolean;
+  isPrefetch?: boolean;
 }
 
-export const VideoEmbed = ({ type, id, isVisible }: VideoEmbedProps) => {
+export const VideoEmbed = ({ type, id, isVisible, isPrefetch }: VideoEmbedProps) => {
   const getEmbedUrl = () => {
     switch (type) {
       case 'YOUTUBE':

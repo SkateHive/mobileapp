@@ -1,6 +1,8 @@
 import React from 'react';
 import { MediaProvider } from './BaseProvider';
 import { BaseVideoEmbed } from '~/components/markdown/embeds/BaseVideoEmbed';
+import { VideoPlayer } from '~/components/Feed/VideoPlayer';
+import { VideoConfig } from '~/lib/config/VideoConfig';
 
 export const IPFSProvider: MediaProvider = {
   name: 'IPFSVIDEO',
@@ -11,13 +13,28 @@ export const IPFSProvider: MediaProvider = {
   resolve: (match: string) => {
     const divMatch = match.match(/data-ipfs-hash="([^"]+)"/i);
     if (divMatch) return divMatch[1];
-    const iframeMatch = match.match(/src=["']https?:\/\/ipfs\.skatehive\.app\/ipfs\/([\w-]+)[^"']*["']/i);
+    const iframeMatch = match.match(/src=["']https?:\/\/ipfs\.skatehive.app\/ipfs\/([\w-]+)[^"']*["']/i);
     if (iframeMatch) return iframeMatch[1];
     return match;
   },
-  Component: ({ id, isVisible }) => {
+  Component: ({ id, isVisible, isPrefetch }: { id: string, isVisible?: boolean, isPrefetch?: boolean }) => {
     const ipfsUrl = id.includes('https') ? id : `https://ipfs.skatehive.app/ipfs/${id}`;
-    const finalUrl = ipfsUrl.includes('?') ? `${ipfsUrl}&autoplay=0&muted=1` : `${ipfsUrl}?autoplay=0&muted=1`;
-    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} />;
+    
+    if (VideoConfig.preferredRenderer === 'native') {
+      return (
+        <VideoPlayer 
+          url={ipfsUrl} 
+          playing={isVisible} 
+          shouldPreload={isPrefetch || isVisible}
+          loop={true}
+          style={{
+            width: '100%',
+            aspectRatio: VideoConfig.aspectRatio,
+          }}
+        />
+      );
+    }
+
+    return <BaseVideoEmbed url={ipfsUrl} isVisible={isVisible} />;
   }
 };

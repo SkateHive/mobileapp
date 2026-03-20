@@ -9,9 +9,10 @@ import { Registry } from '~/lib/markdown/providers';
 interface EmbedFactoryProps {
   token: string;
   isVisible?: boolean;
+  isPrefetch?: boolean;
 }
 
-export const EmbedFactory = ({ token, isVisible }: EmbedFactoryProps) => {
+export const EmbedFactory = ({ token, isVisible, isPrefetch }: EmbedFactoryProps) => {
   // Token format: [[TYPE:ID]] - allow some whitespace and case-insensitive
   // Aliasing IAMGE to IMAGE to handle common typos
   const match = token.match(/^\s*\[\[(YOUTUBE|VIMEO|ODYSEE|THREESPEAK|IPFSVIDEO|INSTAGRAM|ZORACOIN|SNAPSHOT|IMAGE|IAMGE):([^\]]+)\]\]\s*$/i);
@@ -26,7 +27,7 @@ export const EmbedFactory = ({ token, isVisible }: EmbedFactoryProps) => {
   // A. Check for Modular Provider first
   const provider = Registry.getProvider(type);
   if (provider) {
-    return <provider.Component id={id} isVisible={isVisible} />;
+    return <provider.Component id={id} isVisible={isVisible} isPrefetch={isPrefetch} />;
   }
 
   // B. Fallback to Legacy Switch
@@ -36,7 +37,7 @@ export const EmbedFactory = ({ token, isVisible }: EmbedFactoryProps) => {
     case 'ODYSEE':
     case 'THREESPEAK':
     case 'IPFSVIDEO':
-      return <VideoEmbed type={type as VideoType} id={id} isVisible={isVisible} />;
+      return <VideoEmbed type={type as VideoType} id={id} isVisible={isVisible} isPrefetch={isPrefetch} />;
     case 'INSTAGRAM':
       return <InstagramEmbed url={id} />;
     case 'ZORACOIN':
