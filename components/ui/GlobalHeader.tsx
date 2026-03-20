@@ -97,10 +97,14 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   centerContent: {
-    flex: 1,
-    height: 48,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: -1, // Ensure it doesn't block icons
   },
   rightActions: {
     flexDirection: "row",

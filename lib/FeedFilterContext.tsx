@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 
-export type FeedFilterType = 'Recent' | 'Following' | 'Curated' | 'Trending';
+export type FeedFilterType = 'Skatehive' | 'Recent' | 'Following' | 'Curated' | 'Trending';
 
 interface FeedFilterContextType {
   filter: FeedFilterType;

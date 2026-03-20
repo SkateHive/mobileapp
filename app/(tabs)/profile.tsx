@@ -103,16 +103,16 @@ function countryToFlag(location: string): string {
     IN: '🇮🇳', INDIA: '🇮🇳',
     PH: '🇵🇭', PHILIPPINES: '🇵🇭',
   };
-  
+
   // Try exact match first
   if (map[loc]) return map[loc];
-  
+
   // Try finding a known country/code as a full word in the string
   for (const [key, flag] of Object.entries(map)) {
     const regex = new RegExp(`\\b${key}\\b`, 'i');
     if (regex.test(loc)) return flag;
   }
-  
+
   return '🌎';
 }
 
@@ -122,7 +122,7 @@ export default function ProfileScreen() {
   const params = useLocalSearchParams();
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [editProfileVisible, setEditProfileVisible] = useState(false);
-  const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
+  // const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
   const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
@@ -138,7 +138,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     setFollowersModalVisible(false);
     setEditProfileVisible(false);
-    setSettingsMenuVisible(false);
+    // setSettingsMenuVisible(false);
     setProfileTab('grid');
     setIsFollowLoading(false);
   }, [profileUsername]);
@@ -156,17 +156,17 @@ export default function ProfileScreen() {
     if (followingList && profileUsername) {
       const profileLower = profileUsername.toLowerCase();
       const following = followingList.some((u: string) => u.toLowerCase() === profileLower);
-      
+
       console.log(`[Profile Sync] Checking if @${profileLower} is in followingList: ${following}`);
       console.log(` - Current followingList size: ${followingList.length}`);
-      
+
       if (!following && followingList.length < 10) {
         console.log(" - followingList (first 10):", followingList.slice(0, 10));
       }
-      
+
       setIsFollowing(following);
     }
-    
+
     if (blockedList && profileUsername) {
       const profileLower = profileUsername.toLowerCase();
       const blocked = blockedList.some((u: string) => u.toLowerCase() === profileLower);
@@ -176,7 +176,7 @@ export default function ProfileScreen() {
 
   const handleFollow = async () => {
     if (!profileUsername || profileUsername === "SPECTATOR") return;
-    
+
     if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
       showToast('Please login first', 'error');
       return;
@@ -186,7 +186,7 @@ export default function ProfileScreen() {
       setIsFollowLoading(true);
       const isCurrentlyFollowing = followingList.some((u: string) => u.toLowerCase() === profileUsername.toLowerCase());
       const action = isCurrentlyFollowing ? '' : 'blog'; // '' unsets relationship (unfollow)
-      
+
       const success = await updateUserRelationship(profileUsername, action);
       if (success) {
         showToast(isCurrentlyFollowing ? `Unfollowed @${profileUsername}` : `Following @${profileUsername}`, 'success');
@@ -202,7 +202,7 @@ export default function ProfileScreen() {
 
   const handleBlock = async () => {
     if (!profileUsername || profileUsername === "SPECTATOR") return;
-    
+
     if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
       showToast('Please login first', 'error');
       return;
@@ -211,13 +211,13 @@ export default function ProfileScreen() {
     try {
       setIsBlockLoading(true);
       const action = isBlocked ? '' : 'ignore'; // Default to ignore for blocking
-      
+
       const success = await updateUserRelationship(profileUsername, action);
       if (success) {
         showToast(isBlocked ? `Unblocked @${profileUsername}` : `Blocked @${profileUsername}`, 'success');
         // If we just blocked them, we should also unfollow if we following
         if (action === 'ignore' && isFollowing) {
-           setIsFollowing(false);
+          setIsFollowing(false);
         }
       } else {
         showToast(`Failed to ${isBlocked ? 'unblock' : 'block'} user`, 'error');
@@ -245,7 +245,7 @@ export default function ProfileScreen() {
       metadata = typeof post.json_metadata === 'string'
         ? JSON.parse(post.json_metadata)
         : (post.json_metadata || {});
-    } catch {}
+    } catch { }
 
     // 1. Try json_metadata.image (most reliable, set by posting apps)
     if (metadata?.image) {
@@ -289,7 +289,7 @@ export default function ProfileScreen() {
         ? JSON.parse(post.json_metadata)
         : post.json_metadata;
       if (metadata?.image?.length > 0) return true;
-    } catch {}
+    } catch { }
 
     // Check body for media
     const media = extractMediaFromBody(post.body);
@@ -445,18 +445,18 @@ export default function ProfileScreen() {
   let hivepower = 0; // Default hive power
   let vp = 100; // Default voting power
   let rc = 100; // Default RC
-  
+
   if (profileUsername !== "SPECTATOR" && hiveAccount) {
     // Use reputation from profile data if available, otherwise calculate it
-    reputation = hiveAccount.profile?.reputation || 
-      (hiveAccount.reputation ? 
+    reputation = hiveAccount.profile?.reputation ||
+      (hiveAccount.reputation ?
         Math.log10(Math.abs(Number(hiveAccount.reputation))) * 9 + 25 : 25);
-    
+
     const vestingShares = parseFloat(typeof hiveAccount.vesting_shares === 'string' ? hiveAccount.vesting_shares.split(' ')[0] : hiveAccount.vesting_shares.amount.toString());
     const receivedVestingShares = parseFloat(typeof hiveAccount.received_vesting_shares === 'string' ? hiveAccount.received_vesting_shares.split(' ')[0] : hiveAccount.received_vesting_shares.amount.toString());
     const delegatedVestingShares = parseFloat(typeof hiveAccount.delegated_vesting_shares === 'string' ? hiveAccount.delegated_vesting_shares.split(' ')[0] : hiveAccount.delegated_vesting_shares.amount.toString());
     const totalVests = vestingShares + receivedVestingShares - delegatedVestingShares;
-    
+
     // Simple HP calculation (actual conversion requires global props)
     hivepower = totalVests / 1000; // Simplified calculation
 
@@ -466,143 +466,143 @@ export default function ProfileScreen() {
   // Render the profile header section
   const renderProfileHeader = () => {
     return (
-    <View>
-      {/* Profile Section */}
-      <View style={styles.profileSection}>
-        <View style={styles.profileHeaderRow}>
-          <View style={styles.profileImageContainer}>
-            {renderProfileImage()}
-          </View>
-          <View style={styles.nameSection}>
-            {/* Name row with gear icon */}
-            <View style={styles.nameRow}>
-              <Text style={styles.profileName} numberOfLines={1}>
-                {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
-              </Text>
-              {!params.username && (
-                <Pressable
-                  onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
-                  hitSlop={12}
-                  style={styles.gearIcon}
-                >
-                  <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
-                </Pressable>
-              )}
+      <View>
+        {/* Profile Section */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileHeaderRow}>
+            <View style={styles.profileImageContainer}>
+              {renderProfileImage()}
             </View>
-            {/* Username + Action Buttons */}
-            <View style={styles.usernameRow}>
-              <Text style={styles.username}>@{profileUsername}</Text>
-              <View style={styles.headerActionsRaw}>
-                {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    {isBlocked ? (
-                      <Pressable
-                        style={[styles.followActionBtn, styles.mutedActionBtn]}
-                        onPress={handleBlock}
-                        disabled={isBlockLoading}
-                      >
-                        {isBlockLoading ? (
-                          <ActivityIndicator size="small" color={theme.colors.danger} />
-                        ) : (
-                          <Text style={[styles.followActionBtnText, { color: theme.colors.danger }]}>
-                            Blocked
-                          </Text>
-                        )}
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        style={[
-                          styles.followActionBtn,
-                          isFollowing ? styles.unfollowBtn : styles.followBtn
-                        ]}
-                        onPress={handleFollow}
-                        disabled={isFollowLoading}
-                      >
-                        {isFollowLoading ? (
-                          <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
-                        ) : (
-                          <Text style={[
-                            styles.followActionBtnText,
-                            isFollowing ? styles.unfollowBtnText : styles.followBtnText
-                          ]}>
-                            {isFollowing ? 'Unfollow' : 'Follow'}
-                          </Text>
-                        )}
-                      </Pressable>
-                    )}
+            <View style={styles.nameSection}>
+              {/* Name row with gear icon */}
+              <View style={styles.nameRow}>
+                <Text style={styles.profileName} numberOfLines={1}>
+                  {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
+                </Text>
+                {/* {!params.username && (
+                  // <Pressable
+                  //   onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
+                  //   hitSlop={12}
+                  //   style={styles.gearIcon}
+                  // >
+                  //   <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
+                  // </Pressable>
+                )} */}
+              </View>
+              {/* Username + Action Buttons */}
+              <View style={styles.usernameRow}>
+                <Text style={styles.username}>@{profileUsername}</Text>
+                <View style={styles.headerActionsRaw}>
+                  {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {isBlocked ? (
+                        <Pressable
+                          style={[styles.followActionBtn, styles.mutedActionBtn]}
+                          onPress={handleBlock}
+                          disabled={isBlockLoading}
+                        >
+                          {isBlockLoading ? (
+                            <ActivityIndicator size="small" color={theme.colors.danger} />
+                          ) : (
+                            <Text style={[styles.followActionBtnText, { color: theme.colors.danger }]}>
+                              Blocked
+                            </Text>
+                          )}
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={[
+                            styles.followActionBtn,
+                            isFollowing ? styles.unfollowBtn : styles.followBtn
+                          ]}
+                          onPress={handleFollow}
+                          disabled={isFollowLoading}
+                        >
+                          {isFollowLoading ? (
+                            <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
+                          ) : (
+                            <Text style={[
+                              styles.followActionBtnText,
+                              isFollowing ? styles.unfollowBtnText : styles.followBtnText
+                            ]}>
+                              {isFollowing ? 'Unfollow' : 'Follow'}
+                            </Text>
+                          )}
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Stats + flag inline */}
+              <View style={styles.statsRow}>
+                {profileUsername === "SPECTATOR" ? (
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                    <Text style={styles.statLabel}>Following</Text>
+                  </View>
+                ) : (
+                  <Pressable style={styles.statItem} onPress={handleFollowingPress}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                    <Text style={styles.statLabel}>Following</Text>
+                  </Pressable>
+                )}
+                {profileUsername === "SPECTATOR" ? (
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                    <Text style={styles.statLabel}>Followers</Text>
+                  </View>
+                ) : (
+                  <Pressable style={styles.statItem} onPress={handleFollowersPress}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                    <Text style={styles.statLabel}>Followers</Text>
+                  </Pressable>
+                )}
+                {hiveAccount?.metadata?.profile?.location && (
+                  <View style={styles.statItem}>
+                    <Text style={styles.locationFlag}>
+                      {countryToFlag(hiveAccount.metadata.profile.location)}
+                    </Text>
+                    <Text style={styles.statLabel}>
+                      {hiveAccount.metadata.profile.location}
+                    </Text>
                   </View>
                 )}
               </View>
             </View>
-
-            {/* Stats + flag inline */}
-            <View style={styles.statsRow}>
-              {profileUsername === "SPECTATOR" ? (
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
-                </View>
-              ) : (
-                <Pressable style={styles.statItem} onPress={handleFollowingPress}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
-                </Pressable>
-              )}
-              {profileUsername === "SPECTATOR" ? (
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </View>
-              ) : (
-                <Pressable style={styles.statItem} onPress={handleFollowersPress}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </Pressable>
-              )}
-              {hiveAccount?.metadata?.profile?.location && (
-                <View style={styles.statItem}>
-                  <Text style={styles.locationFlag}>
-                    {countryToFlag(hiveAccount.metadata.profile.location)}
-                  </Text>
-                  <Text style={styles.statLabel}>
-                    {hiveAccount.metadata.profile.location}
-                  </Text>
-                </View>
-              )}
-            </View>
           </View>
         </View>
+
+        {/* Show Create Account CTA only for SPECTATOR */}
+        {profileUsername === "SPECTATOR" && <ProfileSpectatorInfo />}
+
+        {/* Tab Switcher */}
+        {profileUsername !== "SPECTATOR" && (
+          <View style={styles.tabBar}>
+            <Pressable
+              style={[styles.tab, profileTab === 'grid' && styles.tabActive]}
+              onPress={() => setProfileTab('grid')}
+            >
+              <Ionicons
+                name="grid-outline"
+                size={20}
+                color={profileTab === 'grid' ? theme.colors.primary : theme.colors.muted}
+              />
+            </Pressable>
+            <Pressable
+              style={[styles.tab, profileTab === 'posts' && styles.tabActive]}
+              onPress={() => setProfileTab('posts')}
+            >
+              <Ionicons
+                name="list-outline"
+                size={20}
+                color={profileTab === 'posts' ? theme.colors.primary : theme.colors.muted}
+              />
+            </Pressable>
+          </View>
+        )}
       </View>
-
-      {/* Show Create Account CTA only for SPECTATOR */}
-      {profileUsername === "SPECTATOR" && <ProfileSpectatorInfo />}
-
-      {/* Tab Switcher */}
-      {profileUsername !== "SPECTATOR" && (
-        <View style={styles.tabBar}>
-          <Pressable
-            style={[styles.tab, profileTab === 'grid' && styles.tabActive]}
-            onPress={() => setProfileTab('grid')}
-          >
-            <Ionicons
-              name="grid-outline"
-              size={20}
-              color={profileTab === 'grid' ? theme.colors.primary : theme.colors.muted}
-            />
-          </Pressable>
-          <Pressable
-            style={[styles.tab, profileTab === 'posts' && styles.tabActive]}
-            onPress={() => setProfileTab('posts')}
-          >
-            <Ionicons
-              name="list-outline"
-              size={20}
-              color={profileTab === 'posts' ? theme.colors.primary : theme.colors.muted}
-            />
-          </Pressable>
-        </View>
-      )}
-    </View>
     );
   };
 
@@ -742,7 +742,7 @@ export default function ProfileScreen() {
       )}
 
       {/* Settings Dialog */}
-      <Modal
+      {/* <Modal
         visible={settingsMenuVisible}
         transparent
         animationType="fade"
@@ -784,7 +784,8 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
         </Pressable>
-      </Modal>
+      </Modal> */}
+
     </View>
   );
 }

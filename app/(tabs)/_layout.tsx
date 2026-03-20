@@ -98,16 +98,20 @@ function FeedHeaderTitle() {
   const { filter, setFilter } = useFeedFilter();
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const filters: ('Recent' | 'Following' | 'Curated' | 'Trending')[] = ['Recent', 'Following', 'Curated', 'Trending'];
+  const filters:
+    ('Skatehive' | 'Recent' | 'Following' | 'Curated' | 'Trending')[] =
+    ['Skatehive', 'Recent', 'Following', 'Curated', 'Trending'];
 
   return (
     <View>
-      <Pressable onPress={() => setShowDropdown(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ fontSize: theme.fontSizes.lg, fontFamily: theme.fonts.bold, color: theme.colors.text }}>
-          {filter}
-        </Text>
-        <Ionicons name="chevron-down" size={18} color={theme.colors.text} style={{ marginLeft: 4 }} />
-      </Pressable>
+      {/* TODO: Add filter dropdown back in */}
+      {/* <Pressable onPress={() => setShowDropdown(true)} style={{ flexDirection: 'row', alignItems: 'center' }}> */}
+      <Text style={{ fontSize: theme.fontSizes.lg, fontFamily: theme.fonts.bold, color: theme.colors.text }}>
+        {/* {filter} */}
+        Skatehive
+      </Text>
+      {/* <Ionicons name="chevron-down" size={18} color={theme.colors.text} style={{ marginLeft: 4 }} /> */}
+      {/* </Pressable> */}
 
       <Modal
         visible={showDropdown}
@@ -115,7 +119,7 @@ function FeedHeaderTitle() {
         animationType="fade"
         onRequestClose={() => setShowDropdown(false)}
       >
-        <Pressable 
+        <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
           onPress={() => setShowDropdown(false)}
         >
@@ -135,9 +139,9 @@ function FeedHeaderTitle() {
                   marginBottom: 4,
                 }}
               >
-                <Text style={{ 
+                <Text style={{
                   color: filter === f ? theme.colors.primary : theme.colors.text,
-                  fontFamily: filter === f ? theme.fonts.bold : theme.fonts.regular 
+                  fontFamily: filter === f ? theme.fonts.bold : theme.fonts.regular
                 }}>
                   {f}
                 </Text>
@@ -146,7 +150,7 @@ function FeedHeaderTitle() {
           </View>
         </Pressable>
       </Modal>
-    </View>
+    </View >
   );
 }
 
@@ -176,7 +180,7 @@ function TabLayoutInner() {
 
   useEffect(() => {
     const isHidden = scrollDirection === 'down';
-    
+
     Animated.parallel([
       Animated.timing(headerTranslateY, {
         toValue: isHidden ? -100 : 0,
@@ -204,8 +208,12 @@ function TabLayoutInner() {
   const currentTab = segments[segments.length - 1];
   const isVideosTab = currentTab === "videos";
   const isProfileTab = currentTab === "profile";
-  
-  const userAvatarUrl = username && username !== "SPECTATOR" 
+  const isFeedTab = currentTab === "feed";
+
+  const activeTab = TAB_ITEMS.find(tab => tab.name === currentTab);
+  const headerTitle = activeTab?.title || (currentTab === "notifications" ? "Notifications" : currentTab === "search" ? "Search" : "Skatehive");
+
+  const userAvatarUrl = username && username !== "SPECTATOR"
     ? (hiveAccount?.metadata?.profile?.profile_image || `https://images.hive.blog/u/${username}/avatar/small`)
     : null;
 
@@ -228,7 +236,7 @@ function TabLayoutInner() {
   return (
     <View style={styles.container}>
       {!isVideosTab && (
-        <Animated.View style={{ 
+        <Animated.View style={{
           transform: [{ translateY: headerTranslateY }],
           opacity: headerOpacity,
           zIndex: 10,
@@ -237,9 +245,11 @@ function TabLayoutInner() {
           left: 0,
           right: 0
         }}>
-          <GlobalHeader 
-            onOpenMenu={() => setIsMenuVisible(true)} 
+          <GlobalHeader
+            onOpenMenu={() => setIsMenuVisible(true)}
             showSettings={isProfileTab}
+            title={headerTitle}
+            centerComponent={isFeedTab ? <FeedHeaderTitle /> : undefined}
           />
         </Animated.View>
       )}
@@ -309,7 +319,7 @@ function TabLayoutInner() {
                 title: "Notifications",
               }}
             />
-            
+
             {/* Hidden search tab - accessible from header */}
             <Tabs.Screen
               name="search"
@@ -337,9 +347,9 @@ function TabBarIcon(props: {
   if (avatarUrl) {
     return (
       <View style={styles.avatarContainer}>
-        <Image 
-          source={{ uri: avatarUrl }} 
-          style={[styles.tabAvatar, { borderColor: color === theme.colors.primary ? theme.colors.primary : 'transparent' }]} 
+        <Image
+          source={{ uri: avatarUrl }}
+          style={[styles.tabAvatar, { borderColor: color === theme.colors.primary ? theme.colors.primary : 'transparent' }]}
           transition={200}
         />
       </View>
