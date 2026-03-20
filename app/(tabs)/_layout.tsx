@@ -173,13 +173,20 @@ function TabLayoutInner() {
   const { scrollDirection } = useScrollDirection();
 
   // Animation values
+  const currentTab = segments[segments.length - 1];
+  const isVideosTab = currentTab === "videos";
+  const isProfileTab = currentTab === "profile";
+  const isFeedTab = currentTab === "feed";
+
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const headerOpacity = useRef(new Animated.Value(1)).current;
   const tabBarTranslateY = useRef(new Animated.Value(0)).current;
   const tabBarOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const isHidden = scrollDirection === 'down';
+    // Only allow hiding on specific tabs (Feed and Videos)
+    const isHidingTab = isFeedTab || isVideosTab;
+    const isHidden = scrollDirection === 'down' && isHidingTab;
 
     Animated.parallel([
       Animated.timing(headerTranslateY, {
@@ -203,12 +210,8 @@ function TabLayoutInner() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [scrollDirection]);
+  }, [scrollDirection, isFeedTab, isVideosTab]);
 
-  const currentTab = segments[segments.length - 1];
-  const isVideosTab = currentTab === "videos";
-  const isProfileTab = currentTab === "profile";
-  const isFeedTab = currentTab === "feed";
 
   const activeTab = TAB_ITEMS.find(tab => tab.name === currentTab);
   const headerTitle = activeTab?.title || (currentTab === "notifications" ? "Notifications" : currentTab === "search" ? "Search" : "Skatehive");
