@@ -47,23 +47,4 @@ export const VideoEmbed = ({ type, id, isVisible }: VideoEmbedProps) => {
   return <BaseVideoEmbed url={url} isVisible={isVisible} />;
 };
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#000',
-    marginVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    overflow: 'hidden',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  loading: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+const styles = StyleSheet.create({});
