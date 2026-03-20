@@ -481,10 +481,10 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
                   </Pressable>
                 )}
 
-              {/* Three dots menu - only show if not viewing own post */}
-              {currentUsername && post.author !== currentUsername && (
+              {/* Three dots menu - show if user is logged in */}
+              {currentUsername && (
                 <Pressable onPress={handleUserMenuPress} style={styles.menuButton}>
-                  <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.text} />
+                  <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text} />
                 </Pressable>
               )}
             </View>
@@ -662,9 +662,9 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
                 disabled={isDeleting}
               >
                 {isDeleting ? (
-                  <ActivityIndicator size="small" color={theme.colors.error} />
+                  <ActivityIndicator size="small" color={theme.colors.gray} />
                 ) : (
-                  <Text style={[styles.userMenuButtonText, { color: theme.colors.error }]}>Delete Snap</Text>
+                  <Text style={[styles.userMenuButtonText, { color: theme.colors.gray }]}>Delete Snap</Text>
                 )}
               </Pressable>
             )}
