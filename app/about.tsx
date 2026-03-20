@@ -40,18 +40,18 @@ export default function AboutScreen() {
             <Bullet text="DIY at its purest: community-driven moderation and development." />
           </Section>
 
-          <Section title="💰 Earn Rewards">
+          {/* <Section title="💰 Earn Rewards">
             <Bullet text="Post-to-Earn: The community votes on what rips, and you get rewarded in crypto (HIVE/HBD) for your contributions." />
             <Bullet text="Your engagement adds value to the ecosystem, and you get a piece of the pie." />
-          </Section>
+          </Section> */}
 
-          <Section title="🛠️ Built by the Homies">
+          {/* <Section title="🛠️ Built by the Homies">
             <Bullet text="@xvlad - Founder & Visionary" />
             <Bullet text="@vaipraonde - Lead Dev & Code Shredder" />
             <Bullet text="@r4topunk - Blockchain Wizard" />
             <Bullet text="@mengao - Community Architect" />
             <Bullet text="@webgnar - Creative Director" />
-          </Section>
+          </Section> */}
 
           <Section title="📖 Open Source">
             <Bullet text="This app is 100% open-source. Anyone can contribute, fork, or build the next iteration of skate media." />
