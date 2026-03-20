@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getUserComments, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
+import { SnapConfig } from '../config/SnapConfig';
 
 interface LastPostInfo {
   author: string;
@@ -43,7 +44,7 @@ export function useUserComments(username: string | null, blockedList: string[] =
   async function getMoreUserComments(): Promise<any[]> {
     if (!username || username === 'SPECTATOR') return [];
 
-    const pageSize = 10;
+    const pageSize = SnapConfig.pageSize;
     const allFilteredPosts: any[] = [];
     let hasMoreData = true;
     let iterationCount = 0;
@@ -57,7 +58,7 @@ export function useUserComments(username: string | null, blockedList: string[] =
         const result = await getUserComments(
           username,
           'comments',
-          20,
+          SnapConfig.fetchLimit,
           lastPostRef.current?.author,
           lastPostRef.current?.permlink
         );
@@ -81,7 +82,7 @@ export function useUserComments(username: string | null, blockedList: string[] =
           lastPostRef.current = { author: lastItem.author, permlink: lastItem.permlink };
         }
 
-        if (result.length < 20) hasMoreData = false;
+        if (result.length < SnapConfig.fetchLimit) hasMoreData = false;
       } catch (error) {
         console.error('Error fetching user posts:', error);
         hasMoreData = false;

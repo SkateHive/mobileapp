@@ -7,10 +7,18 @@ export interface SnapSettings {
    */
   useApi: boolean;
   /**
-   * Whether to verify post status (deleted or not) after fetching from API.
    * This adds a layer of validation by checking the metadata on-chain.
    */
   verifyDeletion: boolean;
+  /**
+   * Number of items to display per page in the UI.
+   */
+  pageSize: number;
+  /**
+   * Number of items to fetch from the blockchain/API in a single request.
+   * This should be larger than pageSize to account for filtering (blocked users, etc).
+   */
+  fetchLimit: number;
 }
 
 /**
@@ -21,13 +29,19 @@ export const SnapConfig: SnapSettings = Platform.select({
   ios: {
     useApi: true,
     verifyDeletion: true,
+    pageSize: 20,
+    fetchLimit: 40,
   },
   android: {
     useApi: true,
     verifyDeletion: true,
+    pageSize: 10,
+    fetchLimit: 20,
   },
   default: {
     useApi: true,
     verifyDeletion: true,
+    pageSize: 10,
+    fetchLimit: 20,
   },
 })!;

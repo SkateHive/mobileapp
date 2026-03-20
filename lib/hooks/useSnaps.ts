@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG, getDiscussions } from '../hive-utils';
 import { Discussion } from '@hiveio/dhive';
+import { SnapConfig } from '../config/SnapConfig';
 import { FeedFilterType } from '../FeedFilterContext';
 import { useAuth } from '../auth-provider';
 
@@ -50,7 +51,7 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
     
     if (effectiveFilter === 'Curated') {
       const tag = COMMUNITY_TAG;
-      const pageSize = 10; // Target page size
+      const pageSize = SnapConfig.pageSize; // Target page size
       const allFilteredComments: ExtendedComment[] = [];
       let hasMoreData = true;
       let permlink = lastContainerRef.current?.permlink || '';
@@ -122,7 +123,7 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
       
       const results = await getDiscussions(type, {
         tag,
-        limit: 10,
+        limit: SnapConfig.pageSize,
         start_author: lastPost?.author,
         start_permlink: lastPost?.permlink
       });
