@@ -35,13 +35,13 @@ export const SnapConfig: SnapSettings = Platform.select({
   android: {
     useApi: true,
     verifyDeletion: true,
-    pageSize: 10,
-    fetchLimit: 20,
+    pageSize: 20,
+    fetchLimit: 40,
   },
   default: {
     useApi: true,
     verifyDeletion: true,
-    pageSize: 10,
-    fetchLimit: 20,
+    pageSize: 20,
+    fetchLimit: 40,
   },
 })!;
