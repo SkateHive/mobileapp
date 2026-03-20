@@ -134,6 +134,23 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
 
   // Helper for rendering account avatar
   const renderAvatar = (size = 40) => {
+    if (username === 'SPECTATOR') {
+      return (
+        <View style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: theme.colors.secondaryCard,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)'
+        }}>
+          <Ionicons name="eye-outline" size={size * 0.6} color={theme.colors.primary} />
+        </View>
+      );
+    }
+
     const profileImage = hiveAccount?.metadata?.profile?.profile_image;
     const hiveAvatarUrl = `https://images.hive.blog/u/${username}/avatar/small`;
     return (
@@ -341,12 +358,16 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Accounts</Text>
-        <Pressable
-          onPress={() => setIsEditProfileVisible(true)}
-          style={styles.editButton}
-        >
-          <Text style={styles.editButtonText}>Edit</Text>
-        </Pressable>
+        {username !== 'SPECTATOR' ? (
+          <Pressable
+            onPress={() => setIsEditProfileVisible(true)}
+            style={styles.editButton}
+          >
+            <Text style={styles.editButtonText}>Edit</Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -363,21 +384,23 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
 
         <View style={styles.card}>
           {/* Active Session */}
-          <View style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="infinite-outline" size={22} color={theme.colors.text} />
-              <View>
-                <Text style={styles.menuItemText}>Hive</Text>
-                <Text style={styles.sessionStatus}>Active Session</Text>
+          {username !== 'SPECTATOR' && (
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="infinite-outline" size={22} color={theme.colors.text} />
+                <View>
+                  <Text style={styles.menuItemText}>Hive</Text>
+                  <Text style={styles.sessionStatus}>Active Session</Text>
+                </View>
               </View>
+              <Text style={styles.menuItemValue}>@{username}</Text>
             </View>
-            <Text style={styles.menuItemValue}>@{username}</Text>
-          </View>
+          )}
 
           {/* Other Stored Sessions */}
           {storedUsers.filter(u => u.username !== username && u.username !== "SPECTATOR").map((user, idx) => (
             <React.Fragment key={user.username}>
-              <View style={styles.divider} />
+              {(username !== 'SPECTATOR' || idx > 0) && <View style={styles.divider} />}
               <View style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
                   <Ionicons name="person-circle-outline" size={22} color={theme.colors.muted} />
@@ -406,8 +429,17 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
             <Text style={styles.logoutButtonText}>Log Out</Text>
           </Pressable>
 
-          <Pressable style={styles.removeButton} onPress={handleRemoveAccount}>
-            <Text style={styles.removeButtonText}>Remove from Device</Text>
+          <Pressable 
+            style={styles.removeButton} 
+            onPress={handleRemoveAccount}
+            disabled={username === 'SPECTATOR'}
+          >
+            <Text style={[
+              styles.removeButtonText,
+              username === 'SPECTATOR' && { color: theme.colors.muted }
+            ]}>
+              Remove from Device
+            </Text>
           </Pressable>
         </View>
 
@@ -456,6 +488,7 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
         <FollowersModal
           visible={isBlockedModalVisible}
           onClose={() => setIsBlockedModalVisible(false)}
+          onNavigate={() => onClose()}
           username={username}
           type="blocked"
         />

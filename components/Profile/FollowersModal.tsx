@@ -24,6 +24,7 @@ import { getMutedList, getBlacklistedList } from '~/lib/api';
 interface FollowersModalProps {
   visible: boolean;
   onClose: () => void;
+  onNavigate?: () => void;
   username: string;
   type: 'followers' | 'following' | 'muted' | 'blocked';
 }
@@ -74,6 +75,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export const FollowersModal: React.FC<FollowersModalProps> = ({
   visible,
   onClose,
+  onNavigate,
   username,
   type,
 }) => {
@@ -204,6 +206,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
 
   const handleUserPress = (selectedUsername: string) => {
     handleClose();
+    if (onNavigate) onNavigate();
     // Navigate to the selected user's profile
     router.push({
       pathname: '/(tabs)/profile',
