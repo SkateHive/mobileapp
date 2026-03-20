@@ -39,8 +39,8 @@ export const VideoConfig: VideoSettings = Platform.select({
   },
   android: {
     ...commonSettings,
-    preferredRenderer: 'native', // Android ExoPlayer is robust but can vary by device
-    enablePrefetch: true,
+    preferredRenderer: 'webview', // Fallback to WebView for Android to avoid reported crashes
+    enablePrefetch: false, // Disable prefetching on Android for stability
   },
   default: {
     ...commonSettings,
