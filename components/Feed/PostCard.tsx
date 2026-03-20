@@ -29,6 +29,7 @@ const ConversationDrawer = React.lazy(() =>
 );
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Media, Post } from '../../lib/types';
 import type { Discussion } from '@hiveio/dhive';
 import { extractMediaFromBody, removeVideoLinksFromBody } from '~/lib/utils';
@@ -619,56 +620,59 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, onOpenCon
         visible={showUserMenu}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setShowUserMenu(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowUserMenu(false)}>
-          <View style={styles.userMenuContainer}>
-            <Text style={styles.userMenuTitle}>@{post.author}</Text>
+          <SafeAreaView style={styles.safeAreaContainer} edges={['top', 'bottom']}>
+            <View style={styles.userMenuContainer}>
+              <Text style={styles.userMenuTitle}>@{post.author}</Text>
 
-            {isFollowing ? (
+              {isFollowing ? (
+                <Pressable
+                  style={styles.userMenuButton}
+                  onPress={() => handleUserAction('unfollow')}
+                >
+                  <Text style={styles.userMenuButtonText}>Unfollow</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={styles.userMenuButton}
+                  onPress={() => handleUserAction('follow')}
+                >
+                  <Text style={styles.userMenuButtonText}>Follow</Text>
+                </Pressable>
+              )}
+
               <Pressable
                 style={styles.userMenuButton}
-                onPress={() => handleUserAction('unfollow')}
+                onPress={() => handleUserAction('mute')}
               >
-                <Text style={styles.userMenuButtonText}>Unfollow</Text>
+                <Text style={styles.userMenuButtonText}>Mute/Block</Text>
               </Pressable>
-            ) : (
+
               <Pressable
                 style={styles.userMenuButton}
-                onPress={() => handleUserAction('follow')}
+                onPress={() => handleReportPost()}
               >
-                <Text style={styles.userMenuButtonText}>Follow</Text>
+                <Text style={styles.userMenuButtonText}>Report Post</Text>
               </Pressable>
-            )}
 
-            <Pressable
-              style={styles.userMenuButton}
-              onPress={() => handleUserAction('mute')}
-            >
-              <Text style={styles.userMenuButtonText}>Mute/Block</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.userMenuButton}
-              onPress={() => handleReportPost()}
-            >
-              <Text style={styles.userMenuButtonText}>Report Post</Text>
-            </Pressable>
-
-            {currentUsername === post.author && (
-              <Pressable
-                style={[styles.userMenuButton, isDeleting && styles.disabledButton]}
-                onPress={handleDeleteSnap}
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <ActivityIndicator size="small" color={theme.colors.gray} />
-                ) : (
-                  <Text style={[styles.userMenuButtonText, { color: theme.colors.gray }]}>Delete Snap</Text>
-                )}
-              </Pressable>
-            )}
-          </View>
+              {currentUsername === post.author && (
+                <Pressable
+                  style={[styles.userMenuButton, isDeleting && styles.disabledButton]}
+                  onPress={handleDeleteSnap}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color={theme.colors.gray} />
+                  ) : (
+                    <Text style={[styles.userMenuButtonText, { color: theme.colors.gray }]}>Delete Snap</Text>
+                  )}
+                </Pressable>
+              )}
+            </View>
+          </SafeAreaView>
         </Pressable>
       </Modal>
 
@@ -910,6 +914,9 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  safeAreaContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },

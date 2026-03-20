@@ -32,6 +32,7 @@ import { useScrollLock } from "~/lib/ScrollLockContext";
 import { ConversationDrawer } from "./ConversationDrawer";
 import { useScrollToTop } from "@react-navigation/native";
 import { VideoConfig } from "~/lib/config/VideoConfig";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
@@ -46,6 +47,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const { isScrollLocked } = useScrollLock();
   const router = useRouter();
   const { username, blockedList } = useAuth();
+  const insets = useSafeAreaInsets();
   const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps(filter, username);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems, updatePrefetchItems } = useViewportTracker();
@@ -166,7 +168,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       const visiblePermlinks = viewableItems
         .filter((item) => item.isViewable && item.item)
         .map((item) => (item.item as Discussion).permlink);
-      
+
       updateVisibleItems(visiblePermlinks);
 
       // Prefetching logic: find the items after the last visible one
@@ -181,7 +183,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
             prefetchPermlinks.push(nextItem.permlink);
           }
         }
-        
+
         updatePrefetchItems(prefetchPermlinks);
       }
     },
@@ -212,7 +214,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const keyExtractor = React.useCallback(
     (item: Post) => item.permlink,
     []
-);
+  );
 
   const ItemSeparatorComponent = React.useCallback(
     () => <View style={styles.separator} />,
@@ -273,7 +275,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         <Animated.View
           style={[
             styles.scrollTopButtonContainer,
-            { opacity: scrollTopOpacity }
+            {
+              opacity: scrollTopOpacity,
+              top: insets.top + 65 // Positioning below GlobalHeader (56px) + small gap
+            }
           ]}
         >
           <Pressable
@@ -284,7 +289,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
             ]}
           >
             <Ionicons name="arrow-up" size={20} color={theme.colors.background} />
-            <Text style={styles.scrollTopText}>POPPING UP 🛹</Text>
+            <Text style={styles.scrollTopText}>Popping Up 🛹</Text>
           </Pressable>
         </Animated.View>
       )}
@@ -335,7 +340,6 @@ const styles = StyleSheet.create({
   },
   scrollTopButtonContainer: {
     position: 'absolute',
-    top: theme.spacing.lg,
     alignSelf: 'center',
     zIndex: 1000,
   },
