@@ -132,6 +132,8 @@ export default function ProfileScreen() {
   const [isBlockLoading, setIsBlockLoading] = useState(false);
   const { followingList, blockedList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
   const { showToast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
 
   // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
@@ -630,9 +632,12 @@ export default function ProfileScreen() {
   };
 
   // Handle refresh
-  const handleRefresh = () => {
-    refreshPosts();
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshPosts();
+    setIsRefreshing(false);
   };
+
 
   return (
     <View style={styles.container}>
