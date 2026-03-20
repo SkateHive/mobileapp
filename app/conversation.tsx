@@ -83,7 +83,7 @@ export default function ConversationScreen() {
           {/* Main Post */}
           {mainPost && (
             <View style={styles.mainPostContainer}>
-              <PostCard post={mainPost} currentUsername={username} />
+              <PostCard post={mainPost as any} currentUsername={username} />
             </View>
           )}
 

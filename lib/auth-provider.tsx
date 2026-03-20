@@ -331,17 +331,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const storedSession = await SecureStore.getItemAsync(SESSION_KEY);
       if (storedSession) {
-        const parsed: AuthSession & { expiryAt: number } = JSON.parse(storedSession);
+        const parsed: Omit<AuthSession, 'decryptedKey'> & { expiryAt: number } = JSON.parse(storedSession);
         
         // Check if session has expired
         if (parsed.expiryAt > Date.now()) {
-          setUsername(parsed.username);
-          setSession(parsed);
-          setIsAuthenticated(true);
+          // Rehydrate the decryptedKey from encrypted storage
+          const encryptedKey = await getEncryptedKey(parsed.username);
           
-          // Refresh relationships in background
-          refreshUserRelationships(parsed.username);
-          return;
+          if (encryptedKey) {
+            let rehydratedKey = '';
+            
+            if (encryptedKey.method === 'biometric') {
+              // Current implementation uses salt as secret for biometric
+              const secret = encryptedKey.salt;
+              rehydratedKey = decryptKey(encryptedKey.encrypted, secret, encryptedKey.iv);
+            }
+            // Note: PIN method cannot be rehydrated without user input (PIN)
+            
+            if (rehydratedKey) {
+              const fullSession: AuthSession = {
+                ...parsed,
+                decryptedKey: rehydratedKey
+              };
+              setUsername(parsed.username);
+              setSession(fullSession);
+              setIsAuthenticated(true);
+              
+              // Refresh relationships in background
+              refreshUserRelationships(parsed.username);
+              return;
+            }
+          }
+          
+          // If we couldn't rehydrate or no encrypted key found, clear session
+          await SecureStore.deleteItemAsync(SESSION_KEY);
         } else {
           // Session expired, clear it
           await SecureStore.deleteItemAsync(SESSION_KEY);
@@ -456,7 +479,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Store session for persistence (skip if duration is 0 / "Auto")
       if (settings.sessionDuration > 0) {
         const expiryAt = Date.now() + (settings.sessionDuration * 60 * 1000);
-        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...authSession, expiryAt }));
+        // [FIX] NEVER store private keys in plaintext. Omit decryptedKey from storage.
+        const { decryptedKey: _, ...safeSession } = authSession;
+        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...safeSession, expiryAt }));
       }
 
       setUsername(normalizedUsername);
@@ -527,7 +552,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Store session for persistence (skip if duration is 0 / "Auto")
       if (settings.sessionDuration > 0) {
         const expiryAt = Date.now() + (settings.sessionDuration * 60 * 1000);
-        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...authSession, expiryAt }));
+        // [FIX] NEVER store private keys in plaintext. Omit decryptedKey from storage.
+        const { decryptedKey: _, ...safeSession } = authSession;
+        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...safeSession, expiryAt }));
       }
 
       setUsername(selectedUsername);

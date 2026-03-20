@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { theme } from '~/lib/theme';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
-import { MatrixRain } from '../ui/loading-effects/MatrixRain';
+import { MatrixRain } from '~/components/ui/loading-effects/MatrixRain';
 import type { HiveNotification } from '~/lib/types';
 
 export const NotificationsScreen = React.memo(() => {

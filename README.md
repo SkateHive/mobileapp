@@ -47,8 +47,8 @@ SkateHive Mobile is a high-performance React Native application built with **Exp
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/SkateHive/mobileapp-skatehive.git
-   cd mobileapp-skatehive
+   git clone https://github.com/SkateHive/mobileapp.git
+   cd mobileapp
    ```
 2. Install dependencies:
    ```bash

@@ -10,6 +10,7 @@ export interface AppSettings {
   isAdvancedWallet: boolean;
   sessionDuration: number; // minutes: 0 (Auto), 5, 60, 480, 1440
   initialScreen: 'videos' | 'feed';
+  isColorsUnlocked: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {

@@ -46,13 +46,14 @@ export async function resilientFetch<T>(
  * Fetch following list from Skatehive API v2 (with pagination up to exhaustion).
  */
 export async function fetchFollowingFromAPI(username: string): Promise<string[]> {
+  const normalizedUsername = username.replace(/^@/, '').toLowerCase();
   let allFollowing: string[] = [];
   let offset = 0;
   const limit = 1000;
   let hasMore = true;
 
   while (hasMore) {
-    const url = `${API_BASE_URL}/following/${username}?t=${Date.now()}&offset=${offset}`;
+    const url = `${API_BASE_URL}/following/${normalizedUsername}?t=${Date.now()}&offset=${offset}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) throw new Error(`API following failed: ${response.status}`);
     const json = await response.json();
@@ -75,13 +76,14 @@ export async function fetchFollowingFromAPI(username: string): Promise<string[]>
  * Fetch followers list from Skatehive API v2 (with pagination up to exhaustion).
  */
 export async function fetchFollowersFromAPI(username: string): Promise<string[]> {
+  const normalizedUsername = username.replace(/^@/, '').toLowerCase();
   let allFollowers: string[] = [];
   let offset = 0;
   const limit = 1000;
   let hasMore = true;
 
   while (hasMore) {
-    const url = `${API_BASE_URL}/followers/${username}?t=${Date.now()}&offset=${offset}`;
+    const url = `${API_BASE_URL}/followers/${normalizedUsername}?t=${Date.now()}&offset=${offset}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) throw new Error(`API followers failed: ${response.status}`);
     const json = await response.json();
@@ -104,13 +106,14 @@ export async function fetchFollowersFromAPI(username: string): Promise<string[]>
  * Fetch muted users from Skatehive API v2 (with pagination up to exhaustion).
  */
 export async function fetchMutedFromAPI(username: string): Promise<string[]> {
+  const normalizedUsername = username.replace(/^@/, '').toLowerCase();
   let allMuted: string[] = [];
   let offset = 0;
   const limit = 1000;
   let hasMore = true;
 
   while (hasMore) {
-    const url = `${API_BASE_URL}/muted/${username}?t=${Date.now()}&offset=${offset}`;
+    const url = `${API_BASE_URL}/muted/${normalizedUsername}?t=${Date.now()}&offset=${offset}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) throw new Error(`API muted failed: ${response.status}`);
     const json = await response.json();
@@ -136,13 +139,14 @@ export async function fetchMutedFromAPI(username: string): Promise<string[]> {
  * Fetch blacklisted users from Skatehive API v2 (with pagination up to exhaustion).
  */
 export async function fetchBlacklistedFromAPI(username: string): Promise<string[]> {
+  const normalizedUsername = username.replace(/^@/, '').toLowerCase();
   let allBlacklisted: string[] = [];
   let offset = 0;
   const limit = 1000;
   let hasMore = true;
 
   while (hasMore) {
-    const url = `${API_BASE_URL}/blacklisted/${username}?t=${Date.now()}&offset=${offset}`;
+    const url = `${API_BASE_URL}/blacklisted/${normalizedUsername}?t=${Date.now()}&offset=${offset}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) throw new Error(`API blacklisted failed: ${response.status}`);
     const json = await response.json();
@@ -172,24 +176,21 @@ export async function fetchFollowingFromRPC(username: string): Promise<string[]>
   let hasMore = true;
 
   while (hasMore) {
-    const params: any = {
-      account: username,
-      sort: 'blog',
-      limit: limit
-    };
-    if (start) {
-      params.start = start;
-    }
-
-    const result = await HiveClient.call('bridge', 'get_following', params);
+    // condenser_api.get_following [account, start, type, limit]
+    const result = await HiveClient.call('condenser_api', 'get_following', [
+      username,
+      start,
+      'blog',
+      limit
+    ]);
     
-    // The bridge API returns the 'start' account as the first item when paginating,
-    // so we need to filter it out if we're not on the first page to avoid duplicates.
+    // condenser_api returns objects with 'following' property
     let pageData = result.map((item: any) => item.following);
     if (start && pageData.length > 0 && pageData[0] === start) {
       pageData = pageData.slice(1);
     }
     
+    if (pageData.length === 0) break;
     allFollowing = [...allFollowing, ...pageData];
 
     if (result.length < limit) {
@@ -212,24 +213,20 @@ export async function fetchFollowersFromRPC(username: string): Promise<string[]>
   let hasMore = true;
 
   while (hasMore) {
-    const params: any = {
-      account: username,
-      sort: 'blog',
-      limit: limit
-    };
-    if (start) {
-      params.start = start;
-    }
-
-    const result = await HiveClient.call('bridge', 'get_followers', params);
+    // condenser_api.get_followers [account, start, type, limit]
+    const result = await HiveClient.call('condenser_api', 'get_followers', [
+      username,
+      start,
+      'blog',
+      limit
+    ]);
     
-    // The bridge API returns the 'start' account as the first item when paginating,
-    // so we need to filter it out if we're not on the first page to avoid duplicates.
     let pageData = result.map((item: any) => item.follower);
     if (start && pageData.length > 0 && pageData[0] === start) {
       pageData = pageData.slice(1);
     }
     
+    if (pageData.length === 0) break;
     allFollowers = [...allFollowers, ...pageData];
 
     if (result.length < limit) {
