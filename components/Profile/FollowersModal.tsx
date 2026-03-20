@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -7,11 +7,16 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
+
 import { getFollowing, getFollowers, setUserRelationship } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
 import { getMutedList, getBlacklistedList } from '~/lib/api';
@@ -64,23 +69,81 @@ const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnblockButto
   );
 };
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 export const FollowersModal: React.FC<FollowersModalProps> = ({
   visible,
   onClose,
   username,
   type,
 }) => {
+  const insets = useSafeAreaInsets();
   const [users, setUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [scrollOffset, setScrollOffset] = useState(0);
   const { session, username: currentUsername, blockedList, updateUserRelationship } = useAuth();
+
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   useEffect(() => {
     if (visible) {
       loadUsers();
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
+    } else {
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible, username, type]);
+
+  const handleClose = () => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        return evt.nativeEvent.locationY < 80;
+      },
+      onMoveShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        return gestureState.dy > 10 && scrollOffset <= 0;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          handleClose();
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
 
   const loadUsers = async (startFrom: string = '', append: boolean = false) => {
     try {
@@ -140,13 +203,14 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
   };
 
   const handleUserPress = (selectedUsername: string) => {
-    onClose();
+    handleClose();
     // Navigate to the selected user's profile
     router.push({
       pathname: '/(tabs)/profile',
       params: { username: selectedUsername },
     });
   };
+
 
   const handleUnblock = async (targetUsername: string) => {
     try {
@@ -195,18 +259,33 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View 
+          {...panResponder.panHandlers}
+          style={[
+            styles.modalContainer,
+            { 
+              transform: [{ translateY }],
+              paddingBottom: insets.bottom,
+            }
+          ]}
+        >
+          {/* Handle bar for swiping */}
+          <View style={styles.handleBarContainer}>
+            <View style={styles.handleBar} />
+          </View>
+
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
               {type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Blocked Users'}
             </Text>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <FontAwesome name="times" size={20} color={theme.colors.text} />
+            <Pressable onPress={handleClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color={theme.colors.text} />
             </Pressable>
           </View>
 
@@ -227,13 +306,16 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
               ListEmptyComponent={renderEmpty}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listContent}
+              onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
+              scrollEventThrottle={16}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 };
+
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -251,7 +333,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
@@ -261,9 +344,23 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontFamily: theme.fonts.bold,
   },
-  closeButton: {
-    padding: theme.spacing.xs,
+  handleBarContainer: {
+    width: '100%',
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+
+  handleBar: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: theme.colors.border,
+  },
+  closeButton: {
+    padding: 4,
+  },
+
   listContent: {
     flexGrow: 1,
   },
