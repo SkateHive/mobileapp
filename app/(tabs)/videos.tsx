@@ -438,16 +438,14 @@ export default function VideosScreen() {
                 color={isLiked ? theme.colors.primary : "#fff"}
               />
             )}
-            {voteCount > 0 && (
-              <Text
-                style={[
-                  styles.actionText,
-                  isLiked && { color: theme.colors.primary },
-                ]}
-              >
-                {voteCount}
-              </Text>
-            )}
+            <Text
+              style={[
+                styles.actionText,
+                isLiked && { color: theme.colors.primary },
+              ]}
+            >
+              {voteCount}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -455,9 +453,7 @@ export default function VideosScreen() {
             onPress={() => handleComment(item)}
           >
             <Ionicons name="chatbubble-outline" size={26} color="#fff" />
-            {item.replies > 0 && (
-              <Text style={styles.actionText}>{item.replies}</Text>
-            )}
+            <Text style={styles.actionText}>{item.replies}</Text>
           </Pressable>
 
           <Pressable
@@ -465,6 +461,7 @@ export default function VideosScreen() {
             onPress={() => handleShare(item)}
           >
             <Ionicons name="share-outline" size={26} color="#fff" />
+            <Text style={styles.actionText}>0</Text>
           </Pressable>
 
           {formatPayout(item.payout) ? (
