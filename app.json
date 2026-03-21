@@ -86,6 +86,12 @@
         "projectId": "6fd50a04-57a5-427a-a804-6a0370994947"
       }
     },
-    "owner": "skatehive"
+    "owner": "skatehive",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6fd50a04-57a5-427a-a804-6a0370994947"
+    }
   }
 }
