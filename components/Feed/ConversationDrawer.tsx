@@ -145,9 +145,10 @@ export function ConversationDrawer({
   return (
     <Modal
       visible={isVisible}
-      transparent
+      transparent={true}
       animationType="none"
       onRequestClose={handleClose}
+      statusBarTranslucent={true}
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={handleClose} />
@@ -197,9 +198,9 @@ export function ConversationDrawer({
           </View>
 
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 40}
           >
             <ScrollView 
               style={styles.repliesList}

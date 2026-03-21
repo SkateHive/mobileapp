@@ -46,7 +46,8 @@
         "android.permission.READ_MEDIA_AUDIO"
       ],
       "package": "com.skatehive.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "adjustResize"
     },
     "web": {
       "bundler": "metro",
