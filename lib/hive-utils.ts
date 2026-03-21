@@ -2,16 +2,15 @@ import { Client, Comment, PrivateKey, Discussion, PublicKey } from '@hiveio/dhiv
 import CryptoJS from 'crypto-js';
 import { 
   SNAPS_CONTAINER_AUTHOR as ENV_SNAPS_CONTAINER_AUTHOR,
-  SNAPS_PAGE_MIN_SIZE as ENV_SNAPS_PAGE_MIN_SIZE,
-  SNAPS_CONTAINER_FETCH_LIMIT as ENV_SNAPS_CONTAINER_FETCH_LIMIT,
   COMMUNITY_TAG as ENV_COMMUNITY_TAG,
   MODERATOR_PUBLIC_KEY as ENV_MODERATOR_PUBLIC_KEY
 } from '@env';
+import { SnapConfig } from './config/SnapConfig';
 
 // --- HIVE CONSTANTS (from .env) ---
 export const SNAPS_CONTAINER_AUTHOR = ENV_SNAPS_CONTAINER_AUTHOR || 'peak.snaps';
-export const SNAPS_PAGE_MIN_SIZE = Number(ENV_SNAPS_PAGE_MIN_SIZE) || 10;
-export const SNAPS_CONTAINER_FETCH_LIMIT = Number(ENV_SNAPS_CONTAINER_FETCH_LIMIT) || 3;
+export const SNAPS_PAGE_MIN_SIZE = SnapConfig.pageSize;
+export const SNAPS_CONTAINER_FETCH_LIMIT = SnapConfig.containerFetchLimit;
 export const COMMUNITY_TAG = ENV_COMMUNITY_TAG || 'hive-173115';
 export const MODERATOR_PUBLIC_KEY = ENV_MODERATOR_PUBLIC_KEY;
 

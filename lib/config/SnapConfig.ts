@@ -19,6 +19,11 @@ export interface SnapSettings {
    * This should be larger than pageSize to account for filtering (blocked users, etc).
    */
   fetchLimit: number;
+  /**
+   * Number of daily container posts to fetch from Hive blockchain.
+   * Higher values fetch more days of history at once.
+   */
+  containerFetchLimit: number;
 }
 
 /**
@@ -29,19 +34,22 @@ export const SnapConfig: SnapSettings = Platform.select({
   ios: {
     useApi: true,
     verifyDeletion: true,
-    pageSize: 20,
+    pageSize: 10,
     fetchLimit: 40,
+    containerFetchLimit: 3,
   },
   android: {
     useApi: true,
     verifyDeletion: true,
-    pageSize: 20,
+    pageSize: 10,
     fetchLimit: 40,
+    containerFetchLimit: 3,
   },
   default: {
     useApi: true,
     verifyDeletion: true,
-    pageSize: 20,
+    pageSize: 10,
     fetchLimit: 40,
+    containerFetchLimit: 3,
   },
 })!;
