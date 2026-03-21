@@ -12,8 +12,8 @@ export const YouTubeProvider: MediaProvider = {
     const idMatch = match.match(/(?:v=|embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
     return idMatch ? idMatch[1] : match;
   },
-  Component: ({ id, isVisible }) => {
+  Component: ({ id, isVisible, isPrefetch, author }) => {
     const finalUrl = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&autoplay=0&mute=1&origin=https://skatehive.app`;
-    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} />;
+    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} isPrefetch={isPrefetch} author={author} provider="YOUTUBE" />;
   }
 };

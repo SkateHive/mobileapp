@@ -12,8 +12,8 @@ export const VimeoProvider: MediaProvider = {
     const idMatch = match.match(/(?:video\/)([0-9]+)/i);
     return idMatch ? idMatch[1] : match;
   },
-  Component: ({ id, isVisible }) => {
+  Component: ({ id, isVisible, isPrefetch, author }) => {
     const finalUrl = `https://player.vimeo.com/video/${id}?autoplay=0&muted=1&origin=https://skatehive.app`;
-    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} />;
+    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} isPrefetch={isPrefetch} author={author} provider="VIMEO" />;
   }
 };

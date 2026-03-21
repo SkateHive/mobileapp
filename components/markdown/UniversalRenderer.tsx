@@ -11,10 +11,11 @@ interface UniversalRendererProps {
   content: string;
   isVisible?: boolean;
   isPrefetch?: boolean;
+  author?: string;
   onPress?: () => void;
 }
 
-export const UniversalRenderer = ({ content, isVisible, isPrefetch, onPress }: UniversalRendererProps) => {
+export const UniversalRenderer = ({ content, isVisible, isPrefetch, author, onPress }: UniversalRendererProps) => {
   const processed = useMemo(() => MarkdownProcessor.process(content), [content]);
 
   // Split by internal token placeholders [[TYPE:ID]]
@@ -171,7 +172,7 @@ export const UniversalRenderer = ({ content, isVisible, isPrefetch, onPress }: U
     <View style={styles.container}>
       {renderItems.map((item) => {
         if (item.type === 'token') {
-          return <EmbedFactory key={item.key} token={item.content as string} isVisible={isVisible} isPrefetch={isPrefetch} />;
+          return <EmbedFactory key={item.key} token={item.content as string} isVisible={isVisible} isPrefetch={isPrefetch} author={author} />;
         }
         if (item.type === 'carousel') {
           return <ImageCarousel key={item.key} urls={item.content as string[]} />;

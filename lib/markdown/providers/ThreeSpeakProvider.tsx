@@ -12,8 +12,8 @@ export const ThreeSpeakProvider: MediaProvider = {
     const idMatch = match.match(/v=([\w\-/]+)/i);
     return idMatch ? idMatch[1] : match;
   },
-  Component: ({ id, isVisible }) => {
+  Component: ({ id, isVisible, isPrefetch, author }) => {
     const finalUrl = `https://play.3speak.tv/watch?v=${id}&mode=iframe&autoplay=0&muted=1`;
-    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} />;
+    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} isPrefetch={isPrefetch} author={author} provider="THREESPEAK" />;
   }
 };

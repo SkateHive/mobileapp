@@ -16,7 +16,7 @@ export const OdyseeProvider: MediaProvider = {
     const idMatch = match.match(/odysee\.com\/(?:[^\/]+\/)?([\w@:%._\+~#=\/-]+)/i);
     return idMatch ? idMatch[1] : match;
   },
-  Component: ({ id, isVisible }: { id: string; isVisible?: boolean }) => {
+  Component: ({ id, isVisible, isPrefetch, author }: { id: string; isVisible?: boolean; isPrefetch?: boolean; author?: string }) => {
     let odyseeBase = '';
     if (id.includes('odysee.com/$/embed')) {
       odyseeBase = id;
@@ -26,6 +26,6 @@ export const OdyseeProvider: MediaProvider = {
       odyseeBase = `https://odysee.com/$/embed/${id}`;
     }
     const finalUrl = odyseeBase.includes('?') ? `${odyseeBase}&autoplay=false&muted=true` : `${odyseeBase}?autoplay=false&muted=true`;
-    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} />;
+    return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} isPrefetch={isPrefetch} author={author} provider="ODYSEE" />;
   }
 };

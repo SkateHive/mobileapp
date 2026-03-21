@@ -10,9 +10,10 @@ interface EmbedFactoryProps {
   token: string;
   isVisible?: boolean;
   isPrefetch?: boolean;
+  author?: string;
 }
 
-export const EmbedFactory = ({ token, isVisible, isPrefetch }: EmbedFactoryProps) => {
+export const EmbedFactory = ({ token, isVisible, isPrefetch, author }: EmbedFactoryProps) => {
   // Token format: [[TYPE:ID]] - allow some whitespace and case-insensitive
   // Aliasing IAMGE to IMAGE to handle common typos
   const match = token.match(/^\s*\[\[(YOUTUBE|VIMEO|ODYSEE|THREESPEAK|IPFSVIDEO|INSTAGRAM|ZORACOIN|SNAPSHOT|IMAGE|IAMGE):([^\]]+)\]\]\s*$/i);
@@ -27,7 +28,7 @@ export const EmbedFactory = ({ token, isVisible, isPrefetch }: EmbedFactoryProps
   // A. Check for Modular Provider first
   const provider = Registry.getProvider(type);
   if (provider) {
-    return <provider.Component id={id} isVisible={isVisible} isPrefetch={isPrefetch} />;
+    return <provider.Component id={id} isVisible={isVisible} isPrefetch={isPrefetch} author={author} />;
   }
 
   // B. Fallback to Legacy Switch
@@ -37,7 +38,7 @@ export const EmbedFactory = ({ token, isVisible, isPrefetch }: EmbedFactoryProps
     case 'ODYSEE':
     case 'THREESPEAK':
     case 'IPFSVIDEO':
-      return <VideoEmbed type={type as VideoType} id={id} isVisible={isVisible} isPrefetch={isPrefetch} />;
+      return <VideoEmbed type={type as VideoType} id={id} isVisible={isVisible} isPrefetch={isPrefetch} author={author} />;
     case 'INSTAGRAM':
       return <InstagramEmbed url={id} />;
     case 'ZORACOIN':

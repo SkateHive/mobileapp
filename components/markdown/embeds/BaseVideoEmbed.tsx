@@ -7,22 +7,32 @@ import { VideoConfig } from '~/lib/config/VideoConfig';
 interface BaseVideoEmbedProps {
   url: string;
   isVisible?: boolean;
+  isPrefetch?: boolean;
+  author?: string;
+  provider?: string;
 }
 
-export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
+export const BaseVideoEmbed = ({ url, isVisible, isPrefetch, author, provider = 'BaseVideoEmbed' }: BaseVideoEmbedProps) => {
   const { height: screenHeight } = useWindowDimensions();
   const [loading, setLoading] = React.useState(true);
+  const startTime = React.useRef(Date.now());
+  const logPrefix = `[${provider}]`;
+  const identifier = author ? `@${author}` : url.split('/').pop();
+
+  React.useEffect(() => {
+    console.log(`${logPrefix} [${identifier}] MOUNTED at +${Date.now() - startTime.current}ms (visible: ${isVisible}, prefetch: ${isPrefetch})`);
+  }, []);
+
+  React.useEffect(() => {
+    console.log(`${logPrefix} [${identifier}] VISIBILITY_CHANGE: ${isVisible} at +${Date.now() - startTime.current}ms`);
+  }, [isVisible, identifier, logPrefix]);
 
   if (!url) return null;
 
-  // Lazy mounting: Only render WebView if visible
-  if (!isVisible) {
+  // Render if visible OR if it's being prefetched
+  if (!isVisible && !isPrefetch) {
     return (
-      <View style={styles.container}>
-        <View style={styles.loading}>
-          <ActivityIndicator color={theme.colors.green} size="small" />
-        </View>
-      </View>
+      <View style={styles.container} />
     );
   }
 
@@ -41,7 +51,10 @@ export const BaseVideoEmbed = ({ url, isVisible }: BaseVideoEmbedProps) => {
         javaScriptEnabled
         domStorageEnabled
         mixedContentMode="always"
-        onLoadEnd={() => setLoading(false)}
+        onLoadEnd={() => {
+          console.log(`${logPrefix} [${identifier}] WEBVIEW_LOAD_END at +${Date.now() - startTime.current}ms`);
+          setLoading(false);
+        }}
         // Defensive script to pause any elements that try to bypass policy
         injectedJavaScript={`
           (function() {

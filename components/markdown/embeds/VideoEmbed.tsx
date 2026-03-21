@@ -11,9 +11,10 @@ interface VideoEmbedProps {
   id: string;
   isVisible?: boolean;
   isPrefetch?: boolean;
+  author?: string;
 }
 
-export const VideoEmbed = ({ type, id, isVisible, isPrefetch }: VideoEmbedProps) => {
+export const VideoEmbed = ({ type, id, isVisible, isPrefetch, author }: VideoEmbedProps) => {
   const getEmbedUrl = () => {
     switch (type) {
       case 'YOUTUBE':
@@ -45,7 +46,7 @@ export const VideoEmbed = ({ type, id, isVisible, isPrefetch }: VideoEmbedProps)
   const url = getEmbedUrl();
   if (!url) return null;
 
-  return <BaseVideoEmbed url={url} isVisible={isVisible} />;
+  return <BaseVideoEmbed url={url} isVisible={isVisible} isPrefetch={isPrefetch} author={author} provider={type} />;
 };
 
 const styles = StyleSheet.create({});
