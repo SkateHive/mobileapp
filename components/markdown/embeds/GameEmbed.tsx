@@ -69,6 +69,19 @@ export const GameEmbed = ({ id }: GameEmbedProps) => {
             source={{ uri: game.url }} 
             style={styles.webview}
             startInLoadingState={true}
+            scalesPageToFit={true}
+            scrollEnabled={false}
+            bounces={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            injectedJavaScript={`
+              const meta = document.createElement('meta');
+              meta.setAttribute('name', 'viewport');
+              meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+              document.getElementsByTagName('head')[0].appendChild(meta);
+              document.body.style.overflow = 'hidden';
+              true;
+            `}
             renderLoading={() => (
               <View style={styles.loading}>
                 <Text style={styles.loadingText}>Loading {game.title}...</Text>
