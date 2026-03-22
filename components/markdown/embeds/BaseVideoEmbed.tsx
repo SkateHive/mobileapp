@@ -36,10 +36,57 @@ export const BaseVideoEmbed = ({ url, isVisible, isPrefetch, author, provider = 
     );
   }
 
+  // Detect direct video files (IPFS direct links or common extensions)
+  const isDirectVideo = (url.includes('/ipfs/') && !url.includes('embed')) || 
+                        /\.(mp4|mov|m4v|webm|ogv)$/i.test(url);
+
+  const htmlWrapper = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+          body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; background-color: #000;
+            display: flex; justify-content: center; align-items: center;
+          }
+          video { 
+            width: 100%; height: 100%; object-fit: contain; 
+            max-width: 100vw; max-height: 100vh;
+          }
+          /* Hide default play button for cleaner prefetch look if possible */
+          video::-webkit-media-controls-start-playback-button {
+            display: none !important;
+          }
+        </style>
+      </head>
+      <body>
+        <video 
+          id="video"
+          controls 
+          playsinline 
+          preload="auto"
+          ${isPrefetch && !isVisible ? 'muted' : ''}
+        >
+          <source src="${url}" type="video/mp4">
+          <source src="${url}" type="video/quicktime">
+          <source src="${url}">
+        </video>
+        <script>
+          const v = document.getElementById('video');
+          // Manual play/pause based on messages if needed, but for now we rely on user action
+          // to comply with mobile policies while in WebView.
+          // However, we can listen for visibility messages from RN if we wanted.
+        </script>
+      </body>
+    </html>
+  `;
+
   return (
     <View style={styles.container}>
       <WebView
-        source={{ uri: url }}
+        source={isDirectVideo ? { html: htmlWrapper, baseUrl: url } : { uri: url }}
         style={styles.webview}
         allowsFullscreenVideo
         allowsInlineMediaPlayback
