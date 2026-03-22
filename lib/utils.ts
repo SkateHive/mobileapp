@@ -24,10 +24,10 @@ export function extractMediaFromBody(body: string): Media[] {
   }
 
   // Extract videos from iframes
-  const iframeMatches = body.match(/<iframe.*?src="(.*?)".*?><\/iframe>/g);
+  const iframeMatches = body.match(/<iframe[\s\S]*?src\s*=\s*"(.*?)".*?>[\s\S]*?<\/iframe>/gim);
   if (iframeMatches) {
     iframeMatches.forEach(match => {
-      const url = match.match(/src="(.*?)"/)?.[1];
+      const url = match.match(/src\s*=\s*"(.*?)"/i)?.[1];
       if (url && !processedUrls.has(url)) {
         // Check if it's a direct video URL (IPFS, mp4, webm, m3u8)
         // These can be played with expo-video
@@ -63,13 +63,11 @@ export function extractMediaFromBody(body: string): Media[] {
   }
 
   // Extract plain YouTube URLs (not in iframes)
-  // Matches: youtube.com/watch?v=, youtu.be/, youtube.com/embed/
   const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/g;
   let youtubeMatch;
   while ((youtubeMatch = youtubeRegex.exec(body)) !== null) {
     const videoId = youtubeMatch[1];
     const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
-    
     if (!processedUrls.has(embedUrl) && !processedUrls.has(youtubeMatch[0])) {
       media.push({ type: 'embed', url: embedUrl });
       processedUrls.add(embedUrl);
@@ -78,17 +76,39 @@ export function extractMediaFromBody(body: string): Media[] {
   }
 
   // Extract plain Odysee URLs (not in iframes)
-  // Matches: odysee.com/@channel/video:id
   const odyseeRegex = /(?:https?:\/\/)?(?:www\.)?odysee\.com\/(@[^\/]+\/[^:]+:[a-zA-Z0-9]+)/g;
   let odyseeMatch;
   while ((odyseeMatch = odyseeRegex.exec(body)) !== null) {
     const videoPath = odyseeMatch[1];
     const embedUrl = `https://odysee.com/$/embed/${videoPath}`;
-    
     if (!processedUrls.has(embedUrl) && !processedUrls.has(odyseeMatch[0])) {
       media.push({ type: 'embed', url: embedUrl });
       processedUrls.add(embedUrl);
       processedUrls.add(odyseeMatch[0]);
+    }
+  }
+
+  // Extract plain IPFS/Video URLs (not in iframes)
+  // Matches: ipfs.skatehive.app/ipfs/HASH, or .mp4, .mov links
+  const directVideoRegex = /(https?:\/\/[^\s'"<>]+\.(?:mp4|mov|webm|m3u8)|https?:\/\/ipfs\.[^\s'"<>]+|https?:\/\/[^\s'"<>]+\/ipfs\/[a-zA-Z0-9]+)/gi;
+  let videoMatch;
+  while ((videoMatch = directVideoRegex.exec(body)) !== null) {
+    const url = videoMatch[0];
+    if (!processedUrls.has(url)) {
+      media.push({ type: 'video', url });
+      processedUrls.add(url);
+    }
+  }
+
+  // Extract plain 3Speak URLs
+  const threeSpeakRegex = /(?:https?:\/\/)?(?:www\.)?3speak\.tv\/watch\?v=([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/g;
+  let threeSpeakMatch;
+  while ((threeSpeakMatch = threeSpeakRegex.exec(body)) !== null) {
+    const videoId = threeSpeakMatch[1];
+    const embedUrl = `https://play.3speak.tv/watch?v=${videoId}`;
+    if (!processedUrls.has(embedUrl)) {
+      media.push({ type: 'embed', url: embedUrl });
+      processedUrls.add(embedUrl);
     }
   }
 

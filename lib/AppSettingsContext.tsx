@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { VideoConfig } from './config/VideoConfig';
 
 const SETTINGS_KEY = 'app_settings';
 
@@ -12,6 +13,8 @@ export interface AppSettings {
   initialScreen: 'videos' | 'feed';
   isColorsUnlocked: boolean;
   loginBackground: 'video' | 'matrix';
+  videoMuted: boolean;
+  videoAutoPlay: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -23,6 +26,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   sessionDuration: 1440,
   initialScreen: 'videos',
   loginBackground: 'video',
+  videoMuted: VideoConfig.autoPlayMuted,
+  videoAutoPlay: VideoConfig.enableAutoPlay,
 };
 
 interface AppSettingsContextType {

@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { View, Pressable, StyleSheet, StyleProp, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { VideoConfig } from "~/lib/config/VideoConfig";
+import { useAppSettings } from "~/lib/AppSettingsContext";
 
 interface VideoPlayerProps {
   url: string;
@@ -38,9 +39,13 @@ export const VideoPlayer = React.memo(
     author,
     provider = 'VideoPlayer',
   }: VideoPlayerProps) => {
+    const { settings, updateSettings } = useAppSettings();
     const isControlled = controlledMuted !== undefined;
     const [internalMuted, setInternalMuted] = useState(initialMuted);
-    const isMuted = isControlled ? controlledMuted : internalMuted;
+    
+    // Use global setting if not controlled, otherwise use controlled prop
+    const isMuted = isControlled ? controlledMuted : settings.videoMuted;
+    
     const startTime = useRef(Date.now());
     const logPrefix = `[${provider}]`;
     const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -71,10 +76,10 @@ export const VideoPlayer = React.memo(
       return () => sub.remove();
     }, [player, identifier]);
 
-    // Set initial muted state after player is created
+    // Set initial muted state after player is created (respecting global settings)
     useEffect(() => {
-      player.muted = initialMuted;
-    }, [player, initialMuted]);
+      player.muted = isMuted;
+    }, [player, isMuted]);
 
     // Cleanup: pause player on unmount to free resources
     useEffect(() => {
@@ -140,6 +145,7 @@ export const VideoPlayer = React.memo(
 
     const toggleMute = () => {
       const newMuted = !isMuted;
+      updateSettings({ videoMuted: newMuted });
       if (isControlled) {
         onMuteToggle?.(newMuted);
       } else {

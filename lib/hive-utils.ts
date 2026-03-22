@@ -6,6 +6,8 @@ import {
   MODERATOR_PUBLIC_KEY as ENV_MODERATOR_PUBLIC_KEY
 } from '@env';
 import { SnapConfig } from './config/SnapConfig';
+import { VideoConfig } from './config/VideoConfig';
+import { MOCK_POSTS } from './mock/videoTestData';
 
 // --- HIVE CONSTANTS (from .env) ---
 export const SNAPS_CONTAINER_AUTHOR = ENV_SNAPS_CONTAINER_AUTHOR || 'peak.snaps';
@@ -262,6 +264,17 @@ export async function getSnapsContainers({
   lastPermlink?: string;
   lastDate?: string;
 }): Promise<Comment[]> {
+  if (VideoConfig.debugVideoTestMode) {
+    console.log('[getSnapsContainers] DEBUG_MODE: Returning mock container');
+    return [
+      {
+        author: SNAPS_CONTAINER_AUTHOR,
+        permlink: 'mock-video-test-container',
+        created: new Date().toISOString(),
+      } as Comment
+    ];
+  }
+
   return HiveClient.database.call('get_discussions_by_author_before_date', [
     SNAPS_CONTAINER_AUTHOR,
     lastPermlink,
@@ -280,6 +293,15 @@ export async function getContentReplies({
   author: string;
   permlink: string;
 }): Promise<ExtendedComment[]> {
+  if (VideoConfig.debugVideoTestMode && permlink === 'mock-video-test-container') {
+    console.log('[getContentReplies] DEBUG_MODE: Returning MOCK_POSTS as replies');
+    return MOCK_POSTS.map(post => ({
+      ...post,
+      parent_author: SNAPS_CONTAINER_AUTHOR,
+      parent_permlink: 'mock-video-test-container',
+    })) as unknown as ExtendedComment[];
+  }
+
   return HiveClient.database.call('get_content_replies', [author, permlink]);
 }
 

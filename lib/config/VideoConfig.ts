@@ -31,6 +31,14 @@ export interface VideoSettings {
    * Whether to prioritize loading videos currently in the viewport
    */
   lowLatencyLoad: boolean;
+  /**
+   * Whether to enable global autoplay for the feed
+   */
+  enableAutoPlay: boolean;
+  /**
+   * Whether to force the video feed to use mock test data
+   */
+  debugVideoTestMode: boolean;
 }
 
 const commonSettings = {
@@ -39,6 +47,8 @@ const commonSettings = {
   autoPlayMuted: true,
   maxConcurrentPlayers: 3,
   lowLatencyLoad: true,
+  enableAutoPlay: true, // Default to off for better DX/performance unless enabled
+  debugVideoTestMode: false, // Fixed to true in DEV for user, but forced to false in PROD
 };
 
 /**

@@ -1,6 +1,7 @@
 import React from 'react';
 import { MediaProvider } from './BaseProvider';
 import { BaseVideoEmbed } from '~/components/markdown/embeds/BaseVideoEmbed';
+import { useAppSettings } from '~/lib/AppSettingsContext';
 
 export const YouTubeProvider: MediaProvider = {
   name: 'YOUTUBE',
@@ -13,7 +14,9 @@ export const YouTubeProvider: MediaProvider = {
     return idMatch ? idMatch[1] : match;
   },
   Component: ({ id, isVisible, isPrefetch, author }) => {
-    const finalUrl = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&autoplay=0&mute=1&origin=https://skatehive.app`;
+    // We use a static URL to prevent WebView reload on visibility change.
+    // Playback and mute are controlled via injectJavaScript in BaseVideoEmbed.
+    const finalUrl = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&autoplay=1&mute=1&origin=https://skatehive.app`;
     return <BaseVideoEmbed url={finalUrl} isVisible={isVisible} isPrefetch={isPrefetch} author={author} provider="YOUTUBE" />;
   }
 };
