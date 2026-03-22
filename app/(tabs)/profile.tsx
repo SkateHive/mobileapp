@@ -253,6 +253,7 @@ export default function ProfileScreen() {
   const [isApiLoading, setIsApiLoading] = useState(false);
   const [apiHasMore, setApiHasMore] = useState(true);
   const [apiPage, setApiPage] = useState(1);
+  const [apiError, setApiError] = useState<string | null>(null);
   const API_LIMIT = 20;
 
   // Use refs to avoid dependency loops in useCallback
@@ -260,6 +261,8 @@ export default function ProfileScreen() {
   const hasMoreRef = useRef(true);
 
   const fetchUserSnaps = useCallback(async (page: number, refresh: boolean = false) => {
+    if (!profileUsername) return;
+
     // Avoid redundant fetches using refs for stability
     if (isFetchingRef.current || (!refresh && !hasMoreRef.current)) {
       return;
@@ -268,10 +271,16 @@ export default function ProfileScreen() {
     try {
       isFetchingRef.current = true;
       setIsApiLoading(true);
+      setApiError(null);
       console.log(`[Profile Snaps] Fetching page ${page} for @${profileUsername} (refresh: ${refresh})`);
       
       const url = `${API_BASE_URL}/skatesnaps/${profileUsername}?page=${page}&limit=${API_LIMIT}`;
       const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
       const result = await response.json();
 
       if (result.success) {
@@ -298,9 +307,12 @@ export default function ProfileScreen() {
         setApiHasMore(result.pagination.hasNextPage);
         hasMoreRef.current = result.pagination.hasNextPage;
         setApiPage(page);
+      } else {
+        throw new Error(result.message || "Failed to fetch snaps");
       }
     } catch (error) {
       console.error("Error fetching user snaps from API:", error);
+      setApiError(error instanceof Error ? error.message : "Network request failed");
     } finally {
       setIsApiLoading(false);
       isFetchingRef.current = false;
@@ -309,10 +321,10 @@ export default function ProfileScreen() {
 
   // Handle pagination and refresh for API
   const loadNextPageApi = useCallback(() => {
-    if (apiHasMore && !isApiLoading) {
+    if (apiHasMore && !isApiLoading && !apiError) {
       fetchUserSnaps(apiPage + 1);
     }
-  }, [apiHasMore, isApiLoading, apiPage, fetchUserSnaps]);
+  }, [apiHasMore, isApiLoading, apiError, apiPage, fetchUserSnaps]);
 
   const refreshPostsApi = useCallback(async () => {
     await fetchUserSnaps(1, true);
@@ -327,6 +339,7 @@ export default function ProfileScreen() {
     setApiPage(1);
     setIsApiLoading(false);
     setApiHasMore(true);
+    setApiError(null);
     isFetchingRef.current = false;
     hasMoreRef.current = true;
     fetchUserSnaps(1, true);
@@ -722,6 +735,21 @@ export default function ProfileScreen() {
 
   // Render footer loading indicator
   const renderFooter = () => {
+    if (apiError) {
+      return (
+        <View style={styles.errorFooter}>
+          <Text style={styles.errorFooterText}>{apiError}</Text>
+          <Pressable 
+            style={styles.retryButton} 
+            onPress={() => fetchUserSnaps(apiPage + 1)}
+          >
+            <Ionicons name="refresh-outline" size={16} color={theme.colors.primary} />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     if (!isLoadingPosts) return null;
     return (
       <View style={styles.loadingFooter}>
@@ -1165,5 +1193,31 @@ const styles = StyleSheet.create({
   errorText: {
     color: theme.colors.text,
     fontFamily: theme.fonts.regular,
+  },
+  errorFooter: {
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  errorFooterText: {
+    color: theme.colors.danger,
+    fontFamily: theme.fonts.regular,
+    fontSize: theme.fontSizes.sm,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  retryButtonText: {
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.sm,
   },
 });
