@@ -19,11 +19,36 @@ export interface VideoSettings {
    * Number of videos to prefetch ahead of the current viewport
    */
   prefetchDistance: number;
+  /**
+   * Whether videos should always start muted during autoplay
+   */
+  autoPlayMuted: boolean;
+  /**
+   * Maximum number of concurrent native players to keep in memory
+   */
+  maxConcurrentPlayers: number;
+  /**
+   * Whether to prioritize loading videos currently in the viewport
+   */
+  lowLatencyLoad: boolean;
+  /**
+   * Whether to enable global autoplay for the feed
+   */
+  enableAutoPlay: boolean;
+  /**
+   * Whether to force the video feed to use mock test data
+   */
+  debugVideoTestMode: boolean;
 }
 
 const commonSettings = {
   aspectRatio: 0.75, // 3:4 ratio for consistent normalization
   prefetchDistance: 2,
+  autoPlayMuted: true,
+  maxConcurrentPlayers: 3,
+  lowLatencyLoad: true,
+  enableAutoPlay: true, // Default to off for better DX/performance unless enabled
+  debugVideoTestMode: false, // Fixed to true in DEV for user, but forced to false in PROD
 };
 
 /**
@@ -40,11 +65,12 @@ export const VideoConfig: VideoSettings = Platform.select({
   android: {
     ...commonSettings,
     preferredRenderer: 'webview', // Fallback to WebView for Android to avoid reported crashes
-    enablePrefetch: true, // Disable prefetching on Android for stability
+    enablePrefetch: true, // User wants to try prefetching on Android too
+    maxConcurrentPlayers: 2, // Be more conservative with memory on Android
   },
   default: {
     ...commonSettings,
     preferredRenderer: 'webview',
-    enablePrefetch: true,
+    enablePrefetch: false,
   },
 })!;

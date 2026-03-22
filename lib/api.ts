@@ -11,6 +11,8 @@ import {
   resilientFetch
 } from './resilient-fetch';
 import { getUserRelationshipList } from './hive-utils';
+import { VideoConfig } from './config/VideoConfig';
+import { MOCK_POSTS } from './mock/videoTestData';
 import type { Post } from './types';
 
 interface ApiResponse<T> {
@@ -24,6 +26,14 @@ interface ApiResponse<T> {
 
 // Paginated feed fetcher
 export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
+  if (VideoConfig.debugVideoTestMode) {
+    console.log(`[getFeed] DEBUG_MODE: Returning MOCK_POSTS for page ${page}`);
+    return MOCK_POSTS.map(post => ({
+      ...post,
+      permlink: `${post.permlink}-${page}`, // Unique permlink for infinite scroll
+    }));
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/feed?page=${page}&limit=${limit}`);
     const data: ApiResponse<Post[]> = await response.json();

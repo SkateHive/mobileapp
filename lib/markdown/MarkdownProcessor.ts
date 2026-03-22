@@ -47,6 +47,24 @@ export class MarkdownProcessor {
       '[[SNAPSHOT:$1]]'
     );
 
+    // 8. SkateHive Games
+    processedContent = processedContent.replace(
+      /(?:^|\s)https?:\/\/(?:www\.)?skatehive\.app\/games\/(quest-for-stoken|lougnar)(?=\s|$)/gim,
+      '[[SKATEHIVEGAME:$1]]'
+    );
+
+    // 9. Builder DAO Proposals (Gnars, Nouns, etc.)
+    processedContent = processedContent.replace(
+      /(?:^|\s)https?:\/\/(?:www\.)?([^\/\s]+\/(?:proposals|vote)\/\d+)(?=\s|$)/gim,
+      '[[BUILDERPROPOSAL:https://$1]]'
+    );
+
+    // 10. POIDH Bounties
+    processedContent = processedContent.replace(
+      /(?:^|\s)https?:\/\/(?:www\.)?(?:skatehive\.app|localhost:\d+)\/bounties\/poidh\/(\d+)\/(\d+)(?=\s|$)/gim,
+      '[[POIDHBOUNTY:$1:$2]]'
+    );
+
     // 10. Deep Clean HTML tags that clutter or break rendering
     // Strip specific Hive/PeakD schema wrappers
     processedContent = processedContent.replace(/<div itemscope itemtype="https:\/\/schema\.org\/VideoObject">/gi, '');

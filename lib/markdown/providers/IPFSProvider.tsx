@@ -17,7 +17,7 @@ export const IPFSProvider: MediaProvider = {
     if (iframeMatch) return iframeMatch[1];
     return match;
   },
-  Component: ({ id, isVisible, isPrefetch }: { id: string, isVisible?: boolean, isPrefetch?: boolean }) => {
+  Component: ({ id, isVisible, isPrefetch, author }: { id: string, isVisible?: boolean, isPrefetch?: boolean, author?: string }) => {
     const ipfsUrl = id.includes('https') ? id : `https://ipfs.skatehive.app/ipfs/${id}`;
     
     if (VideoConfig.preferredRenderer === 'native') {
@@ -26,6 +26,8 @@ export const IPFSProvider: MediaProvider = {
           url={ipfsUrl} 
           playing={isVisible} 
           shouldPreload={isPrefetch || isVisible}
+          author={author}
+          provider="IPFS"
           loop={true}
           style={{
             width: '100%',
@@ -35,6 +37,6 @@ export const IPFSProvider: MediaProvider = {
       );
     }
 
-    return <BaseVideoEmbed url={ipfsUrl} isVisible={isVisible} />;
+    return <BaseVideoEmbed url={ipfsUrl} isVisible={isVisible} isPrefetch={isPrefetch} author={author} provider="IPFS" />;
   }
 };

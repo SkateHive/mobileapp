@@ -547,6 +547,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
                   content={postContent}
                   isVisible={isVisible}
                   isPrefetch={isPrefetch}
+                  author={post.author}
                   onPress={handleBodyPress}
                 />
               </View>

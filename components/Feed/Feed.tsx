@@ -171,16 +171,26 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
       updateVisibleItems(visiblePermlinks);
 
-      // Prefetching logic: find the items after the last visible one
+      // Prefetching logic: find the items around the visible ones
       if (viewableItems.length > 0) {
+        const firstVisibleIndex = viewableItems[0].index ?? 0;
         const lastVisibleIndex = viewableItems[viewableItems.length - 1].index ?? 0;
         const prefetchDistance = VideoConfig.prefetchDistance;
         const prefetchPermlinks: string[] = [];
 
+        // Prefetch downwards
         for (let i = 1; i <= prefetchDistance; i++) {
           const nextItem = filteredFeedData[lastVisibleIndex + i];
           if (nextItem) {
             prefetchPermlinks.push(nextItem.permlink);
+          }
+        }
+        
+        // Prefetch upwards
+        for (let i = 1; i <= prefetchDistance; i++) {
+          const prevItem = filteredFeedData[firstVisibleIndex - i];
+          if (prevItem) {
+            prefetchPermlinks.push(prevItem.permlink);
           }
         }
 
@@ -190,10 +200,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     [updateVisibleItems, updatePrefetchItems, filteredFeedData]
   );
 
-  // Viewability config - item is considered viewable when 60% is visible
+  // Viewability config - item is considered viewable when 40% is visible
   const viewabilityConfig = React.useMemo(
     () => ({
-      viewAreaCoveragePercentThreshold: 60,
+      viewAreaCoveragePercentThreshold: 40,
       minimumViewTime: 100,
     }),
     []
