@@ -2,6 +2,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState, useRef } from "react";
 import { View, Pressable, StyleSheet, StyleProp, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/native";
 import { VideoConfig } from "~/lib/config/VideoConfig";
 import { useAppSettings } from "~/lib/AppSettingsContext";
 
@@ -39,6 +40,7 @@ export const VideoPlayer = React.memo(
     author,
     provider = 'VideoPlayer',
   }: VideoPlayerProps) => {
+    const isFocused = useIsFocused();
     const { settings, updateSettings } = useAppSettings();
     const isControlled = controlledMuted !== undefined;
     const [internalMuted, setInternalMuted] = useState(initialMuted);
@@ -105,14 +107,14 @@ export const VideoPlayer = React.memo(
     }, [playing, player, identifier]);
 
     useEffect(() => {
-      if (playing) {
+      if (playing && isFocused) {
         console.log(`${logPrefix} [${identifier}] CALL_PLAY at +${Date.now() - startTime.current}ms`);
         player.play();
       } else {
         console.log(`${logPrefix} [${identifier}] CALL_PAUSE at +${Date.now() - startTime.current}ms`);
         player.pause();
       }
-    }, [playing, player, identifier]);
+    }, [playing, isFocused, player, identifier]);
 
     // Sync React state -> player (when user taps custom button)
     useEffect(() => {

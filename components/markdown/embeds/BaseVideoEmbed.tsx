@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ActivityIndicator, Pressable, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useIsFocused } from '@react-navigation/native';
 import { theme } from '~/lib/theme';
 import { VideoConfig } from '~/lib/config/VideoConfig';
 import { useAppSettings } from '~/lib/AppSettingsContext';
@@ -14,6 +15,7 @@ interface BaseVideoEmbedProps {
 }
 
 export const BaseVideoEmbed = ({ url, isVisible, isPrefetch, author, provider = 'BaseVideoEmbed' }: BaseVideoEmbedProps) => {
+  const isFocused = useIsFocused();
   const { settings } = useAppSettings();
   const { height: screenHeight } = useWindowDimensions();
   const [loading, setLoading] = React.useState(true);
@@ -119,12 +121,12 @@ export const BaseVideoEmbed = ({ url, isVisible, isPrefetch, author, provider = 
 
   // Sync playback state via injection (no reload)
   React.useEffect(() => {
-    if (isVisible && settings.videoAutoPlay) {
+    if (isVisible && isFocused && settings.videoAutoPlay) {
       dispatchCommand('PLAY');
     } else {
       dispatchCommand('PAUSE');
     }
-  }, [isVisible, settings.videoAutoPlay, provider, dispatchCommand]);
+  }, [isVisible, isFocused, settings.videoAutoPlay, provider, dispatchCommand]);
 
   // Sync mute state via injection (no reload)
   React.useEffect(() => {
