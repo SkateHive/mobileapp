@@ -200,7 +200,7 @@ export function ConversationDrawer({
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 40}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 90}
           >
             <ScrollView 
               style={styles.repliesList}
