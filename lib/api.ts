@@ -95,6 +95,7 @@ export async function getSnapsFeed(page = 1, limit = 10): Promise<Post[]> {
 
         // Ensure children count is a number (for comment count display)
         post.children = Number(post.children || 0);
+        console.log(`[getSnapsFeed] ${post.author}/${post.permlink.slice(0,20)}: children=${post.children}, active_votes=${post.active_votes?.length}`);
         
         // Ensure json_metadata is parsed if it's a string from the API
         if (typeof post.post_json_metadata === 'string') {
