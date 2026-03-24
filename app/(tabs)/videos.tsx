@@ -389,12 +389,12 @@ export default function VideosScreen() {
         <Animated.View style={[styles.topHeader, { opacity: uiOpacity }]}>
           <Pressable style={styles.userInfo} onPress={handleUserPress}>
             <Image 
-              source={{ uri: item.soft_post_avatar || avatarUrl }} 
+              source={{ uri: item.avatarUrl || avatarUrl }} 
               style={styles.avatar} 
               fadeDuration={0} 
             />
             <Text style={styles.username}>
-              {item.soft_post_display_name ? item.soft_post_display_name : `@${item.username}`}
+              {item.displayName ? item.displayName : `@${item.username}`}
             </Text>
           </Pressable>
 

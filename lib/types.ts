@@ -7,6 +7,10 @@ export interface Post extends Omit<Discussion, 'post_json_metadata' | 'user_json
   soft_post_display_name?: string;
   soft_post_avatar?: string;
 
+  // Render-friendly standardized fields mapped from API
+  avatarUrl?: string;
+  displayName?: string;
+
   // Overridden fields to match our API response or specific usage
   post_json_metadata: any; 
   user_json_metadata: any;
