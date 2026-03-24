@@ -274,7 +274,7 @@ export default function ProfileScreen() {
       setApiError(null);
       console.log(`[Profile Snaps] Fetching page ${page} for @${profileUsername} (refresh: ${refresh})`);
       
-      const url = `${API_BASE_URL}/skatesnaps/${profileUsername}?page=${page}&limit=${API_LIMIT}`;
+      const url = `${API_BASE_URL}/feed?author=${profileUsername}&page=${page}&limit=${API_LIMIT}`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -288,8 +288,7 @@ export default function ProfileScreen() {
         // Map fields for compatibility with PostCard and other components
         const mappedPosts = result.data.map((p: any) => ({
           ...p,
-          // API fields mapped to Hive/PostCard expectations
-          json_metadata: p.post_json_metadata || p.json_metadata,
+          // Map API 'votes' → dhive 'active_votes' for PostCard compatibility
           active_votes: p.votes || [],
         }));
 
