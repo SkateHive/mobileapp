@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1, // Ensure it fills space for gestures
-    paddingBottom: 100, // Space for composer
+    paddingBottom: 160, // Extra space so last comment icons aren't hidden behind composer
   },
   repliesHeader: {
     flexDirection: 'row',
