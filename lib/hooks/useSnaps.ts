@@ -4,6 +4,7 @@ import { Discussion } from '@hiveio/dhive';
 import { SnapConfig } from '../config/SnapConfig';
 import { FeedFilterType } from '../FeedFilterContext';
 import { useAuth } from '../auth-provider';
+import { getSnapsFeed } from '../api';
 
 interface LastContainerInfo {
   permlink: string;
@@ -14,6 +15,7 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
   const { blockedList } = useAuth();
   const lastContainerRef = useRef<LastContainerInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
+  const apiPageRef = useRef<number>(1);
 
   const [comments, setComments] = useState<ExtendedComment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +28,7 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
     setHasMore(true);
     lastContainerRef.current = null;
     fetchedPermlinksRef.current = new Set();
+    apiPageRef.current = 1;
   }, [filter]);
 
   // Filter comments by tag
@@ -50,6 +53,26 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
     const effectiveFilter = 'Curated';
     
     if (effectiveFilter === 'Curated') {
+      try {
+        const currentPage = apiPageRef.current;
+        const apiSnaps = await getSnapsFeed(currentPage, SnapConfig.pageSize);
+        
+        if (apiSnaps && apiSnaps.length > 0) {
+          apiPageRef.current += 1;
+          const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+          const safelyFilteredComments = apiSnaps.filter(c => !blockedSet.has(c.author.toLowerCase())) as unknown as ExtendedComment[];
+          
+          safelyFilteredComments.forEach(c => fetchedPermlinksRef.current.add(c.permlink));
+          return safelyFilteredComments;
+        } else if (apiSnaps && apiSnaps.length === 0 && currentPage > 1) {
+          // We reached the end of the API feed
+          return [];
+        }
+      } catch (error) {
+        console.warn('Failed to fetch from skatehive-api, falling back to dhive natively:', error);
+      }
+
+      // --- NATIVE DHIVE FALLBACK ---
       const tag = COMMUNITY_TAG;
       const pageSize = SnapConfig.pageSize; // Target page size
       const allFilteredComments: ExtendedComment[] = [];
@@ -177,6 +200,7 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
   const refresh = useCallback(() => {
     lastContainerRef.current = null;
     fetchedPermlinksRef.current = new Set();
+    apiPageRef.current = 1;
     setComments([]);
     setHasMore(true);
     setFetchTrigger((t) => t + 1);

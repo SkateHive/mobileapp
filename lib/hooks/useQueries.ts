@@ -27,10 +27,9 @@ export interface VideoPost {
   tags: string[];
   json_metadata: any;
   active_votes: any[];
-  is_soft_post?: boolean;
-  soft_post_author?: string;
-  soft_post_display_name?: string;
-  soft_post_avatar?: string;
+  // Standardized soft post mappings
+  avatarUrl?: string;
+  displayName?: string;
 }
 
 const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
@@ -75,10 +74,9 @@ async function fetchVideoFeed({ pageParam = 1 }: { pageParam?: any }): Promise<V
           tags: metadata?.tags || [],
           json_metadata: metadata,
           active_votes: rawPost.active_votes || rawPost.votes || [],
-          is_soft_post: post.is_soft_post,
-          soft_post_author: post.soft_post_author,
-          soft_post_display_name: post.soft_post_display_name,
-          soft_post_avatar: post.soft_post_avatar,
+          // Use standardized mapped fields
+          avatarUrl: post.avatarUrl,
+          displayName: post.displayName,
         });
       });
     }

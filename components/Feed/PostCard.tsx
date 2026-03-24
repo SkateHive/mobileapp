@@ -442,7 +442,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
         <View style={styles.minimizedRow}>
           <View style={styles.minimizedAvatarContainer}>
             <Image
-              source={{ uri: post.soft_post_avatar || `https://images.hive.blog/u/${post.author}/avatar/small` }}
+              source={{ uri: post.avatarUrl || `https://images.hive.blog/u/${post.author}/avatar/small` }}
               style={styles.minimizedAvatar}
               alt={`${post.author}'s avatar`}
             />
@@ -496,9 +496,9 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
           ]}>
             <Pressable onPress={handleProfilePress}>
               <Image
-                source={{ uri: post.soft_post_avatar || `https://images.hive.blog/u/${post.author}/avatar/small` }}
+                source={{ uri: post.avatarUrl || `https://images.hive.blog/u/${post.author}/avatar/small` }}
                 style={styles.profileImage}
-                alt={`${post.soft_post_display_name || post.author}'s avatar`}
+                alt={`${post.displayName || post.author}'s avatar`}
                 transition={200}
               />
             </Pressable>
@@ -509,7 +509,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
             {/* Header with author and date */}
             <View style={styles.headerContainer}>
               <Pressable onPress={handleProfilePress}>
-                <Text style={styles.authorText}>{post.soft_post_display_name || post.author}</Text>
+                <Text style={styles.authorText}>{post.displayName || post.author}</Text>
               </Pressable>
               <Text style={styles.dateText}>
                 {formattedDate}
