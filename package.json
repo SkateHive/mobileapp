@@ -1,7 +1,7 @@
 {
   "name": "mycommunity-app",
   "main": "index.js",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "scripts": {
     "dev": "expo start -c",
     "dev:web": "expo start -c --web",
