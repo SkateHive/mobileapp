@@ -2,16 +2,17 @@ import { Client, Comment, PrivateKey, Discussion, PublicKey } from '@hiveio/dhiv
 import CryptoJS from 'crypto-js';
 import { 
   SNAPS_CONTAINER_AUTHOR as ENV_SNAPS_CONTAINER_AUTHOR,
-  SNAPS_PAGE_MIN_SIZE as ENV_SNAPS_PAGE_MIN_SIZE,
-  SNAPS_CONTAINER_FETCH_LIMIT as ENV_SNAPS_CONTAINER_FETCH_LIMIT,
   COMMUNITY_TAG as ENV_COMMUNITY_TAG,
   MODERATOR_PUBLIC_KEY as ENV_MODERATOR_PUBLIC_KEY
 } from '@env';
+import { SnapConfig } from './config/SnapConfig';
+import { VideoConfig } from './config/VideoConfig';
+import { MOCK_POSTS } from './mock/videoTestData';
 
 // --- HIVE CONSTANTS (from .env) ---
 export const SNAPS_CONTAINER_AUTHOR = ENV_SNAPS_CONTAINER_AUTHOR || 'peak.snaps';
-export const SNAPS_PAGE_MIN_SIZE = Number(ENV_SNAPS_PAGE_MIN_SIZE) || 10;
-export const SNAPS_CONTAINER_FETCH_LIMIT = Number(ENV_SNAPS_CONTAINER_FETCH_LIMIT) || 3;
+export const SNAPS_PAGE_MIN_SIZE = SnapConfig.pageSize;
+export const SNAPS_CONTAINER_FETCH_LIMIT = SnapConfig.containerFetchLimit;
 export const COMMUNITY_TAG = ENV_COMMUNITY_TAG || 'hive-173115';
 export const MODERATOR_PUBLIC_KEY = ENV_MODERATOR_PUBLIC_KEY;
 
@@ -263,6 +264,17 @@ export async function getSnapsContainers({
   lastPermlink?: string;
   lastDate?: string;
 }): Promise<Comment[]> {
+  if (VideoConfig.debugVideoTestMode) {
+    console.log('[getSnapsContainers] DEBUG_MODE: Returning mock container');
+    return [
+      {
+        author: SNAPS_CONTAINER_AUTHOR,
+        permlink: 'mock-video-test-container',
+        created: new Date().toISOString(),
+      } as Comment
+    ];
+  }
+
   return HiveClient.database.call('get_discussions_by_author_before_date', [
     SNAPS_CONTAINER_AUTHOR,
     lastPermlink,
@@ -281,7 +293,42 @@ export async function getContentReplies({
   author: string;
   permlink: string;
 }): Promise<ExtendedComment[]> {
+  if (VideoConfig.debugVideoTestMode && permlink === 'mock-video-test-container') {
+    console.log('[getContentReplies] DEBUG_MODE: Returning MOCK_POSTS as replies');
+    return MOCK_POSTS.map(post => ({
+      ...post,
+      parent_author: SNAPS_CONTAINER_AUTHOR,
+      parent_permlink: 'mock-video-test-container',
+    })) as unknown as ExtendedComment[];
+  }
+
   return HiveClient.database.call('get_content_replies', [author, permlink]);
+}
+
+/**
+ * Get discussions (posts) by filter and tag
+ */
+export async function getDiscussions(
+  type: 'created' | 'trending' | 'hot' | 'feed',
+  query: { 
+    tag?: string; 
+    limit?: number; 
+    start_author?: string; 
+    start_permlink?: string;
+  }
+): Promise<Discussion[]> {
+  const params: any = {
+    limit: query.limit || 10,
+    tag: query.tag || COMMUNITY_TAG,
+  };
+  
+  if (query.start_author && query.start_permlink) {
+    params.start_author = query.start_author;
+    params.start_permlink = query.start_permlink;
+  }
+
+  // get_discussions_by_feed requires account name in 'tag' field
+  return HiveClient.database.call(`get_discussions_by_${type}`, [params]);
 }
 
 /**
@@ -300,12 +347,122 @@ export async function getContent(author: string, permlink: string): Promise<Disc
   }
 }
 
+/**
+ * Verifies if a list of posts are deleted on the blockchain.
+ * This is used as a fallback to catch deletions that HAFSQL might have missed.
+ * Returns only the posts that are NOT deleted.
+ */
+export async function filterDeletedPosts(posts: any[]): Promise<any[]> {
+  if (!posts || posts.length === 0) return [];
+
+  console.log(`[Hive Utils] Checking deletion status for ${posts.length} posts...`);
+
+  try {
+    const verifiedPosts = await Promise.all(
+      posts.map(async (post) => {
+        try {
+          // Fetch current state directly from a Hive node
+          const content = await getContent(post.author, post.permlink);
+          
+          // If content not found or author is empty, it's likely hard deleted
+          if (!content || !content.author || content.author === "") {
+            return null;
+          }
+          
+          // Check for "soft delete" where body is set to "deleted"
+          // This is the pattern used in skatehive3.0
+          if (content.body === "deleted") {
+            return null;
+          }
+          
+          // Check json_metadata for a deleted flag
+          let metadata: any = {};
+          try {
+            metadata = typeof content.json_metadata === 'string' 
+              ? JSON.parse(content.json_metadata) 
+              : content.json_metadata;
+          } catch (e) {}
+          
+          if (metadata?.deleted === true || metadata?.deleted === 1) {
+            return null;
+          }
+
+          // Return the original post object but with updated body if it's the official source
+          return {
+            ...post,
+            body: content.body,
+            json_metadata: content.json_metadata,
+            active_votes: content.active_votes || post.active_votes
+          };
+        } catch (e) {
+          // If single fetch fails, keep the original as fallback
+          return post;
+        }
+      })
+    );
+
+    const result = verifiedPosts.filter((p): p is any => p !== null);
+    console.log(`[Hive Utils] Filtered out ${posts.length - result.length} deleted posts.`);
+    return result;
+  } catch (error) {
+    console.error("Error in filterDeletedPosts:", error);
+    return posts; // Return original if everything fails
+  }
+}
+
 // Define custom error classes for better error handling
 export class HiveError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'HiveError';
   }
+}
+
+/**
+ * Hard delete a post/comment using the delete_comment operation.
+ * Only works if there are no replies and no votes.
+ */
+export async function hardDeleteSnap(
+  privateKey: string,
+  author: string,
+  permlink: string
+): Promise<any> {
+  const operation: any = [
+    'delete_comment',
+    {
+      author,
+      permlink,
+    },
+  ];
+  return sendOperation(privateKey, [operation]);
+}
+
+/**
+ * Soft delete a post/comment by updating its body to "deleted".
+ * Works even if there are replies or votes.
+ */
+export async function softDeleteSnap(
+  privateKey: string,
+  author: string,
+  permlink: string,
+  parentAuthor: string = '',
+  parentPermlink: string = '',
+  title: string = '',
+  jsonMetadata: any = {}
+): Promise<any> {
+  const operation: any = [
+    'comment',
+    {
+      parent_author: parentAuthor,
+      parent_permlink: parentPermlink,
+      author: author,
+      permlink: permlink,
+      title: title,
+      body: 'deleted',
+      json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata),
+    },
+  ];
+  return sendOperation(privateKey, [operation]);
 }
 
 export class InvalidKeyFormatError extends HiveError {
@@ -539,8 +696,11 @@ export async function getBlockchainAccountData(username: string): Promise<{
   hbd: string;
   vests: string;
   hp_equivalent: string;
+  delegated_hp: string;
+  received_hp: string;
   hive_savings: string;
   hbd_savings: string;
+  hbd_claimable: string;
 }> {
   try {
     const [account] = await HiveClient.database.getAccounts([username]);
@@ -553,19 +713,41 @@ export async function getBlockchainAccountData(username: string): Promise<{
     const hive = extractNumber(account.balance);
     const hbd = extractNumber(account.hbd_balance);
     const vestingShares = extractNumber(account.vesting_shares);
+    const delegatedVestingShares = extractNumber(account.delegated_vesting_shares);
+    const receivedVestingShares = extractNumber(account.received_vesting_shares);
     const hiveSavings = extractNumber(account.savings_balance);
     const hbdSavings = extractNumber(account.savings_hbd_balance);
     
     // Convert VESTS to HIVE Power
     const hpEquivalent = await convertVestToHive(parseFloat(vestingShares));
+    const delegatedHP = await convertVestToHive(parseFloat(delegatedVestingShares));
+    const receivedHP = await convertVestToHive(parseFloat(receivedVestingShares));
+
+    // Calculate Claimable HBD Interest
+    // Simplified interest calculation: (hbd_seconds * rate) / (seconds_in_year * precision)
+    // Rate is usually 14% (0.14)
+    const HBD_PRINT_RATE_MAX = 10000;
+    const rate = 0.14; 
+    const hbdSeconds = BigInt(account.savings_hbd_seconds);
+    const now = new Date();
+    const lastUpdate = new Date(account.savings_hbd_seconds_last_update + "Z");
+    const secondsSinceUpdate = BigInt(Math.floor((now.getTime() - lastUpdate.getTime()) / 1000));
+    const totalHbdSeconds = hbdSeconds + (BigInt(parseFloat(hbdSavings) * 1000) * secondsSinceUpdate);
+    
+    // interest = (HBD_seconds * interest_rate) / (seconds_per_year * 10000)
+    // 31536000 seconds in a year
+    const pendingInterest = Number(totalHbdSeconds * BigInt(1400)) / (31536000 * 10000 * 1000);
     
     return {
       hive,
       hbd,
       vests: vestingShares,
       hp_equivalent: hpEquivalent.toFixed(3),
+      delegated_hp: delegatedHP.toFixed(3),
+      received_hp: receivedHP.toFixed(3),
       hive_savings: hiveSavings,
       hbd_savings: hbdSavings,
+      hbd_claimable: pendingInterest.toFixed(3),
     };
   } catch (error) {
     console.error('Error fetching blockchain account data:', error);
@@ -679,11 +861,15 @@ export async function getBlockchainRewards(username: string): Promise<{
       };
     });
 
+    // Hive payouts are typically 50% HP and 50% HBD/Liquid Hive (depending on settings)
+    const pendingHBD = totalPendingPayout / 2;
+    const pendingHP = totalPendingPayout / 2; // This is in HBD value, would need conversion if we want HP count
+
     return {
       summary: {
         total_pending_payout: totalPendingPayout.toFixed(3),
-        pending_hbd: totalPendingPayout.toFixed(3),
-        pending_hp: "0.000", // Would need to calculate based on rewards split
+        pending_hbd: pendingHBD.toFixed(3),
+        pending_hp: pendingHP.toFixed(3), 
         pending_posts_count: pendingPosts.length.toString(),
         total_author_rewards: totalAuthorRewards.toFixed(3),
         total_curator_payouts: totalCuratorRewards.toFixed(3),
@@ -962,21 +1148,55 @@ export async function getUserRelationshipList(
   username: string,
   type: 'blog' | 'ignore' | 'blacklist',
   startFollowing: string = '',
-  limit: number = 100
+  limit: number = 1000
 ): Promise<string[]> {
   try {
-    // Use the traditional follow_api for getting full lists
-    const result = await HiveClient.call('follow_api', 'get_following', [
-      username,
-      startFollowing,
-      type,
-      limit,
-    ]);
+    const allUsernames: string[] = [];
+    let lastUsername = startFollowing;
+    const pageSize = Math.min(limit, 1000); // Hive API caps at 1000
 
-    // Extract usernames from the result
-    return result.map((item: any) => item.following);
+    // Paginate through all results
+    while (true) {
+      let result;
+      if (type === 'ignore') {
+        // bridge.get_following does not support 'ignore', so we use condenser_api
+        result = await HiveClient.call('condenser_api', 'get_following', [
+          username,
+          lastUsername,
+          'ignore',
+          pageSize
+        ]);
+      } else {
+        // Use bridge API for 'blog' (following) as it is the modern method
+        result = await HiveClient.call('bridge', 'get_following', {
+          account: username,
+          start: lastUsername,
+          type: type,
+          limit: pageSize,
+        });
+      }
+
+      if (!result || result.length === 0) break;
+
+      const usernames: string[] = result.map((item: any) => 
+        type === 'ignore' ? item.following : item.following
+      );
+
+      // If we provided a lastUsername, the first result is inclusive (skip it)
+      const newUsernames = lastUsername ? usernames.slice(1) : usernames;
+
+      if (newUsernames.length === 0) break;
+
+      allUsernames.push(...newUsernames);
+      lastUsername = usernames[usernames.length - 1];
+
+      // If we got fewer results than the page size, we've reached the end
+      if (result.length < pageSize) break;
+    }
+
+    return allUsernames;
   } catch (error) {
-    console.error('Error fetching user relationship list:', error);
+    console.error(`Error fetching user relationship list (${type}):`, error);
     return [];
   }
 }

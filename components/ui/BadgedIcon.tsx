@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   icon: {
-    marginBottom: -10,
+    // Removed negative margin that caused misalignment
   },
   badge: {
     position: 'absolute',

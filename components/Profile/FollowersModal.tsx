@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -7,29 +7,36 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
-import { getFollowing, getFollowers, getMuted, setUserRelationship } from '~/lib/hive-utils';
+
+import { getFollowing, getFollowers, setUserRelationship } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
+import { getMutedList, getBlacklistedList } from '~/lib/api';
 
 interface FollowersModalProps {
   visible: boolean;
   onClose: () => void;
+  onNavigate?: () => void;
   username: string;
-  type: 'followers' | 'following' | 'muted';
+  type: 'followers' | 'following' | 'muted' | 'blocked';
 }
 
 interface UserItemProps {
   username: string;
   onPress: (username: string) => void;
-  showUnmuteButton?: boolean;
-  onUnmute?: (username: string) => void;
+  showUnblockButton?: boolean;
+  onUnblock?: (username: string) => void;
 }
 
-const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton, onUnmute }) => {
+const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnblockButton, onUnblock }) => {
   return (
     <Pressable
       style={styles.userItem}
@@ -42,15 +49,15 @@ const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton
       <View style={styles.userInfo}>
         <Text style={styles.username}>@{username}</Text>
       </View>
-      {showUnmuteButton && onUnmute ? (
+      {showUnblockButton && onUnblock ? (
         <Pressable
-          style={styles.unmuteButton}
+          style={styles.unblockButton}
           onPress={(e) => {
             e.stopPropagation();
-            onUnmute(username);
+            onUnblock(username);
           }}
         >
-          <Text style={styles.unmuteText}>Unmute</Text>
+          <Text style={styles.unblockText}>Unblock</Text>
         </Pressable>
       ) : (
         <FontAwesome 
@@ -63,23 +70,82 @@ const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton
   );
 };
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 export const FollowersModal: React.FC<FollowersModalProps> = ({
   visible,
   onClose,
+  onNavigate,
   username,
   type,
 }) => {
+  const insets = useSafeAreaInsets();
   const [users, setUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const { session, username: currentUsername } = useAuth();
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const { session, username: currentUsername, blockedList, updateUserRelationship } = useAuth();
+
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   useEffect(() => {
     if (visible) {
       loadUsers();
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
+    } else {
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible, username, type]);
+
+  const handleClose = () => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        return evt.nativeEvent.locationY < 80;
+      },
+      onMoveShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        return gestureState.dy > 10 && scrollOffset <= 0;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          handleClose();
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
 
   const loadUsers = async (startFrom: string = '', append: boolean = false) => {
     try {
@@ -95,8 +161,22 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
         newUsers = await getFollowers(username, startFrom, 50);
       } else if (type === 'following') {
         newUsers = await getFollowing(username, startFrom, 50);
+      } else if (type === 'muted' || type === 'blocked') {
+        if (username === currentUsername) {
+          // Use the cached list from AuthProvider for current user
+          newUsers = blockedList;
+        } else {
+          // Fallback to API for other users
+          const [muted, blacklisted] = await Promise.all([
+            getMutedList(username),
+            getBlacklistedList(username)
+          ]);
+          newUsers = Array.from(new Set([...muted, ...blacklisted]));
+        }
+        setHasMore(false);
       } else {
-        newUsers = await getMuted(username, startFrom, 50);
+        newUsers = [];
+        setHasMore(false);
       }
 
       if (append) {
@@ -105,8 +185,10 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
         setUsers(newUsers);
       }
 
-      // If we got less than 50, we've reached the end
-      setHasMore(newUsers.length === 50);
+      // If we got fewer results than the page size, we've reached the end
+      if (type === 'followers' || type === 'following') {
+        setHasMore(newUsers.length === 50);
+      }
     } catch (error) {
       console.error(`Error loading ${type}:`, error);
     } finally {
@@ -123,7 +205,8 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
   };
 
   const handleUserPress = (selectedUsername: string) => {
-    onClose();
+    handleClose();
+    if (onNavigate) onNavigate();
     // Navigate to the selected user's profile
     router.push({
       pathname: '/(tabs)/profile',
@@ -131,20 +214,18 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     });
   };
 
-  const handleUnmute = async (targetUsername: string) => {
-    if (!session?.decryptedKey || !currentUsername) {
-      console.error('No authenticated session found');
-      return;
-    }
 
+  const handleUnblock = async (targetUsername: string) => {
     try {
-      // Remove from muted list by setting relationship to empty string
-      await setUserRelationship(session.decryptedKey, currentUsername, targetUsername, '');
+      // Remove all relationships (unblock)
+      const success = await updateUserRelationship(targetUsername, '');
       
-      // Remove from local state
-      setUsers(prevUsers => prevUsers.filter(user => user !== targetUsername));
+      if (success) {
+        // Remove from local state
+        setUsers(prevUsers => prevUsers.filter(user => user !== targetUsername));
+      }
     } catch (error) {
-      console.error('Error unmuting user:', error);
+      console.error('Error unblocking user:', error);
     }
   };
 
@@ -152,8 +233,8 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     <UserItem 
       username={item} 
       onPress={handleUserPress}
-      showUnmuteButton={type === 'muted'}
-      onUnmute={type === 'muted' ? handleUnmute : undefined}
+      showUnblockButton={type === 'muted' || type === 'blocked'}
+      onUnblock={(type === 'muted' || type === 'blocked') ? handleUnblock : undefined}
     />
   );
 
@@ -181,18 +262,33 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View 
+          {...panResponder.panHandlers}
+          style={[
+            styles.modalContainer,
+            { 
+              transform: [{ translateY }],
+              paddingBottom: insets.bottom,
+            }
+          ]}
+        >
+          {/* Handle bar for swiping */}
+          <View style={styles.handleBarContainer}>
+            <View style={styles.handleBar} />
+          </View>
+
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Muted'}
+              {type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Blocked Users'}
             </Text>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <FontAwesome name="times" size={20} color={theme.colors.text} />
+            <Pressable onPress={handleClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color={theme.colors.text} />
             </Pressable>
           </View>
 
@@ -200,7 +296,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.green} />
-              <Text style={styles.loadingText}>Loading {type === 'muted' ? 'muted users' : type}...</Text>
+              <Text style={styles.loadingText}>Loading {type === 'muted' || type === 'blocked' ? 'blocked users' : type}...</Text>
             </View>
           ) : (
             <FlatList
@@ -213,13 +309,16 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
               ListEmptyComponent={renderEmpty}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listContent}
+              onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
+              scrollEventThrottle={16}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 };
+
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -237,7 +336,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
@@ -247,9 +347,23 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontFamily: theme.fonts.bold,
   },
-  closeButton: {
-    padding: theme.spacing.xs,
+  handleBarContainer: {
+    width: '100%',
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+
+  handleBar: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: theme.colors.border,
+  },
+  closeButton: {
+    padding: 4,
+  },
+
   listContent: {
     flexGrow: 1,
   },
@@ -302,13 +416,13 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
     textAlign: 'center',
   },
-  unmuteButton: {
+  unblockButton: {
     backgroundColor: theme.colors.primary,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.sm,
   },
-  unmuteText: {
+  unblockText: {
     color: theme.colors.background,
     fontSize: theme.fontSizes.sm,
     fontFamily: theme.fonts.bold,

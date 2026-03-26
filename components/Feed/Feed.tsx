@@ -2,17 +2,25 @@ import React from "react";
 import {
   View,
   FlatList,
+  FlatListProps,
   StyleSheet,
   RefreshControl,
   ViewToken,
   Pressable,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
 import { useAuth } from "~/lib/auth-provider";
-import { useSnaps } from "~/lib/hooks/useSnaps";
+import { Post } from '~/lib/types';
+import { useFeedFilter } from '~/lib/FeedFilterContext';
+import { useScrollDirection } from '~/lib/ScrollDirectionContext';
+import { useSnaps } from '~/lib/hooks/useSnaps';
 import { theme } from "~/lib/theme";
 import {
   ViewportTrackerProvider,
@@ -20,6 +28,11 @@ import {
 } from "~/lib/ViewportTracker";
 import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
+import { useScrollLock } from "~/lib/ScrollLockContext";
+import { ConversationDrawer } from "./ConversationDrawer";
+import { useScrollToTop } from "@react-navigation/native";
+import { VideoConfig } from "~/lib/config/VideoConfig";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Discussion } from "@hiveio/dhive";
 
 interface FeedProps {
@@ -27,13 +40,98 @@ interface FeedProps {
   onRefresh?: () => void;
 }
 
+const AnimatedFlatList = Animated.FlatList;
+
 function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
+  const { filter } = useFeedFilter();
+  const { isScrollLocked } = useScrollLock();
   const router = useRouter();
-  const { username, mutedList, blacklistedList } = useAuth();
-  const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps();
+  const { username, blockedList } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { comments, isLoading, loadNextPage, hasMore, refresh } = useSnaps(filter, username);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const { updateVisibleItems } = useViewportTracker();
+  const { updateVisibleItems, updatePrefetchItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+  const scrollY = React.useRef(new Animated.Value(0)).current;
+  const lastScrollY = React.useRef(0);
+  const upScrollDistance = React.useRef(0);
+
+  const flatListRef = React.useRef<FlatList>(null);
+  const { setScrollDirection } = useScrollDirection();
+  const navigation = useNavigation();
+
+  React.useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
+      // Check if we are already focused on the feed
+      const isFocused = navigation.isFocused();
+      if (isFocused) {
+        // If already on feed, scroll to top
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const handleScrollToTop = React.useCallback(async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const onScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const currentY = event.nativeEvent.contentOffset.y;
+        const diff = lastScrollY.current - currentY;
+
+        if (diff > 0) {
+          // Scrolling up
+          upScrollDistance.current += diff;
+          if (diff > 5) setScrollDirection('up'); // Sensitivity threshold
+        } else if (diff < 0) {
+          // Scrolling down
+          upScrollDistance.current = 0;
+          if (Math.abs(diff) > 5) setScrollDirection('down');
+          if (showScrollTop) setShowScrollTop(false);
+        }
+
+        if (currentY > 2600 && upScrollDistance.current > 800) {
+          if (!showScrollTop) setShowScrollTop(true);
+        }
+
+        if (currentY < 100) {
+          if (showScrollTop) setShowScrollTop(false);
+          setScrollDirection('up'); // Keep visible at top
+        }
+
+        lastScrollY.current = currentY;
+      },
+    }
+  );
+
+  const scrollTopOpacity = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(scrollTopOpacity, {
+      toValue: showScrollTop ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showScrollTop]);
+
+  // Conversation drawer state (lifted out of PostCard)
+  const [conversationPost, setConversationPost] = React.useState<Discussion | null>(null);
+
+  const handleOpenConversation = React.useCallback((post: Discussion) => {
+    setConversationPost(post);
+  }, []);
+
+  const handleCloseConversation = React.useCallback(() => {
+    setConversationPost(null);
+  }, []);
 
   // Handle pull-to-refresh
   const handleRefresh = React.useCallback(async () => {
@@ -46,58 +144,85 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     setIsRefreshing(false);
   }, [refresh, onRefresh]);
 
-  // Handle viewable items change for video autoplay
-  const onViewableItemsChanged = React.useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const visiblePermlinks = viewableItems
-        .filter((item) => item.isViewable && item.item)
-        .map((item) => (item.item as Discussion).permlink);
-      updateVisibleItems(visiblePermlinks);
-    },
-    [updateVisibleItems]
-  );
-
-  // Viewability config - item is considered viewable when 60% is visible
-  const viewabilityConfig = React.useMemo(
-    () => ({
-      viewAreaCoveragePercentThreshold: 60,
-      minimumViewTime: 100,
-    }),
-    []
-  );
-
   // Map blockchain comments (Discussion) to Post for PostCard compatibility
-  const feedData: Discussion[] = comments as unknown as Discussion[];
-
-  // Filter out posts from muted and blacklisted users
+  // Filter out posts from blocked users
   const filteredFeedData = React.useMemo(() => {
+    const feedData = comments as unknown as Post[];
     if (!feedData || feedData.length === 0) return [];
 
     return feedData.filter((post) => {
       // Don't filter out the user's own posts
       if (post.author === username) return true;
 
-      // Filter out muted and blacklisted users
-      return (
-        !mutedList.includes(post.author) &&
-        !blacklistedList.includes(post.author)
-      );
+      const authorLower = post.author.toLowerCase();
+      const blockedLowerList = blockedList.map((u) => u.toLowerCase());
+
+      // Filter out blocked users
+      return !blockedLowerList.includes(authorLower);
     });
-  }, [feedData, mutedList, blacklistedList, username]);
+  }, [comments, blockedList, username]);
+
+  // Handle viewable items change for video autoplay and prefetching
+  const onViewableItemsChanged = React.useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const visiblePermlinks = viewableItems
+        .filter((item) => item.isViewable && item.item)
+        .map((item) => (item.item as Discussion).permlink);
+
+      updateVisibleItems(visiblePermlinks);
+
+      // Prefetching logic: find the items around the visible ones
+      if (viewableItems.length > 0) {
+        const firstVisibleIndex = viewableItems[0].index ?? 0;
+        const lastVisibleIndex = viewableItems[viewableItems.length - 1].index ?? 0;
+        const prefetchDistance = VideoConfig.prefetchDistance;
+        const prefetchPermlinks: string[] = [];
+
+        // Prefetch downwards
+        for (let i = 1; i <= prefetchDistance; i++) {
+          const nextItem = filteredFeedData[lastVisibleIndex + i];
+          if (nextItem) {
+            prefetchPermlinks.push(nextItem.permlink);
+          }
+        }
+        
+        // Prefetch upwards
+        for (let i = 1; i <= prefetchDistance; i++) {
+          const prevItem = filteredFeedData[firstVisibleIndex - i];
+          if (prevItem) {
+            prefetchPermlinks.push(prevItem.permlink);
+          }
+        }
+
+        updatePrefetchItems(prefetchPermlinks);
+      }
+    },
+    [updateVisibleItems, updatePrefetchItems, filteredFeedData]
+  );
+
+  // Viewability config - item is considered viewable when 40% is visible
+  const viewabilityConfig = React.useMemo(
+    () => ({
+      viewAreaCoveragePercentThreshold: 40,
+      minimumViewTime: 100,
+    }),
+    []
+  );
 
   const renderItem = React.useCallback(
-    ({ item }: { item: Discussion }) => (
+    ({ item }: { item: Post }) => (
       <PostCard
         key={item.permlink}
         post={item}
         currentUsername={username || ""}
+        onOpenConversation={handleOpenConversation}
       />
     ),
-    [username]
+    [username, handleOpenConversation]
   );
 
   const keyExtractor = React.useCallback(
-    (item: Discussion) => item.permlink,
+    (item: Post) => item.permlink,
     []
   );
 
@@ -106,33 +231,9 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     []
   );
 
-  const handleNotificationsPress = React.useCallback(() => {
-    router.push("/(tabs)/notifications");
-  }, [router]);
-
   const ListHeaderComponent = React.useCallback(
-    () => (
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Feed</Text>
-        <Pressable
-          onPress={handleNotificationsPress}
-          style={styles.notificationButton}
-          accessibilityRole="button"
-          accessibilityLabel={
-            badgeCount > 0
-              ? `Notifications, ${badgeCount} unread`
-              : "Notifications"
-          }
-        >
-          <BadgedIcon
-            name="notifications-outline"
-            color={theme.colors.text}
-            badgeCount={badgeCount}
-          />
-        </Pressable>
-      </View>
-    ),
-    [handleNotificationsPress, badgeCount]
+    () => <View style={{ height: 100 }} />,
+    []
   );
 
   const ListFooterComponent = isLoading ? (
@@ -143,15 +244,20 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <AnimatedFlatList<Post>
+        ref={flatListRef as any}
         data={filteredFeedData}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isScrollLocked}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         ListHeaderComponent={ListHeaderComponent}
         ItemSeparatorComponent={ItemSeparatorComponent}
         ListFooterComponent={ListFooterComponent}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingBottom: 100 } // Space for absolute tab bar
+        ]}
         onEndReached={hasMore ? loadNextPage : undefined}
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}
@@ -166,22 +272,53 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
             titleColor={theme.colors.text}
           />
         }
-        removeClippedSubviews={true}
+        removeClippedSubviews={true} // Re-enabled to help with memory/OOM crashes
         initialNumToRender={5}
-        maxToRenderPerBatch={3}
-        windowSize={7}
+        maxToRenderPerBatch={5}
+        windowSize={11}
         updateCellsBatchingPeriod={50}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       />
+
+      {showScrollTop && (
+        <Animated.View
+          style={[
+            styles.scrollTopButtonContainer,
+            {
+              opacity: scrollTopOpacity,
+              top: insets.top + 65 // Positioning below GlobalHeader (56px) + small gap
+            }
+          ]}
+        >
+          <Pressable
+            onPress={handleScrollToTop}
+            style={({ pressed }) => [
+              styles.scrollTopButton,
+              pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] }
+            ]}
+          >
+            <Ionicons name="arrow-up" size={20} color={theme.colors.background} />
+            <Text style={styles.scrollTopText}>Popping Up 🛹</Text>
+          </Pressable>
+        </Animated.View>
+      )}
+
+      {/* Single shared conversation drawer */}
+      {conversationPost && (
+        <ConversationDrawer
+          isVisible={!!conversationPost}
+          onClose={handleCloseConversation}
+          post={conversationPost}
+        />
+      )}
     </View>
   );
 }
 
 export function Feed({ refreshTrigger, onRefresh }: FeedProps) {
   return (
-    <ViewportTrackerProvider>
-      <FeedContent refreshTrigger={refreshTrigger} onRefresh={onRefresh} />
-    </ViewportTrackerProvider>
+    <FeedContent refreshTrigger={refreshTrigger} onRefresh={onRefresh} />
   );
 }
 
@@ -189,23 +326,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xxs,
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  headerText: {
-    fontSize: theme.fontSizes.xxl,
-    fontWeight: "bold",
-    color: theme.colors.text,
-    lineHeight: 40,
-    fontFamily: theme.fonts.bold,
-  },
-  notificationButton: {
-    padding: theme.spacing.xs,
+  chevron: {
+    marginLeft: theme.spacing.xs,
+    marginTop: 4,
   },
   separator: {
     height: 1,
@@ -219,6 +346,33 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingTop: theme.spacing.sm, // Add some top padding to ensure proper spacing
-    paddingHorizontal: theme.spacing.md, // Add horizontal padding for content
+    paddingHorizontal: 2, // Give more breathing room from screen edge (4px rhythm adjustment)
+  },
+  scrollTopButtonContainer: {
+    position: 'absolute',
+    alignSelf: 'center',
+    zIndex: 1000,
+  },
+  scrollTopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    gap: theme.spacing.xs,
+    elevation: 8,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  scrollTopText: {
+    color: theme.colors.background,
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.bold,
+    letterSpacing: 1,
   },
 });

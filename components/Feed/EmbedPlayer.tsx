@@ -74,7 +74,7 @@ export const EmbedPlayer = ({ url }: EmbedPlayerProps) => {
             position: relative;
             width: 100%;
             height: 0;
-            padding-bottom: 56.25%; /* 16:9 */
+            padding-bottom: 100%; /* 1:1 Aspect Ratio */
           }
           iframe {
             position: absolute;
@@ -130,7 +130,7 @@ export const EmbedPlayer = ({ url }: EmbedPlayerProps) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    aspectRatio: 1, // Square for consistent layout
     backgroundColor: '#000',
     borderRadius: theme.borderRadius.sm,
     overflow: 'hidden',

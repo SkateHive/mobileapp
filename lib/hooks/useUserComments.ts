@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getUserComments, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
+import { SnapConfig } from '../config/SnapConfig';
 
 interface LastPostInfo {
   author: string;
   permlink: string;
 }
 
-export function useUserComments(username: string | null) {
+export function useUserComments(username: string | null, blockedList: string[] = []) {
   const lastPostRef = useRef<LastPostInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
   const prevUsernameRef = useRef<string | null>(null);
+  const prevBlockedListRef = useRef<string[]>(blockedList);
 
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +44,7 @@ export function useUserComments(username: string | null) {
   async function getMoreUserComments(): Promise<any[]> {
     if (!username || username === 'SPECTATOR') return [];
 
-    const pageSize = 10;
+    const pageSize = SnapConfig.pageSize;
     const allFilteredPosts: any[] = [];
     let hasMoreData = true;
     let iterationCount = 0;
@@ -56,7 +58,7 @@ export function useUserComments(username: string | null) {
         const result = await getUserComments(
           username,
           'comments',
-          20,
+          SnapConfig.fetchLimit,
           lastPostRef.current?.author,
           lastPostRef.current?.permlink
         );
@@ -80,7 +82,7 @@ export function useUserComments(username: string | null) {
           lastPostRef.current = { author: lastItem.author, permlink: lastItem.permlink };
         }
 
-        if (result.length < 20) hasMoreData = false;
+        if (result.length < SnapConfig.fetchLimit) hasMoreData = false;
       } catch (error) {
         console.error('Error fetching user posts:', error);
         hasMoreData = false;
@@ -123,9 +125,18 @@ export function useUserComments(username: string | null) {
 
         setPosts((prevPosts) => {
           const existingPermlinks = new Set(prevPosts.map((p) => p.permlink));
-          const uniquePosts = newPosts.filter((p: any) => !existingPermlinks.has(p.permlink));
+          const blockedLower = blockedList.map(m => m.toLowerCase());
+          const uniquePosts = newPosts.filter((p: any) => 
+            !existingPermlinks.has(p.permlink) && 
+            !blockedLower.includes(p.author.toLowerCase())
+          );
 
-          if (uniquePosts.length === 0) {
+          if (uniquePosts.length === 0 && newPosts.length > 0) {
+            // All new posts were filtered out by mutes, try to get more
+            setFetchTrigger(t => t + 1);
+          }
+
+          if (uniquePosts.length === 0 && newPosts.length === 0) {
             setHasMore(false);
           }
 
@@ -142,7 +153,20 @@ export function useUserComments(username: string | null) {
     fetchPosts();
 
     return () => { cancelled = true; };
-  }, [fetchTrigger, username]);
+  }, [fetchTrigger, username, blockedList]);
+
+  // Reset when blockedList changes significantly (e.g. login/logout or new block)
+  useEffect(() => {
+    if (JSON.stringify(prevBlockedListRef.current) !== JSON.stringify(blockedList)) {
+      prevBlockedListRef.current = blockedList;
+      // Re-fetch and clear current posts
+      lastPostRef.current = null;
+      fetchedPermlinksRef.current = new Set();
+      setPosts([]);
+      setHasMore(true);
+      setFetchTrigger((t) => t + 1);
+    }
+  }, [blockedList]);
 
   // Load next page — just bump the trigger
   const loadNextPage = useCallback(() => {

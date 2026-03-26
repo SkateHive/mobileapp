@@ -9,10 +9,9 @@ import type { StoredUser } from '../../lib/types';
 interface StoredUsersViewProps {
   users: StoredUser[];
   onQuickLogin: (user: StoredUser) => void;
-  onDeleteUser?: (username: string) => void;
 }
 
-export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUsersViewProps) {
+export function StoredUsersView({ users, onQuickLogin }: StoredUsersViewProps) {
   return (
     <View style={styles.container}>
       <ScrollView
@@ -21,10 +20,10 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
         bounces={false}
       >
         {users
-          .filter(user => user.username !== "SPECTATOR")
-          .map((user) => (
+          .filter(user => user.username && user.username.trim() !== "" && user.username !== "SPECTATOR")
+          .map((user, index) => (
             <View
-              key={user.username}
+              key={`stored-user-${user.username}-${index}`}
               style={styles.userRow}
             >
               <Button
@@ -38,7 +37,7 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
                     style={styles.avatar}
                   />
                   <Text style={styles.username}>
-                    {user.username}
+                    @{user.username}
                   </Text>
                 </View>
                 <Ionicons
@@ -47,20 +46,6 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
                   color={theme.colors.muted}
                 />
               </Button>
-              {onDeleteUser && (
-                <Pressable
-                  onPress={() => onDeleteUser(user.username)}
-                  style={styles.deleteButton}
-                  accessibilityLabel={`Delete @${user.username}`}
-                  hitSlop={8}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={22}
-                    color={theme.colors.danger}
-                  />
-                </Pressable>
-              )}
             </View>
           ))}
       </ScrollView>

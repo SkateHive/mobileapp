@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SkateHive",
+    "name": "Skatehive",
     "slug": "skatehive-app",
     "version": "1.0.2",
     "orientation": "portrait",
@@ -39,10 +39,15 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ],
       "package": "com.skatehive.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "adjustResize"
     },
     "web": {
       "bundler": "metro",
@@ -57,17 +62,18 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "SkateHive needs access to your camera to capture photos and videos of your skateboarding tricks and moments. This media will be uploaded to IPFS and shared on the Hive blockchain as part of your posts."
+          "cameraPermission": "Skatehive needs access to your camera to capture photos and videos of your skateboarding tricks and moments. This media will be uploaded to IPFS and shared on the Hive blockchain as part of your posts."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "SkateHive needs access to your photo library to let you select existing photos and videos for your skateboarding posts. Selected media will be uploaded to IPFS and shared on the Hive blockchain.",
-          "savePhotosPermission": "SkateHive needs permission to save photos to your library."
+          "photosPermission": "Skatehive needs access to your photo library to let you select existing photos and videos for your skateboarding posts. Selected media will be uploaded to IPFS and shared on the Hive blockchain.",
+          "savePhotosPermission": "Skatehive needs permission to save photos to your library."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
@@ -77,9 +83,15 @@
         "origin": false
       },
       "eas": {
-        "projectId": "cb49cb24-702c-4d0c-9747-1d7197c9c4d8"
+        "projectId": "6fd50a04-57a5-427a-a804-6a0370994947"
       }
     },
-    "owner": "bgrana"
+    "owner": "skatehive",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6fd50a04-57a5-427a-a804-6a0370994947"
+    }
   }
 }

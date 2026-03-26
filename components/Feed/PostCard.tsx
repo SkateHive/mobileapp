@@ -1,30 +1,36 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
-import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
+import {
+  vote as hiveVote,
+  submitEncryptedReport,
+  hardDeleteSnap,
+  softDeleteSnap
+} from '~/lib/hive-utils';
+import { Alert } from 'react-native';
 import { useAuth } from '~/lib/auth-provider';
+import { useScrollLock } from '~/lib/ScrollLockContext';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
 import { useViewportTracker } from '~/lib/ViewportTracker';
 import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
+import { VotePresetButtons } from '../ui/VotePresetButtons';
+import { useAppSettings } from '~/lib/AppSettingsContext';
 import { MediaPreview } from './MediaPreview';
+import { CommentBottomSheet } from '../ui/CommentBottomSheet';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
-// Lazy imports break the require cycle:
-// PostCard → ConversationDrawer → PostCard
-// PostCard → FullConversationDrawer → PostCard
 const ConversationDrawer = React.lazy(() =>
   import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
 );
-const FullConversationDrawer = React.lazy(() =>
-  import('./FullConversationDrawer').then(m => ({ default: m.FullConversationDrawer }))
-);
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
-import type { Media } from '../../lib/types';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Media, Post } from '../../lib/types';
 import type { Discussion } from '@hiveio/dhive';
 import { extractMediaFromBody, removeVideoLinksFromBody } from '~/lib/utils';
 
@@ -32,68 +38,77 @@ import { extractMediaFromBody, removeVideoLinksFromBody } from '~/lib/utils';
 const formatTimeAbbreviated = (date: Date): string => {
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
+
   if (diffInSeconds < 60) return '1m'; // Less than a minute, show 1m
-  
+
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   if (diffInMinutes < 60) return `${diffInMinutes}m`;
-  
+
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) return `${diffInHours}h`;
-  
+
   const diffInDays = Math.floor(diffInHours / 24);
   if (diffInDays < 30) return `${diffInDays}d`;
-  
+
   const diffInMonths = Math.floor(diffInDays / 30);
   if (diffInMonths < 12) return `${diffInMonths}mo`;
-  
+
   const diffInYears = Math.floor(diffInMonths / 12);
   return `${diffInYears}y`;
 };
 
 interface PostCardProps {
-  post: Discussion;
+  post: Post;
   currentUsername: string | null;
+  isStatic?: boolean;
+  isMinimized?: boolean;
+  onOpenConversation?: (post: Post) => void;
 }
 
 
-export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
+export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimized, onOpenConversation }: PostCardProps) => {
+  const { isScrollLocked, setScrollLocked } = useScrollLock();
   const { session, followingList, updateUserRelationship } = useAuth();
+  const { settings } = useAppSettings();
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
-  const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
+  const { isItemVisible, isItemPrefetch, registerItem, unregisterItem } = useViewportTracker();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const [showSlider, setShowSlider] = useState(false);
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
-  const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
-  const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState('');
   const [reportAdditionalInfo, setReportAdditionalInfo] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
-  
+  const [isDeleted, setIsDeleted] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Register/unregister with viewport tracker
   useEffect(() => {
     registerItem(post.permlink);
     return () => unregisterItem(post.permlink);
   }, [post.permlink, registerItem, unregisterItem]);
-  
-  // Check if this post is currently visible
+
+  // Check if this post is currently visible or in prefetch range
   const isVisible = isItemVisible(post.permlink);
-  
+  const isPrefetch = isItemPrefetch(post.permlink);
+
   // Memoize expensive calculations
-  const initialVoteCount = useMemo(() => 
+  const initialVoteCount = useMemo(() =>
     Array.isArray(post.active_votes)
       ? post.active_votes.filter((vote: any) => vote.weight > 0).length
       : 0,
     [post.active_votes]
   );
-  
+
   const [voteCount, setVoteCount] = useState(initialVoteCount);
-  
+
   // Memoize payout value calculation
   const initialPayoutValue = useMemo(() => {
     const pending = parseFloat(post.pending_payout_value?.toString?.() || '0');
@@ -101,24 +116,14 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
     const curator = parseFloat(post.curator_payout_value?.toString?.() || '0');
     return pending + total + curator;
   }, [post.pending_payout_value, post.total_payout_value, post.curator_payout_value]);
-  
+
   // Track the post's payout value for dynamic updates
   const [payoutValue, setPayoutValue] = useState(initialPayoutValue);
   const { showToast } = useToast();
 
-  // Memoize media extraction
-  const media = useMemo(() => extractMediaFromBody(post.body), [post.body]);
-  
-  // Memoize post content processing - remove iframes, images, and video links
-  const postContent = useMemo(() => {
-    let content = post.body;
-    // Remove iframes and images
-    content = content.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '');
-    // Remove plain video URLs (YouTube and Odysee)
-    content = removeVideoLinksFromBody(content);
-    return content.trim();
-  }, [post.body]);
-  
+  // Use raw body as the new UniversalRenderer handles multimedia tokenization internally
+  const postContent = post.body;
+
   // Memoize formatted date
   const formattedDate = useMemo(() => {
     const dateStr = post.created;
@@ -131,15 +136,46 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   // Check if user has already voted on this post
   useEffect(() => {
     if (currentUsername && Array.isArray(post.active_votes)) {
-      const hasVoted = post.active_votes.some((vote: any) => vote.voter === currentUsername && vote.weight > 0);
+      const hasVoted = post.active_votes.some((vote: any) =>
+        vote.voter.toLowerCase() === currentUsername.toLowerCase() && vote.weight > 0
+      );
       setIsLiked(hasVoted);
     }
   }, [post.active_votes, currentUsername]);
+
+  // Sync following status
+  useEffect(() => {
+    if (followingList && post.author) {
+      const following = followingList.some(u => u.toLowerCase() === post.author.toLowerCase());
+      setIsFollowing(following);
+    }
+  }, [followingList, post.author]);
 
   const handleMediaPress = useCallback((media: Media) => {
     setSelectedMedia(media);
     setIsModalVisible(true);
   }, []);
+
+  const handleFollow = async () => {
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsFollowLoading(true);
+      const success = await updateUserRelationship(post.author, 'blog');
+      if (success) {
+        showToast(`Following @${post.author}`, 'success');
+      } else {
+        showToast('Failed to follow user', 'error');
+      }
+    } catch (error) {
+      showToast('Error following user', 'error');
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
 
   const handleVote = async (customWeight?: number) => {
     try {
@@ -161,7 +197,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
       // Calculate vote value before submitting
       const votePercentage = customWeight ?? voteWeight;
       let estimatedValue = 0;
-      
+
       try {
         if (!isVoteValueLoading) {
           estimatedValue = await estimateVoteValue(votePercentage);
@@ -174,10 +210,10 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
       const previousLikedState = isLiked;
       const previousVoteCount = voteCount;
       const previousPayoutValue = payoutValue;
-      
+
       setIsLiked(!isLiked);
       setVoteCount(prevCount => previousLikedState ? prevCount - 1 : prevCount + 1);
-      
+
       // Update payout value if we have an estimation and user is voting (not unvoting)
       if (estimatedValue > 0 && !previousLikedState) {
         setPayoutValue(prev => prev + estimatedValue);
@@ -191,7 +227,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
           post.permlink,
           previousLikedState ? 0 : Math.round(votePercentage * 100)
         );
-        
+
         // Show simple success toast
         showToast('Vote submitted!', 'success');
       } catch (err) {
@@ -210,6 +246,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
     } finally {
       setIsVoting(false);
       setShowSlider(false);
+      setScrollLocked(false);
     }
   };
 
@@ -232,11 +269,19 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   };
 
   const handleConversationPress = () => {
-    setIsConversationDrawerVisible(true);
+    if (onOpenConversation) {
+      onOpenConversation(post);
+    } else {
+      setIsDrawerVisible(true);
+    }
   };
 
   const handleBodyPress = () => {
-    setIsFullConversationVisible(true);
+    if (onOpenConversation) {
+      onOpenConversation(post);
+    } else {
+      setIsDrawerVisible(true);
+    }
   };
 
   const handleUserMenuPress = () => {
@@ -264,21 +309,73 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
           break;
         case 'mute':
           relationship = 'ignore';
-          successMessage = `Muted ${post.author}`;
+          successMessage = `Muted and blocked ${post.author}`;
           break;
       }
 
       const success = await updateUserRelationship(post.author, relationship);
       if (success) {
         showToast(successMessage, 'success');
-      } else {
-        showToast('Failed to update relationship', 'error');
+        setShowUserMenu(false);
       }
     } catch (error) {
-      showToast('Failed to update relationship', 'error');
-    } finally {
-      setShowUserMenu(false);
+      showToast('Action failed', 'error');
     }
+  };
+
+  const handleDeleteSnap = async () => {
+    if (!session || !session.decryptedKey || session.username !== post.author) {
+      showToast('Authentication error', 'error');
+      return;
+    }
+
+    const hasActivity = (post.children || 0) > 0 || (post.active_votes || []).length > 0;
+
+    Alert.alert(
+      "Delete",
+      hasActivity
+        //? "This snap has votes or replies. It will be 'cleared' (soft-deleted) but will remain on the blockchain history. Continue?"
+        ? "Are you sure you want to delete this?"
+        //: "This snap will be 'permanently' deleted. Continue?"
+        : "Are you sure you want to delete this?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              setShowUserMenu(false);
+
+              const result = hasActivity
+                ? await softDeleteSnap(
+                  session.decryptedKey!,
+                  post.author,
+                  post.permlink,
+                  post.parent_author,
+                  post.parent_permlink,
+                  post.title,
+                  post.json_metadata
+                )
+                : await hardDeleteSnap(session.decryptedKey!, post.author, post.permlink);
+
+              if (result && !result.error) {
+                showToast('Snap deleted successfully!', 'success');
+                setIsDeleted(true); // Optimistic UI update
+              } else {
+                throw new Error(result?.message || 'Deletion failed');
+              }
+            } catch (error: any) {
+              console.error('Error deleting snap:', error);
+              showToast(error.message || 'Failed to delete snap', 'error');
+            } finally {
+              setIsDeleting(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleReportPost = () => {
@@ -299,7 +396,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
 
     try {
       setIsSubmittingReport(true);
-      
+
       const success = await submitEncryptedReport(
         session.decryptedKey!,
         session.username,
@@ -330,60 +427,128 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
 
   // Create dynamic styles based on theme with Fira Code font
 
+  // Check if snap was optimistically deleted
+  if (isDeleted) {
+    return null;
+  }
+
+  if (isMinimized) {
+    const media = extractMediaFromBody(post.body);
+    const firstMedia = media.length > 0 ? media[0] : null;
+    const cleanBody = post.body.replace(/\[\[.*?\]\]/gi, '').trim();
+
+    return (
+      <View style={styles.minimizedContainer}>
+        <View style={styles.minimizedRow}>
+          <View style={styles.minimizedAvatarContainer}>
+            <Image
+              source={{ uri: post.avatarUrl || `https://images.hive.blog/u/${post.author}/avatar/small` }}
+              style={styles.minimizedAvatar}
+              alt={`${post.author}'s avatar`}
+            />
+          </View>
+          
+          <View style={styles.minimizedContent}>
+            <View style={styles.minimizedHeader}>
+              <Text style={styles.minimizedAuthor}>@{post.author}</Text>
+              <Text style={styles.minimizedDate}>{formattedDate}</Text>
+            </View>
+            
+            <View style={styles.minimizedBodyRow}>
+              <Text numberOfLines={2} style={styles.minimizedText}>
+                {cleanBody || "Media post"}
+              </Text>
+              
+              {firstMedia && (
+                <View style={styles.minimizedMediaPreview}>
+                  {firstMedia.type === 'image' ? (
+                    <Image 
+                      source={{ uri: firstMedia.url }} 
+                      style={styles.minimizedThumbnail} 
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={styles.minimizedVideoPlaceholder}>
+                      <Ionicons name="play-circle" size={20} color={theme.colors.gray} />
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <>
       <View style={styles.container}>
         {/* Two-column layout: Profile pic | Everything else */}
-        <View style={styles.mainLayout}>
+        <View style={[
+          styles.mainLayout,
+          // settings.stance === 'goofy' && { flexDirection: 'row-reverse' }
+        ]}>
           {/* Left column: Profile pic only */}
-          <View style={styles.leftColumn}>
+          <View style={[
+            styles.leftColumn,
+            // settings.stance === 'goofy' ? {marginLeft: theme.spacing.sm, marginRight: 0 } : {marginRight: theme.spacing.sm, marginLeft: 0 }
+          ]}>
             <Pressable onPress={handleProfilePress}>
               <Image
-                source={{ uri: `https://images.hive.blog/u/${post.author}/avatar/small` }}
+                source={{ uri: post.avatarUrl || `https://images.hive.blog/u/${post.author}/avatar/small` }}
                 style={styles.profileImage}
-                alt={`${post.author}'s avatar`}
+                alt={`${post.displayName || post.author}'s avatar`}
+                transition={200}
               />
             </Pressable>
           </View>
-          
+
           {/* Right column: All content */}
           <View style={styles.rightColumn}>
             {/* Header with author and date */}
             <View style={styles.headerContainer}>
               <Pressable onPress={handleProfilePress}>
-                <Text style={styles.authorText}>{post.author}</Text>
+                <Text style={styles.authorText}>{post.displayName || post.author}</Text>
               </Pressable>
               <Text style={styles.dateText}>
                 {formattedDate}
               </Text>
-              
-              {/* Three dots menu - only show if not viewing own post */}
-              {currentUsername && post.author !== currentUsername && (
+
+              {/* Follow Button */}
+              {currentUsername &&
+                post.author.toLowerCase() !== currentUsername.toLowerCase() &&
+                !isFollowing && (
+                  <Pressable
+                    onPress={handleFollow}
+                    style={styles.followButton}
+                    disabled={isFollowLoading}
+                  >
+                    {isFollowLoading ? (
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                    ) : (
+                      <Text style={styles.followButtonText}>Follow</Text>
+                    )}
+                  </Pressable>
+                )}
+
+              {/* Three dots menu - show if user is logged in */}
+              {currentUsername && (
                 <Pressable onPress={handleUserMenuPress} style={styles.menuButton}>
-                  <FontAwesome name="ellipsis-h" size={16} color={theme.colors.text} />
+                  <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text} />
                 </Pressable>
               )}
             </View>
 
-            {/* Content */}
-            <Pressable onPress={handleBodyPress}>
-              {postContent !== '' && (
-                <View style={styles.contentContainer}>
-                  <EnhancedMarkdownRenderer content={postContent} />
-                </View>
-              )}
-            </Pressable>
-
-            {/* Media - outside Pressable so clicks don't open conversation */}
-            {media.length > 0 && (
-              <View style={styles.mediaContainer}>
-                <MediaPreview
-                  media={media}
-                  onMediaPress={handleMediaPress}
-                  selectedMedia={selectedMedia}
-                  isModalVisible={isModalVisible}
-                  onCloseModal={() => setIsModalVisible(false)}
+            {/* Content and Media handled by UniversalRenderer */}
+            {postContent !== '' && (
+              <View style={styles.contentContainer}>
+                <EnhancedMarkdownRenderer
+                  content={postContent}
                   isVisible={isVisible}
+                  isPrefetch={isPrefetch}
+                  author={post.author}
+                  onPress={handleBodyPress}
                 />
               </View>
             )}
@@ -391,36 +556,53 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
           </View>
         </View>
 
-        {/* Full-width action bar — outside mainLayout for better thumb reach */}
-        <View style={styles.bottomBar}>
+        {/* Full-width action bar */}
+        <View style={[
+          styles.bottomBar,
+          settings.stance === 'goofy' && { flexDirection: 'row-reverse' }
+        ]}>
           {showSlider ? (
-            /* Voting slider mode - takes entire bottom bar */
+            /* Voting mode - takes entire bottom bar */
             <View style={styles.votingSliderContainer}>
-              <VotingSlider
-                value={voteWeight}
-                onValueChange={setVoteWeight}
-                minimumValue={1}
-                maximumValue={100}
-              />
+              {settings.useVoteSlider ? (
+                /* Slider mode */
+                <VotingSlider
+                  value={voteWeight}
+                  onValueChange={setVoteWeight}
+                  minimumValue={1}
+                  maximumValue={100}
+                />
+              ) : (
+                /* Preset buttons mode */
+                <VotePresetButtons
+                  onSelect={(weight) => handleVote(weight)}
+                  disabled={isVoting}
+                />
+              )}
               <View style={styles.sliderControls}>
                 <Pressable
                   style={styles.cancelVoteButton}
-                  onPress={() => setShowSlider(false)}
+                  onPress={() => {
+                    setShowSlider(false);
+                    setScrollLocked(false);
+                  }}
                   disabled={isVoting}
                 >
                   <FontAwesome name="times" size={22} color={theme.colors.gray} />
                 </Pressable>
-                <Pressable
-                  style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
-                  onPress={() => handleVote(voteWeight)}
-                  disabled={isVoting}
-                >
-                  {isVoting ? (
-                    <ActivityIndicator size="small" color={theme.colors.green} />
-                  ) : (
-                    <FontAwesome name="arrow-up" size={22} color={theme.colors.green} />
-                  )}
-                </Pressable>
+                {settings.useVoteSlider && (
+                  <Pressable
+                    style={[styles.confirmVoteButton, isVoting && styles.disabledButton]}
+                    onPress={() => handleVote(voteWeight)}
+                    disabled={isVoting}
+                  >
+                    {isVoting ? (
+                      <ActivityIndicator size="small" color={theme.colors.green} />
+                    ) : (
+                      <Ionicons name="thumbs-up" size={22} color={theme.colors.green} />
+                    )}
+                  </Pressable>
+                )}
               </View>
             </View>
           ) : (
@@ -433,13 +615,16 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               <View style={styles.actionsContainer}>
                 {/* Replies section - clickable to open conversation */}
                 <Pressable onPress={handleConversationPress} style={styles.actionItem} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                  <FontAwesome name="comment-o" size={22} color={theme.colors.gray} />
+                  <Ionicons name="chatbubble-outline" size={18} color={theme.colors.gray} />
                   <Text style={styles.actionText}>{post.children}</Text>
                 </Pressable>
 
                 {/* Voting section */}
                 <Pressable
-                  onPress={() => setShowSlider(true)}
+                  onPress={() => {
+                    setShowSlider(true);
+                    setScrollLocked(true);
+                  }}
                   style={[styles.actionItem, isVoting && styles.disabledButton]}
                   disabled={isVoting}
                   hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
@@ -454,9 +639,9 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                       <Text style={[styles.voteCount, { color: isLiked ? theme.colors.green : theme.colors.gray }]}>
                         {voteCount}
                       </Text>
-                      <FontAwesome
-                        name="arrow-up"
-                        size={22}
+                      <Ionicons
+                        name={isLiked ? "thumbs-up" : "thumbs-up-outline"}
+                        size={18}
                         color={isLiked ? theme.colors.green : theme.colors.gray}
                       />
                     </>
@@ -466,71 +651,79 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
             </>
           )}
         </View>
-      </View>
+      </View >
 
-      {/* Conversation Drawer - Quick reply only */}
-      {isConversationDrawerVisible && (
-        <React.Suspense fallback={null}>
-          <ConversationDrawer
-            visible={isConversationDrawerVisible}
-            onClose={() => setIsConversationDrawerVisible(false)}
-            discussion={post}
-          />
-        </React.Suspense>
-      )}
-
-      {/* Full Conversation Drawer - Entire conversation thread */}
-      {isFullConversationVisible && (
-        <React.Suspense fallback={null}>
-          <FullConversationDrawer
-            visible={isFullConversationVisible}
-            onClose={() => setIsFullConversationVisible(false)}
-            discussion={post}
-          />
-        </React.Suspense>
-      )}
+      {/* Unified Conversation Drawer - only show if not managed by parent */}
+      {
+        !onOpenConversation && isDrawerVisible && (
+          <React.Suspense fallback={null}>
+            <ConversationDrawer
+              isVisible={isDrawerVisible}
+              onClose={() => setIsDrawerVisible(false)}
+              post={post}
+            />
+          </React.Suspense>
+        )
+      }
 
       {/* User Menu Modal */}
       <Modal
         visible={showUserMenu}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setShowUserMenu(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowUserMenu(false)}>
-          <View style={styles.userMenuContainer}>
-            <Text style={styles.userMenuTitle}>@{post.author}</Text>
-            
-            {followingList.includes(post.author) ? (
+          <SafeAreaView style={styles.safeAreaContainer} edges={['top', 'bottom']}>
+            <View style={styles.userMenuContainer}>
+              <Text style={styles.userMenuTitle}>@{post.author}</Text>
+
+              {isFollowing ? (
+                <Pressable
+                  style={styles.userMenuButton}
+                  onPress={() => handleUserAction('unfollow')}
+                >
+                  <Text style={styles.userMenuButtonText}>Unfollow</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={styles.userMenuButton}
+                  onPress={() => handleUserAction('follow')}
+                >
+                  <Text style={styles.userMenuButtonText}>Follow</Text>
+                </Pressable>
+              )}
+
               <Pressable
                 style={styles.userMenuButton}
-                onPress={() => handleUserAction('unfollow')}
+                onPress={() => handleUserAction('mute')}
               >
-                <Text style={styles.userMenuButtonText}>Unfollow</Text>
+                <Text style={styles.userMenuButtonText}>Mute/Block</Text>
               </Pressable>
-            ) : (
+
               <Pressable
                 style={styles.userMenuButton}
-                onPress={() => handleUserAction('follow')}
+                onPress={() => handleReportPost()}
               >
-                <Text style={styles.userMenuButtonText}>Follow</Text>
+                <Text style={styles.userMenuButtonText}>Report Post</Text>
               </Pressable>
-            )}
-            
-            <Pressable
-              style={styles.userMenuButton}
-              onPress={() => handleUserAction('mute')}
-            >
-              <Text style={styles.userMenuButtonText}>Mute/Block</Text>
-            </Pressable>
-            
-            <Pressable
-              style={styles.userMenuButton}
-              onPress={() => handleReportPost()}
-            >
-              <Text style={styles.userMenuButtonText}>Report Post</Text>
-            </Pressable>
-          </View>
+
+              {currentUsername === post.author && (
+                <Pressable
+                  style={[styles.userMenuButton, isDeleting && styles.disabledButton]}
+                  onPress={handleDeleteSnap}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color={theme.colors.gray} />
+                  ) : (
+                    <Text style={[styles.userMenuButtonText, { color: theme.colors.gray }]}>Delete Snap</Text>
+                  )}
+                </Pressable>
+              )}
+            </View>
+          </SafeAreaView>
         </Pressable>
       </Modal>
 
@@ -546,9 +739,9 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
             <ScrollView style={styles.reportModalContent}>
               <Text style={styles.reportModalTitle}>Report Post</Text>
               <Text style={styles.reportModalSubtitle}>@{post.author}</Text>
-              
+
               <Text style={styles.reportSectionTitle}>Reason for reporting:</Text>
-              
+
               {['Spam', 'Harassment or Abuse', 'Inappropriate Content', 'Copyright Violation', 'Misinformation', 'Other'].map((reason) => (
                 <Pressable
                   key={reason}
@@ -566,7 +759,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                   </Text>
                 </Pressable>
               ))}
-              
+
               <Text style={styles.reportSectionTitle}>Additional Information (Optional):</Text>
               <TextInput
                 style={styles.reportTextInput}
@@ -578,7 +771,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                 onChangeText={setReportAdditionalInfo}
                 editable={!isSubmittingReport}
               />
-              
+
               <View style={styles.reportModalButtons}>
                 <Pressable
                   style={[styles.reportModalButton, styles.reportCancelButton]}
@@ -587,10 +780,10 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
                 >
                   <Text style={styles.reportCancelButtonText}>Cancel</Text>
                 </Pressable>
-                
+
                 <Pressable
                   style={[
-                    styles.reportModalButton, 
+                    styles.reportModalButton,
                     styles.reportSubmitButton,
                     (!selectedReportReason || isSubmittingReport) && styles.reportSubmitButtonDisabled
                   ]}
@@ -623,11 +816,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   leftColumn: {
-    width: 42, // Fixed width for profile pic column
-    marginRight: theme.spacing.sm,
+    width: 40, // Match avatar size
+    marginRight: 8, // More breathing room (4px rhythm)
   },
   rightColumn: {
     flex: 1, // Takes remaining space
+    paddingTop: 2, // Minor alignment with avatar top
   },
   profileImage: {
     width: 40,
@@ -637,8 +831,8 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
-    marginBottom: 0,
+    gap: theme.spacing.xs, // 4px gap
+    marginBottom: 4, // username -> caption: 4px
   },
   authorText: {
     fontSize: theme.fontSizes.md, // Force consistent font size
@@ -658,6 +852,74 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     lineHeight: 20,
     fontFamily: theme.fonts.default,
+  },
+  minimizedContainer: {
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  minimizedRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  minimizedAvatarContainer: {
+    paddingTop: 2,
+  },
+  minimizedAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  minimizedContent: {
+    flex: 1,
+  },
+  minimizedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  minimizedAuthor: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontFamily: theme.fonts.bold,
+  },
+  minimizedDate: {
+    fontSize: 12,
+    color: theme.colors.muted,
+  },
+  minimizedBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  minimizedText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.text,
+    fontFamily: theme.fonts.default,
+  },
+  minimizedMediaPreview: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.card,
+  },
+  minimizedThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  minimizedVideoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.card,
   },
   linkText: {
     fontSize: theme.fontSizes.md, // Force consistent font size
@@ -683,7 +945,7 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.lightGray,
   },
   payoutText: {
-    fontSize: theme.fontSizes.md, 
+    fontSize: theme.fontSizes.md,
     fontFamily: theme.fonts.regular,
   },
   actionsContainer: {
@@ -695,10 +957,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 6,
     borderRadius: theme.borderRadius.sm,
-    backgroundColor: 'rgba(50, 205, 50, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   actionText: {
     fontSize: theme.fontSizes.md,
@@ -748,16 +1010,32 @@ const styles = StyleSheet.create({
     height: 36,
   },
   menuButton: {
-    padding: theme.spacing.sm,
+    padding: theme.spacing.xs,
     marginLeft: 'auto',
-    minWidth: 40,
-    minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  followButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(50, 205, 50, 0.08)',
+    marginHorizontal: theme.spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followButtonText: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.green,
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  safeAreaContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },

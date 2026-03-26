@@ -1,221 +1,107 @@
-# MyCommunity App 🚀
+# SkateHive Mobile App 🛹🚀
 
-A powerful React Native mobile application that empowers communities through the HIVE blockchain. MyCommunity App combines social networking features with decentralized rewards, secure authentication, and a modern user interface to create a seamless community experience.
+The official mobile application for **SkateHive**, the premier skateboarding community on the HIVE blockchain. This app allows skaters to share content (photos/videos), vote on posts, interact with the community, and earn crypto rewards (HIVE/HBD) in a truly decentralized environment.
 
 ## 📱 Overview
 
-MyCommunity App is built using the latest React Native and Expo technologies, offering a cross-platform solution with native performance. The application connects to the HIVE blockchain, allowing users to interact with decentralized content, manage their HIVE wallets, and participate in community governance.
+SkateHive Mobile is a high-performance React Native application built with **Expo SDK 54**. It features a modern, high-contrast dark theme, secure biometric authentication, and deep integration with the HIVE blockchain.
 
 ## 🌟 Key Features
 
-### Content Creation & Sharing
+- **Content Creation & Sharing**:
+  - 📝 Markdown-supported posts and comments.
+  - 🖼️ Rich media support with HEIC to JPEG conversion.
+  - 🎬 Video uploads with IPFS integration.
+- **Secure Wallet & Auth**:
+  - 🔒 AES-encrypted key storage via Expo SecureStore.
+  - 🔑 PIN and Biometric (FaceID/TouchID) authentication.
+  - 💰 Real-time balance and reward tracking.
+- **Community Interaction**:
+  - ⭐ Hive reputation system.
+  - 📊 Global and community leaderboards.
+  - 💬 Threaded conversations and notifications.
+- **UI/UX**:
+  - 🌒 Pure Dark Theme (Black #000000, Lime Green #32CD32).
+  - ⚡ Fast, responsive UI with FiraCode (monospace) typography.
+  - 🎯 Viewport-aware video autoplay.
 
-- 📝 Long-form articles with Markdown support
-- 📱 Short posts for quick updates
-- 🖼️ Rich media support (images & videos)
-- 🎬 IPFS video integration
-- 📊 Post analytics and earnings tracking
+## 🛠️ Technology Stack
 
-### Secure Wallet Integration
-
-- 🔒 Encrypted credential storage
-- 💰 HIVE wallet integration
-- 🎁 Easy community rewards distribution
-- 📈 Real-time payout tracking
-- 🔐 Secure voting mechanism
-
-### Community Features
-
-- 👥 Community building tools
-- 🏷️ Custom tags and categories
-- 💬 Interactive discussions
-- ⭐ Reputation system
-- 📊 Community analytics
-
-### UI/UX
-
-- 🌓 Dark/Light theme toggle
-- 📱 Native mobile experience
-- ⚡ Fast and responsive interface
-- 🎨 Modern design language
-
-## 🛠️ Project Structure
-
-The project follows a clean, modular architecture:
-
-```
-mycommunity-app/
-├── app/                 # Expo Router screens and navigation
-│   ├── (tabs)/          # Main tab screens
-│   ├── (onboarding)/    # Onboarding flows
-│   └── _layout.tsx      # Root navigation layout
-├── assets/              # Static assets (images, videos)
-├── components/          # Reusable UI components
-│   ├── auth/            # Authentication components
-│   ├── Feed/            # Feed-related components
-│   ├── ui/              # Base UI components
-│   └── Leaderboard/     # Leaderboard components
-├── lib/                 # Core utilities and business logic
-│   ├── hooks/           # Custom React hooks
-│   ├── icons/           # Icon components
-│   ├── api.ts           # API integration
-│   ├── auth-provider.tsx # Authentication context
-│   ├── hive-utils.ts    # HIVE blockchain utilities
-│   └── types.ts         # TypeScript type definitions
-└── ...configuration files
-```
-
-### Key Files
-
-- `app/_layout.tsx`: Root navigation and providers setup
-- `lib/auth-provider.tsx`: Authentication logic and secure storage
-- `lib/api.ts`: API integration functions
-- `components/ui/`: Reusable UI components built with NativeWind
-
-## 📋 Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18 or newer)
-- [pnpm](https://pnpm.io/) package manager
-- [Expo CLI](https://docs.expo.dev/workflow/expo-cli/) (optional, but recommended)
-- For iOS development: macOS with Xcode
-- For Android development: Android Studio and SDK
+- **Core**: React Native (Expo SDK 54, Bare Workflow)
+- **Navigation**: Expo Router (File-based, Typed)
+- **Language**: TypeScript (Strict)
+- **State Management**: React Query (Server), React Context (Auth/Toast/Notifications)
+- **Blockchain**: `@hiveio/dhive` (HIVE RPC integration)
+- **Styling**: `StyleSheet` (Standard themed styles)
+- **Storage**: `expo-secure-store`, `expo-file-system`
 
 ## 🚀 Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18+)
+- [pnpm](https://pnpm.io/)
+- [EAS CLI](https://docs.expo.dev/build/introduction/) (for builds)
 
 ### Installation
 
 1. Clone the repository:
+   ```bash
+   git clone https://github.com/SkateHive/mobileapp.git
+   cd mobileapp
+   ```
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+3. Set up environment:
+   ```bash
+   cp .env.example .env
+   # Configure API_BASE_URL and other vars
+   ```
+
+### Running Locally
 
 ```bash
-git clone https://github.com/SkateHive/mobileapp.git
-cd mobileapp
+pnpm dev      # Start Expo Metro bundler
+pnpm ios      # Run on iOS simulator
+pnpm android  # Run on Android emulator
 ```
-
-2. Install dependencies with pnpm:
-
-```bash
-pnpm install
-```
-
-3. Set up environment variables (if needed):
-
-Create a `.env` file in the project root with your configuration:
-
-```
-API_BASE_URL=your_api_url
-HIVE_NODE=your_preferred_node
-```
-
-### Running the App
-
-#### Development Mode
-
-Run the app in development mode with hot reloading:
-
-```bash
-# Start the development server with Metro bundler
-pnpm dev
-
-# Run on iOS simulator
-pnpm ios
-
-# Run on Android emulator
-pnpm android
-
-# Run on web browser
-pnpm web
-```
-
-#### Using a Physical Device
-
-To run on a physical device:
-
-1. Install the Expo Go app on your device
-2. Make sure your device is on the same network as your development machine
-3. Scan the QR code displayed in the terminal with your camera app (iOS) or Expo Go app (Android)
 
 ## 📦 Building for Production
 
-This project uses [EAS Build](https://docs.expo.dev/build/introduction/) for creating production-ready builds:
+This project uses [EAS Build](https://docs.expo.dev/build/introduction/):
 
 ```bash
-# Install EAS CLI if not already installed
-npm install -g eas-cli
-
-# Log in to your Expo account
-eas login
-
-# Configure your build profiles (if needed)
-eas build:configure
-
-# Build for internal testing (preview)
-eas build --platform ios --profile preview
-eas build --platform android --profile preview
-
-# Build for production
 eas build --platform ios --profile production
 eas build --platform android --profile production
 ```
 
-## 📱 HIVE Blockchain Integration
+> [!IMPORTANT]
+> **Versioning Checklist**: Update version in `app.json`, `ios/skatehive/Info.plist`, `ios/skatehive.xcodeproj/project.pbxproj`, and `package.json` before building.
 
-MyCommunity App integrates with the HIVE blockchain for:
+## 🔒 Security & Key Storage
 
-- User authentication using HIVE account credentials
-- Content storage and retrieval
-- Rewards distribution and tracking
-- Voting and social interactions
+Private keys are never stored in plaintext. They are encrypted using AES (PBKDF2 key derivation) and stored in the device's SecureStore.
 
-The integration is handled through the `@hiveio/dhive` library with secure storage of user credentials using Expo SecureStore.
+### Production Security Checklist
 
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### Metro Bundler Issues
-
-If you encounter issues with the Metro bundler:
-
-```bash
-# Clear Metro cache
-pnpm clean
-pnpm dev -c
-```
+- [ ] Ensure PBKDF2 iterations are set to 100,000+ (no dev overrides).
+- [ ] Verify `expo-crypto` is used for all Salt/IV generation (remove `Math.random` fallbacks).
+- [ ] Disable all debug logs and test credentials in `lib/auth-provider.tsx`.
+- [ ] Test on a real device using a production build (EAS).
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please follow these steps:
 
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add some amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-## 🔐 Security
-
-- Encrypted local storage
-- Secure key management
-- Private key never leaves the device
-- Regular security audits
-
-## 💎 Powered by HIVE
-
-Built on the HIVE blockchain, enabling:
-
-- Decentralized content storage
-- Community rewards
-- Transparent monetization
-- Censorship resistance
-
-## 🔗 Links
-
-- [HIVE Blockchain](https://hive.io/)
-- [Expo Documentation](https://docs.expo.dev/)
-- [React Native Documentation](https://reactnative.dev/docs/getting-started)
+1. Fork the repo and create your feature branch.
+2. Ensure TypeScript types are correctly defined in `lib/types.ts`.
+3. Use `async/await` with proper try/catch blocks for blockchain operations.
+4. Submit a Pull Request with a clear description of changes.
 
 ---
 
 <p align="center">
-  Made with ❤️ for the HIVE community
+  <b>Built on the HIVE Blockchain</b> | <i>Empowering Skaters Globally</i>
 </p>

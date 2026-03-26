@@ -83,7 +83,7 @@ export default function ConversationScreen() {
           {/* Main Post */}
           {mainPost && (
             <View style={styles.mainPostContainer}>
-              <PostCard post={mainPost} currentUsername={username} />
+              <PostCard post={mainPost as any} currentUsername={username} />
             </View>
           )}
 
@@ -120,7 +120,7 @@ export default function ConversationScreen() {
                 {allReplies.map((reply, index) => (
                   <View key={`${reply.author}/${reply.permlink}-${index}`} style={styles.replyContainer}>
                     <ConversationReply 
-                      post={reply} 
+                      post={reply as any} 
                       currentUsername={username}
                       depth={reply.depth || 0}
                       maxDepth={3}

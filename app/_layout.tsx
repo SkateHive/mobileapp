@@ -10,7 +10,10 @@ import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
 import { ViewportTrackerProvider } from '~/lib/ViewportTracker';
 import { NotificationProvider } from '~/lib/notifications-context';
+import { ScrollLockProvider } from '~/lib/ScrollLockContext';
+import { AppSettingsProvider } from '~/lib/AppSettingsContext';
 import { theme } from '~/lib/theme';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const styles = StyleSheet.create({
   container: {
@@ -81,64 +84,77 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <NavigationGuard>
-          <NotificationProvider>
-            <ToastProvider>
-              <ViewportTrackerProvider>
-                <SafeAreaProvider>
-                  <ActivityWrapper>
-                    <View style={styles.container}>
-                      <Stack
-                        screenOptions={{
-                          headerShown: false,
-                          animation: 'none',
-                          contentStyle: { backgroundColor: theme.colors.background },
-                        }}
-                        initialRouteName="index"
-                      >
-                        <Stack.Screen 
-                          name="index" 
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="login"
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="about"
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="conversation"
-                          options={{
-                            contentStyle: { backgroundColor: theme.colors.background },
-                          }}
-                        />
-                        <Stack.Screen 
-                          name="(tabs)"
-                          options={{
-                            animation: 'none',
-                            contentStyle: { backgroundColor: theme.colors.background },
-                            gestureEnabled: false,
-                          }}
-                        />
-                      </Stack>
-                    </View>
-                  </ActivityWrapper>
-                </SafeAreaProvider>
-              </ViewportTrackerProvider>
-            </ToastProvider>
-          </NotificationProvider>
-        </NavigationGuard>
-      </AuthProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <AppSettingsProvider>
+          <AuthProvider>
+            <ScrollLockProvider>
+              <NavigationGuard>
+                <NotificationProvider>
+                  <ToastProvider>
+                    <ViewportTrackerProvider>
+                      <SafeAreaProvider>
+                        <ActivityWrapper>
+                          <View style={styles.container}>
+                            <Stack
+                              screenOptions={{
+                                headerShown: false,
+                                animation: 'none',
+                                contentStyle: { backgroundColor: theme.colors.background },
+                              }}
+                              initialRouteName="index"
+                            >
+                              <Stack.Screen
+                                name="index"
+                                options={{
+                                  contentStyle: { backgroundColor: theme.colors.background },
+                                }}
+                              />
+                              <Stack.Screen
+                                name="login"
+                                options={{
+                                  contentStyle: { backgroundColor: theme.colors.background },
+                                }}
+                              />
+                              <Stack.Screen
+                                name="about"
+                                options={{
+                                  contentStyle: { backgroundColor: theme.colors.background },
+                                }}
+                              />
+                              <Stack.Screen
+                                name="conversation"
+                                options={{
+                                  contentStyle: { backgroundColor: theme.colors.background },
+                                }}
+                              />
+                              <Stack.Screen
+                                name="wallet"
+                                options={{
+                                  contentStyle: { backgroundColor: theme.colors.background },
+                                  headerShown: false,
+                                }}
+                              />
+                              <Stack.Screen
+                                name="(tabs)"
+                                options={{
+                                  animation: 'none',
+                                  contentStyle: { backgroundColor: theme.colors.background },
+                                  gestureEnabled: false,
+                                }}
+                              />
+                            </Stack>
+                          </View>
+                        </ActivityWrapper>
+                      </SafeAreaProvider>
+                    </ViewportTrackerProvider>
+                  </ToastProvider>
+                </NotificationProvider>
+              </NavigationGuard>
+            </ScrollLockProvider>
+          </AuthProvider>
+        </AppSettingsProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -1,43 +1,28 @@
 {
   "cli": {
-    "version": ">= 5.2.0",
-    "appVersionSource": "local"
+    "version": ">= 18.4.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": {
-        "simulator": true
-      }
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
-      "ios": {
-        "enterpriseProvisioning": "adhoc"
-      }
+      "channel": "preview"
     },
     "production": {
-      "android": {
-        "buildType": "app-bundle"
-      },
-      "ios": {
-        "buildConfiguration": "Release"
-      }
+      "autoIncrement": true,
+      "channel": "production"
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "ascAppId": "6751173076"
-      },
-      "android": {
-        "serviceAccountKeyPath": "./google-play-service-account.json",
-        "track": "production"
-      }
-    }
+    "production": {}
   }
 }

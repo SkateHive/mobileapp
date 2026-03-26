@@ -1,8 +1,9 @@
-import { useQuery, QueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, QueryClient } from '@tanstack/react-query';
 import {
   getFeed,
   getBalance,
   getRewards } from '../api';
+import { useAuth } from '../auth-provider';
 import { API_BASE_URL, LEADERBOARD_API_URL } from '../constants';
 import { extractMediaFromBody } from '../utils';
 import type { Post } from '../types';
@@ -26,16 +27,20 @@ export interface VideoPost {
   tags: string[];
   json_metadata: any;
   active_votes: any[];
+  // Standardized soft post mappings
+  avatarUrl?: string;
+  displayName?: string;
 }
 
 const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
 const VIDEO_FEED_STALE_TIME = 1000 * 60 * 2; // 2 minutes
 
-async function fetchVideoFeed(): Promise<VideoPost[]> {
-  const posts = await getFeed(1, 50);
+async function fetchVideoFeed({ pageParam = 1 }: { pageParam?: any }): Promise<VideoPost[]> {
+  const posts = await getFeed(pageParam, 50);
   const videoList: VideoPost[] = [];
 
-  posts.forEach((post: Post) => {
+  posts?.forEach((post: Post) => {
+    if (!post || !post.body) return;
     const media = extractMediaFromBody(post.body);
     const videoMedia = media.filter((m) => m.type === 'video');
     const rawPost = post as any;
@@ -62,13 +67,16 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
           title: post.title || '',
           body: post.body || '',
           created: post.created || '',
-          votes: rawPost.net_votes || 0,
+          votes: rawPost.net_votes || (rawPost.votes || []).length,
           payout: rawPost.pending_payout_value || rawPost.total_payout_value || '0.000 HBD',
           replies: rawPost.children || 0,
           thumbnailUrl: thumbnail,
           tags: metadata?.tags || [],
           json_metadata: metadata,
-          active_votes: rawPost.active_votes || [],
+          active_votes: rawPost.active_votes || rawPost.votes || [],
+          // Use standardized mapped fields
+          avatarUrl: post.avatarUrl,
+          displayName: post.displayName,
         });
       });
     }
@@ -78,17 +86,36 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
 }
 
 export function useVideoFeed() {
-  return useQuery({
+  const { blockedList } = useAuth();
+  
+  return useInfiniteQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
     queryFn: fetchVideoFeed,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      // If we've reached a high page count without finding enough, stop to avoid infinite loops
+      if (allPages.length >= 10) return undefined;
+      
+      // Even if lastPage was empty (no videos found in those 50 posts), 
+      // we try the next page of posts as there might be videos there.
+      return allPages.length + 1;
+    },
     staleTime: VIDEO_FEED_STALE_TIME,
+    select: (data) => {
+      if (!data || !data.pages) return [];
+      const flattened = data.pages.flat();
+      if (!blockedList || blockedList.length === 0) return flattened;
+      const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+      return flattened.filter(post => !blockedSet.has((post.author || '').toLowerCase()));
+    },
   });
 }
 
 export function prefetchVideoFeed(queryClient: QueryClient) {
-  queryClient.prefetchQuery({
+  queryClient.prefetchInfiniteQuery({
     queryKey: VIDEO_FEED_QUERY_KEY,
     queryFn: fetchVideoFeed,
+    initialPageParam: 1,
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 }
@@ -100,17 +127,19 @@ export function prefetchVideoFeed(queryClient: QueryClient) {
 export async function warmUpVideoAssets(queryClient: QueryClient) {
   const { Image } = require('react-native');
 
-  const data = await queryClient.ensureQueryData({
+  const data = await queryClient.ensureInfiniteQueryData({
     queryKey: VIDEO_FEED_QUERY_KEY,
     queryFn: fetchVideoFeed,
+    initialPageParam: 1,
     staleTime: VIDEO_FEED_STALE_TIME,
   });
 
-  if (!data || data.length === 0) return;
+  const firstPage = data?.pages?.[0] || [];
+  if (!firstPage || firstPage.length === 0) return;
 
-  // Prefetch thumbnails for the first 5 videos
-  const thumbnailUrls = data
-    .slice(0, 5)
+  // Prefetch thumbnails for the first 2 videos
+  const thumbnailUrls = firstPage
+    .slice(0, 2)
     .map((v: VideoPost) => v.thumbnailUrl)
     .filter(Boolean) as string[];
 
@@ -119,9 +148,51 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
   });
 
   // Prefetch avatar images
-  const avatarUrls = [...new Set(data.slice(0, 5).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
+  const avatarUrls = [...new Set(firstPage.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
   avatarUrls.forEach((url: string) => {
     Image.prefetch(url).catch(() => {});
+  });
+}
+
+// ============================================================================
+// LOGIN-SCREEN PREFETCH — warm caches before user enters the app
+// ============================================================================
+
+/**
+ * Prefetch the main community feed (first page).
+ * Called on the login screen so the home tab loads instantly.
+ */
+export function prefetchCommunityFeed(queryClient: QueryClient) {
+  queryClient.prefetchQuery({
+    queryKey: ['feed', 1],
+    queryFn: () => getFeed(1, 10),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+/**
+ * Prefetch a user's profile after successful login.
+ */
+export function prefetchProfile(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['profile', username],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/profile/${username}`);
+      const json = await response.json();
+      return json.success ? json.data : null;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+/**
+ * Prefetch a user's balance data after successful login.
+ */
+export function prefetchBalance(queryClient: QueryClient, username: string) {
+  queryClient.prefetchQuery({
+    queryKey: ['balance', username],
+    queryFn: () => getBalance(username),
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 

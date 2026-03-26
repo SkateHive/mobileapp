@@ -60,6 +60,8 @@ yarn-error.*
 .env
 /.env
 .env*.local
+.env.production
+.env*
 
 # typescript
 *.tsbuildinfo

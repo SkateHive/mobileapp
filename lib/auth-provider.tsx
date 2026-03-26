@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { STORED_USERS_KEY } from './constants';
 import {
   AccountNotFoundError,
@@ -27,6 +28,10 @@ import {
   getUserRelationshipList,
   setUserRelationship
 } from './hive-utils';
+import { useAppSettings } from './AppSettingsContext';
+import { getFollowingList, getFollowersList, getMutedList, getBlacklistedList } from './api';
+
+const SESSION_KEY = 'current_auth_session';
 
 // ============================================================================
 // APPLE REVIEW TEST ACCOUNT CONFIGURATION
@@ -69,6 +74,7 @@ interface AuthContextType {
   followingList: string[];
   mutedList: string[];
   blacklistedList: string[];
+  blockedList: string[];
   login: (username: string, postingKey: string, method: EncryptionMethod, pin?: string) => Promise<void>;
   loginStoredUser: (username: string, pin?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -92,7 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [followingList, setFollowingList] = useState<string[]>([]);
   const [mutedList, setMutedList] = useState<string[]>([]);
   const [blacklistedList, setBlacklistedList] = useState<string[]>([]);
+  const [blockedList, setBlockedList] = useState<string[]>([]);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { settings } = useAppSettings();
 
   // Delete a single stored user and update state
   const removeStoredUser = async (usernameToRemove: string) => {
@@ -113,8 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Inactivity timeout (5 minutes)
-  const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
+  // Inactivity timeout based on settings
+  const INACTIVITY_TIMEOUT = settings.sessionDuration * 60 * 1000;
 
   useEffect(() => {
     loadStoredUsers();
@@ -129,12 +137,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       clearInactivityTimer();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // Handle Session persistence settings change
+  useEffect(() => {
+    if (settings.sessionDuration === 0) {
+      // If Auto-lock is enabled, clear any persistent session from storage
+      // The current session will stay in memory until the app is closed
+      SecureStore.deleteItemAsync(SESSION_KEY).catch(console.error);
+    }
+  }, [settings.sessionDuration]);
 
   const resetInactivityTimer = () => {
     // Only reset timer if user is authenticated and has a session
-    if (!session || !isAuthenticated) return;
+    if (!session || !isAuthenticated || settings.sessionDuration === 0) return;
     
     clearInactivityTimer();
     inactivityTimer.current = setTimeout(() => {
@@ -154,29 +170,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Load user relationship lists (following, muted, blacklisted)
-  const refreshUserRelationships = async () => {
-    if (!username || username === 'SPECTATOR') {
+  const refreshUserRelationships = useCallback(async (explicitUsername?: string) => {
+    const targetUser = explicitUsername || username;
+    
+    if (!targetUser || targetUser === 'SPECTATOR') {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
+      setBlockedList([]);
       return;
     }
 
+    // 1. Instantly load from local disk cache to prevent UI flashing
     try {
-      const [following, muted, blacklisted] = await Promise.all([
-        getUserRelationshipList(username, 'blog'),
-        getUserRelationshipList(username, 'ignore'),
-        getUserRelationshipList(username, 'blacklist'),
+      const cacheKey = `skatehive_relationships_${targetUser}`;
+      const cachedDataStr = await AsyncStorage.getItem(cacheKey);
+      
+      if (cachedDataStr) {
+        const cachedData = JSON.parse(cachedDataStr);
+        if (cachedData.following) setFollowingList(cachedData.following);
+        if (cachedData.muted) setMutedList(cachedData.muted);
+        if (cachedData.blacklisted) setBlacklistedList(cachedData.blacklisted);
+        
+        // Compute blockedList from cache
+        const combined = Array.from(new Set([
+          ...(cachedData.muted || []),
+          ...(cachedData.blacklisted || [])
+        ]));
+        setBlockedList(combined);
+        
+        console.log(`[Auth] Loaded cached relationships for @${targetUser}`);
+      }
+    } catch (cacheError) {
+      console.warn(`[Auth] Failed to load relationship cache for @${targetUser}:`, cacheError);
+    }
+
+    // 2. Fetch fresh data silently in the background
+    try {
+      const [following, muted, blacklisted, followers] = await Promise.all([
+        getFollowingList(targetUser),
+        getMutedList(targetUser),
+        getBlacklistedList(targetUser),
+        getFollowersList(targetUser),
       ]);
       
+      // Update React state
       setFollowingList(following);
       setMutedList(muted);
       setBlacklistedList(blacklisted);
+      
+      const combined = Array.from(new Set([...muted, ...blacklisted]));
+      setBlockedList(combined);
+      
+      // 3. Save the fresh data back to the disk cache
+      try {
+        const cacheKey = `skatehive_relationships_${targetUser}`;
+        const cacheDataToSave = JSON.stringify({ following, muted, blacklisted });
+        await AsyncStorage.setItem(cacheKey, cacheDataToSave);
+      } catch (saveError) {
+        console.warn(`[Auth] Failed to save relationship cache for @${targetUser}:`, saveError);
+      }
+      
+      console.log(`[Auth] User relationships refreshed & cached for @${targetUser}:`);
+      console.log(` - Following: ${following.length} users (${following.slice(0, 5).join(', ')}...)`);
+      console.log(` - Muted: ${muted.length} users`);
+      console.log(` - Blacklisted: ${blacklisted.length} users`);
     } catch (error) {
-      console.error('Error loading user relationships:', error);
+      console.error(`[Auth] Error refreshing relationships for @${targetUser}:`, error);
       // Don't throw error, just log it to avoid breaking the app
     }
-  };
+  }, [username]);
 
   // Update user relationship and refresh the lists
   const updateUserRelationship = async (
@@ -201,13 +264,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setFollowingList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
         } else if (relationship === 'ignore') {
           setMutedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setBlockedList(prev => Array.from(new Set([...prev.filter(u => u !== targetUsername), targetUsername])));
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
         } else if (relationship === 'blacklist') {
           setBlacklistedList(prev => [...prev.filter(u => u !== targetUsername), targetUsername]);
+          setBlockedList(prev => Array.from(new Set([...prev.filter(u => u !== targetUsername), targetUsername])));
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
         } else if (relationship === '') {
-          // Unfollow
+          // Unmute/Unblacklist/Unfollow
           setFollowingList(prev => prev.filter(u => u !== targetUsername));
+          setMutedList(prev => prev.filter(u => u !== targetUsername));
+          setBlacklistedList(prev => prev.filter(u => u !== targetUsername));
+          setBlockedList(prev => prev.filter(u => u !== targetUsername));
         }
       }
 
@@ -225,6 +293,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let users: StoredUser[] = [];
       if (keys) {
         users = JSON.parse(keys);
+        // Clean up invalid entries on load
+        const cleanedUsers = users.filter(u => u.username && u.username.trim() !== "");
+        if (cleanedUsers.length !== users.length) {
+          users = cleanedUsers;
+          await SecureStore.setItemAsync(STORED_USERS_KEY, JSON.stringify(users));
+        }
       }
       setStoredUsers(users);
     } catch (error) {
@@ -235,7 +309,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Check if a user is already logged in (restore session)
   const checkCurrentUser = async () => {
     try {
-      // Do not auto-login: always require full login for decrypted key
+      // Robust check: Verify session duration from storage to avoid race conditions
+      // with AppSettingsContext loading.
+      const storedSettingsStr = await SecureStore.getItemAsync('app_settings');
+      let isAutoLock = false;
+      if (storedSettingsStr) {
+        const storedSettings = JSON.parse(storedSettingsStr);
+        if (storedSettings.sessionDuration === 0) {
+          isAutoLock = true;
+        }
+      }
+
+      if (isAutoLock) {
+        // If Auto-lock is enabled, we never restore from SecureStore
+        await SecureStore.deleteItemAsync(SESSION_KEY);
+        setUsername(null);
+        setIsAuthenticated(false);
+        setSession(null);
+        return;
+      }
+
+      const storedSession = await SecureStore.getItemAsync(SESSION_KEY);
+      if (storedSession) {
+        const parsed: Omit<AuthSession, 'decryptedKey'> & { expiryAt: number } = JSON.parse(storedSession);
+        
+        // Check if session has expired
+        if (parsed.expiryAt > Date.now()) {
+          // Rehydrate the decryptedKey from encrypted storage
+          const encryptedKey = await getEncryptedKey(parsed.username);
+          
+          if (encryptedKey) {
+            let rehydratedKey = '';
+            
+            if (encryptedKey.method === 'biometric') {
+              // Current implementation uses salt as secret for biometric
+              const secret = encryptedKey.salt;
+              rehydratedKey = decryptKey(encryptedKey.encrypted, secret, encryptedKey.iv);
+            }
+            // Note: PIN method cannot be rehydrated without user input (PIN)
+            
+            if (rehydratedKey) {
+              const fullSession: AuthSession = {
+                ...parsed,
+                decryptedKey: rehydratedKey
+              };
+              setUsername(parsed.username);
+              setSession(fullSession);
+              setIsAuthenticated(true);
+              
+              // Refresh relationships in background
+              refreshUserRelationships(parsed.username);
+              return;
+            }
+          }
+          
+          // If we couldn't rehydrate or no encrypted key found, clear session
+          await SecureStore.deleteItemAsync(SESSION_KEY);
+        } else {
+          // Session expired, clear it
+          await SecureStore.deleteItemAsync(SESSION_KEY);
+        }
+      }
+      
+      // No valid session found
       setUsername(null);
       setIsAuthenticated(false);
       setSession(null);
@@ -248,6 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Update stored users list in SecureStore
   const updateStoredUsers = async (user: StoredUser) => {
+    if (!user.username || user.username === 'SPECTATOR') return;
     try {
       let users = [...storedUsers];
       users = users.filter(u => u.username !== user.username);
@@ -333,12 +470,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: Date.now(),
       };
       await updateStoredUsers(user);
+      const authSession: AuthSession = { 
+        username: normalizedUsername, 
+        decryptedKey: postingKey, 
+        loginTime: Date.now() 
+      };
+      
+      // Store session for persistence (skip if duration is 0 / "Auto")
+      if (settings.sessionDuration > 0) {
+        const expiryAt = Date.now() + (settings.sessionDuration * 60 * 1000);
+        // [FIX] NEVER store private keys in plaintext. Omit decryptedKey from storage.
+        const { decryptedKey: _, ...safeSession } = authSession;
+        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...safeSession, expiryAt }));
+      }
+
       setUsername(normalizedUsername);
       setIsAuthenticated(true);
-      setSession({ username: normalizedUsername, decryptedKey: postingKey, loginTime: Date.now() });
+      setSession(authSession);
       
       // Load user relationships after successful login
-      setTimeout(() => refreshUserRelationships(), 100);
+      refreshUserRelationships(normalizedUsername);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -392,13 +543,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await deleteEncryptedKey(selectedUsername);
         throw new AuthError('Stored credentials are incompatible. Please log in again.');
       }
+      const authSession: AuthSession = { 
+        username: selectedUsername, 
+        decryptedKey, 
+        loginTime: Date.now() 
+      };
+
+      // Store session for persistence (skip if duration is 0 / "Auto")
+      if (settings.sessionDuration > 0) {
+        const expiryAt = Date.now() + (settings.sessionDuration * 60 * 1000);
+        // [FIX] NEVER store private keys in plaintext. Omit decryptedKey from storage.
+        const { decryptedKey: _, ...safeSession } = authSession;
+        await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify({ ...safeSession, expiryAt }));
+      }
+
       setUsername(selectedUsername);
       setIsAuthenticated(true);
-      setSession({ username: selectedUsername, decryptedKey, loginTime: Date.now() });
+      setSession(authSession);
       await updateStoredUsers({ username: selectedUsername, method: encryptedKey.method, createdAt: encryptedKey.createdAt });
       
       // Load user relationships after successful login
-      setTimeout(() => refreshUserRelationships(), 100);
+      refreshUserRelationships(selectedUsername);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -424,6 +589,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFollowingList([]);
       setMutedList([]);
       setBlacklistedList([]);
+      setBlockedList([]);
+      await SecureStore.deleteItemAsync(SESSION_KEY);
       await SecureStore.deleteItemAsync('lastLoggedInUser');
     } catch (error) {
       console.error('Error during logout:', error);
@@ -451,6 +618,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await deleteEncryptedKey(user.username);
       }
       await SecureStore.deleteItemAsync(STORED_USERS_KEY);
+      await SecureStore.deleteItemAsync(SESSION_KEY);
       await SecureStore.deleteItemAsync('lastLoggedInUser');
       setStoredUsers([]);
       setSession(null);
@@ -473,6 +641,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         followingList,
         mutedList,
         blacklistedList,
+        blockedList,
         login,
         loginStoredUser,
         logout,

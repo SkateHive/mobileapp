@@ -1,19 +1,35 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
+import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG, getDiscussions } from '../hive-utils';
+import { Discussion } from '@hiveio/dhive';
+import { SnapConfig } from '../config/SnapConfig';
+import { FeedFilterType } from '../FeedFilterContext';
+import { useAuth } from '../auth-provider';
+import { getSnapsFeed } from '../api';
 
 interface LastContainerInfo {
   permlink: string;
   date: string;
 }
 
-export function useSnaps() {
+export function useSnaps(filter: FeedFilterType = 'Recent', username: string | null = null) {
+  const { blockedList } = useAuth();
   const lastContainerRef = useRef<LastContainerInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
+  const apiPageRef = useRef<number>(1);
 
   const [comments, setComments] = useState<ExtendedComment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [fetchTrigger, setFetchTrigger] = useState(0);
+
+  // Clear comments when filter changes
+  useEffect(() => {
+    setComments([]);
+    setHasMore(true);
+    lastContainerRef.current = null;
+    fetchedPermlinksRef.current = new Set();
+    apiPageRef.current = 1;
+  }, [filter]);
 
   // Filter comments by tag
   function filterCommentsByTag(comments: ExtendedComment[], targetTag: string): ExtendedComment[] {
@@ -33,59 +49,119 @@ export function useSnaps() {
 
   // Fetch comments with progressive loading
   async function getMoreSnaps(): Promise<ExtendedComment[]> {
-    const tag = COMMUNITY_TAG;
-    const pageSize = 10;
-    const allFilteredComments: ExtendedComment[] = [];
-    let hasMoreData = true;
-    let permlink = lastContainerRef.current?.permlink || '';
-    let date = lastContainerRef.current?.date || new Date().toISOString();
-    let iterationCount = 0;
-    const maxIterations = 10;
-    const allPermlinks = new Set(fetchedPermlinksRef.current);
-
-    while (allFilteredComments.length < pageSize && hasMoreData && iterationCount < maxIterations) {
-      iterationCount++;
-
+    // MOCKED: For now, we only show the Curated feed regardless of filter
+    const effectiveFilter = 'Curated';
+    
+    if (effectiveFilter === 'Curated') {
       try {
-        const result = await getSnapsContainers({
-          lastPermlink: permlink,
-          lastDate: date,
-        });
-
-        if (!result.length) {
-          hasMoreData = false;
-          break;
-        }
-
-        for (const resultItem of result) {
-          if (allPermlinks.has(resultItem.permlink)) continue;
-
-          const replies = await getContentReplies({
-            author: SNAPS_CONTAINER_AUTHOR,
-            permlink: resultItem.permlink,
-          });
-
-          const filteredComments = filterCommentsByTag(replies, tag);
-
-          allPermlinks.add(resultItem.permlink);
-          filteredComments.forEach(c => allPermlinks.add(c.permlink));
-          allFilteredComments.push(...filteredComments);
-
-          permlink = resultItem.permlink;
-          date = resultItem.created;
-
-          if (allFilteredComments.length >= pageSize) break;
+        const currentPage = apiPageRef.current;
+        const apiSnaps = await getSnapsFeed(currentPage, SnapConfig.pageSize);
+        
+        if (apiSnaps && apiSnaps.length > 0) {
+          apiPageRef.current += 1;
+          const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+          const safelyFilteredComments = apiSnaps.filter(c => !blockedSet.has(c.author.toLowerCase())) as unknown as ExtendedComment[];
+          
+          safelyFilteredComments.forEach(c => fetchedPermlinksRef.current.add(c.permlink));
+          return safelyFilteredComments;
+        } else if (apiSnaps && apiSnaps.length === 0 && currentPage > 1) {
+          // We reached the end of the API feed
+          return [];
         }
       } catch (error) {
-        console.error('Error fetching snaps:', error);
-        hasMoreData = false;
+        console.warn('Failed to fetch from skatehive-api, falling back to dhive natively:', error);
       }
-    }
 
-    fetchedPermlinksRef.current = allPermlinks;
-    lastContainerRef.current = { permlink, date };
-    allFilteredComments.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-    return allFilteredComments;
+      // --- NATIVE DHIVE FALLBACK ---
+      const tag = COMMUNITY_TAG;
+      const pageSize = SnapConfig.pageSize; // Target page size
+      const allFilteredComments: ExtendedComment[] = [];
+      let hasMoreData = true;
+      let permlink = lastContainerRef.current?.permlink || '';
+      let date = lastContainerRef.current?.date || new Date().toISOString();
+      let iterationCount = 0;
+      const maxIterations = 10; // Prevent infinite loops
+      
+      const allPermlinks = new Set(fetchedPermlinksRef.current);
+
+      while (allFilteredComments.length < pageSize && hasMoreData && iterationCount < maxIterations) {
+        iterationCount++;
+        
+        try {
+          const result = await getSnapsContainers({
+            lastPermlink: permlink,
+            lastDate: date,
+          });
+          
+          if (!result.length) {
+            hasMoreData = false;
+            break;
+          }
+          
+          for (const resultItem of result) {
+            if (allPermlinks.has(resultItem.permlink)) continue;
+            
+            const replies = await getContentReplies({
+              author: SNAPS_CONTAINER_AUTHOR,
+              permlink: resultItem.permlink,
+            });
+            
+            const filteredComments = filterCommentsByTag(replies, tag);
+            
+            // Filter by blocked users
+            const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+            const safelyFilteredComments = filteredComments.filter(c => !blockedSet.has(c.author.toLowerCase()));
+            
+            allPermlinks.add(resultItem.permlink);
+            safelyFilteredComments.forEach(c => allPermlinks.add(c.permlink));
+            allFilteredComments.push(...safelyFilteredComments);
+            permlink = resultItem.permlink;
+            date = resultItem.created;
+            
+            if (allFilteredComments.length >= pageSize) break;
+          }
+        } catch (error) {
+          console.error('Error fetching snaps:', error);
+          hasMoreData = false;
+        }
+      }
+      
+      fetchedPermlinksRef.current = allPermlinks;
+      lastContainerRef.current = { permlink, date };
+      allFilteredComments.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      return allFilteredComments;
+    } else {
+      // Use getDiscussions for other filters
+      let type: 'created' | 'trending' | 'hot' | 'feed' = 'created';
+      let tag = COMMUNITY_TAG;
+
+      if (filter === 'Trending') type = 'trending';
+      if (filter === 'Following') {
+        if (!username || username === 'SPECTATOR') return [];
+        type = 'feed';
+        tag = username;
+      }
+
+      const lastPost = comments.length > 0 ? comments[comments.length - 1] : null;
+      
+      const results = await getDiscussions(type, {
+        tag,
+        limit: SnapConfig.pageSize,
+        start_author: lastPost?.author,
+        start_permlink: lastPost?.permlink
+      });
+
+      // Filter out blocked users and duplicates
+      const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+      const filteredResults = results.filter(r => 
+        !blockedSet.has(r.author.toLowerCase()) && 
+        !fetchedPermlinksRef.current.has(r.permlink)
+      );
+      
+      filteredResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
+      
+      return filteredResults as unknown as ExtendedComment[];
+    }
   }
 
   // Single effect for all fetching
@@ -124,6 +200,7 @@ export function useSnaps() {
   const refresh = useCallback(() => {
     lastContainerRef.current = null;
     fetchedPermlinksRef.current = new Set();
+    apiPageRef.current = 1;
     setComments([]);
     setHasMore(true);
     setFetchTrigger((t) => t + 1);

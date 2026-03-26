@@ -2,6 +2,7 @@ import React from 'react';
 import { Animated, Dimensions, TouchableOpacity, StyleSheet } from 'react-native';
 import { Text } from './text';
 import { theme } from '../../lib/theme';
+import { MatrixRain } from '~/components/ui/loading-effects/MatrixRain';
 
 const { width } = Dimensions.get('window');
 
@@ -81,7 +82,11 @@ export function Toast({ message, type = 'error', onHide }: ToastProps) {
           }
         ]}
       >
-        <Text style={styles.message}>
+        {(type === 'error' || type === 'success') && <MatrixRain containerHeight={100} intensity={0.3} />}
+        <Text style={[
+          styles.message,
+          (type === 'error' || type === 'success') && styles.messageTextBold
+        ]}>
           {message}
         </Text>
       </Animated.View>
@@ -104,10 +109,16 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   errorBackground: {
-    backgroundColor: 'rgba(239, 68, 68, 0.9)', // red-500/90
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+    overflow: 'hidden',
   },
   successBackground: {
-    backgroundColor: 'rgba(34, 197, 94, 0.9)', // green-500/90
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: '#22C55E', // theme.colors.green
+    overflow: 'hidden',
   },
   infoBackground: {
     backgroundColor: 'rgba(59, 130, 246, 0.9)', // blue-500/90
@@ -119,5 +130,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: theme.fonts.regular,
     fontSize: 16,
+  },
+  messageTextBold: {
+    color: '#ffffff',
+    fontFamily: theme.fonts.bold,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
 });

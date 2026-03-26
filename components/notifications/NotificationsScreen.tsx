@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { theme } from '~/lib/theme';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
+import { MatrixRain } from '~/components/ui/loading-effects/MatrixRain';
 import type { HiveNotification } from '~/lib/types';
 
 export const NotificationsScreen = React.memo(() => {
@@ -28,7 +29,7 @@ export const NotificationsScreen = React.memo(() => {
 
   const handleMarkAsRead = async () => {
     if (unreadCount === 0) return;
-    
+
     try {
       await markAsRead();
       // Immediately clear the badge and refresh it
@@ -47,7 +48,7 @@ export const NotificationsScreen = React.memo(() => {
 
   const renderFooter = () => {
     if (!isLoadingMore) return null;
-    
+
     return (
       <View style={styles.footerLoader}>
         <ActivityIndicator size="small" color={theme.colors.green} />
@@ -80,7 +81,8 @@ export const NotificationsScreen = React.memo(() => {
     if (username === 'SPECTATOR') {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
+          <MatrixRain opacity={0.2} />
+          <Text style={styles.loginText}>
             Please log in to view notifications
           </Text>
         </View>
@@ -108,7 +110,7 @@ export const NotificationsScreen = React.memo(() => {
           Notifications
         </Text>
         {unreadCount > 0 && (
-          <Button 
+          <Button
             onPress={handleMarkAsRead}
             variant="outline"
             size="sm"
@@ -153,6 +155,8 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: theme.spacing.md,
+    paddingTop: 100, // Space for absolute header
+    paddingBottom: 100, // Space for absolute tab bar
     flexGrow: 1,
   },
   header: {
@@ -181,6 +185,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: theme.spacing.sm,
     fontFamily: theme.fonts.regular,
+  },
+  loginText: {
+    fontSize: theme.fontSizes.lg,
+    color: theme.colors.primary,
+    textAlign: 'center',
+    fontFamily: theme.fonts.bold,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 4,
+    zIndex: 1,
   },
   emptySubtext: {
     fontSize: theme.fontSizes.sm,

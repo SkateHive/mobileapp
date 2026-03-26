@@ -1,10 +1,15 @@
 import React, { useMemo } from "react";
-import { View, Image, ScrollView, StyleSheet } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { Text } from "~/components/ui/text";
 import { Ionicons } from "@expo/vector-icons";
 import { Crown } from "lucide-react-native";
 import { useLeaderboard } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
+import { useAuth } from "~/lib/auth-provider";
+import { LoadingScreen } from "~/components/ui/LoadingScreen";
 
 interface LeaderboardProps {
   currentUsername: string | null;
@@ -18,14 +23,23 @@ interface LeaderboardUserInfo {
 }
 
 export function Leaderboard({ currentUsername }: LeaderboardProps) {
+  const { mutedList } = useAuth();
   const { data: leaderboardData, isLoading, error } = useLeaderboard();
 
+  const filteredLeaderboardData = useMemo(() => {
+    if (!leaderboardData) return [];
+    if (!mutedList || mutedList.length === 0) return leaderboardData;
+    
+    const mutedLower = mutedList.map((u: string) => u.toLowerCase());
+    return leaderboardData.filter(user => !mutedLower.includes(user.hive_author.toLowerCase()));
+  }, [leaderboardData, mutedList]);
+
   const { topSkaters, surroundingUsers, currentUserInfo } = useMemo(() => {
-    if (!leaderboardData)
+    if (!filteredLeaderboardData || filteredLeaderboardData.length === 0)
       return { topSkaters: [], surroundingUsers: [], currentUserInfo: null };
 
     // Updated the map and filter functions to include explicit type annotations for parameters
-    const top10 = leaderboardData.slice(0, 10).map((user, index: number) => ({
+    const top10 = filteredLeaderboardData.slice(0, 10).map((user, index: number) => ({
       position: index + 1,
       id: user.id,
       hive_author: user.hive_author,
@@ -36,23 +50,23 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
     let currentUserInfo = null;
 
     if (currentUsername) {
-          const currentUserIndex = leaderboardData.findIndex(
+          const currentUserIndex = filteredLeaderboardData.findIndex(
         (user) => user.hive_author === currentUsername
       );
 
       if (currentUserIndex !== -1) {
         currentUserInfo = {
           position: currentUserIndex + 1,
-          id: leaderboardData[currentUserIndex].id,
-          hive_author: leaderboardData[currentUserIndex].hive_author,
-          points: leaderboardData[currentUserIndex].points,
+          id: filteredLeaderboardData[currentUserIndex].id,
+          hive_author: filteredLeaderboardData[currentUserIndex].hive_author,
+          points: filteredLeaderboardData[currentUserIndex].points,
         };
 
         if (currentUserIndex > 9) {
           const startIndex = currentUserIndex > 14 ? currentUserIndex - 5 : 10;
-          const endIndex = Math.min(currentUserIndex + 5, leaderboardData.length - 1);
+          const endIndex = Math.min(currentUserIndex + 5, filteredLeaderboardData.length - 1);
 
-          surroundingUsers = leaderboardData
+          surroundingUsers = filteredLeaderboardData
             .slice(startIndex, endIndex + 1)
             .map((user, idx: number) => ({
               position: startIndex + idx + 1,
@@ -70,14 +84,12 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
     }
 
     return { topSkaters: top10, surroundingUsers, currentUserInfo };
-  }, [leaderboardData, currentUsername]);
+  }, [filteredLeaderboardData, currentUsername]);
 
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading leaderboard...</Text>
-        </View>
+        <LoadingScreen />
       </View>
     );
   }
@@ -85,8 +97,14 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
   if (error) {
     return (
       <View style={styles.container}>
+        <MatrixRain intensity={0.5} opacity={0.2} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error loading leaderboard</Text>
+          <Text style={styles.matrixErrorText}>
+            we are collecting data for the leaderboard.
+          </Text>
+          <Text style={[styles.matrixErrorText, { color: theme.colors.primary, marginTop: 10 }]}>
+            come back later to see our champions
+          </Text>
         </View>
       </View>
     );
@@ -95,12 +113,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerContainer}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="podium-outline" size={48} color={theme.colors.primary} />
-          </View>
-          <Text style={styles.title}>Leaderboard</Text>
-        </View>
+        {/* Header Removed for more space */}
 
         <View style={styles.listContainer}>
           {topSkaters.map((skater: LeaderboardUserInfo, index: number) => (
@@ -138,6 +151,15 @@ const LeaderboardItem = ({
   isTop?: boolean;
   isCurrentUser?: boolean;
 }) => {
+  const router = useRouter();
+
+  const handlePress = () => {
+    router.push({
+      pathname: "/(tabs)/profile",
+      params: { username: skater.hive_author },
+    });
+  };
+
   const itemStyle = [
     styles.itemContainer,
     isTop && styles.topItemContainer,
@@ -160,7 +182,7 @@ const LeaderboardItem = ({
   ];
 
   return (
-    <View style={itemStyle}>
+    <Pressable style={itemStyle} onPress={handlePress}>
       <Text style={positionStyle}>
         #{skater.position}
       </Text>
@@ -171,6 +193,7 @@ const LeaderboardItem = ({
             uri: `https://images.hive.blog/u/${skater.hive_author}/avatar/small`,
           }}
           style={styles.avatar}
+          transition={200}
         />
         {isTop && skater.position === 1 && (
           <View style={styles.crownContainer}>
@@ -185,7 +208,7 @@ const LeaderboardItem = ({
       <Text style={pointsStyle}>
         {skater.points.toFixed(0)}
       </Text>
-    </View>
+    </Pressable>
   );
 };
 
@@ -196,7 +219,8 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     width: '100%',
-    paddingVertical: theme.spacing.md,
+    paddingTop: 100, // Space for absolute header
+    paddingBottom: 100, // Space for absolute tab bar
   },
   loadingContainer: {
     flex: 1,
@@ -218,28 +242,19 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.md,
     fontFamily: theme.fonts.regular,
   },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: theme.colors.border,
-  },
-  title: {
-    fontSize: theme.fontSizes.xxxl,
-    fontWeight: 'bold',
-    marginTop: theme.spacing.sm,
+  matrixErrorText: {
     color: theme.colors.text,
+    fontSize: theme.fontSizes.lg,
     fontFamily: theme.fonts.bold,
-    paddingTop: theme.spacing.sm, // Add padding to prevent cutoff
-    lineHeight: 40, // Ensure proper line height
+    textAlign: "center",
+    textTransform: "lowercase",
+    paddingHorizontal: theme.spacing.xl,
+    textShadowColor: "rgba(0, 255, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  headerContainer: {
+    display: 'none',
   },
   listContainer: {
     paddingHorizontal: theme.spacing.md,

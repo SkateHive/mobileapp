@@ -20,12 +20,23 @@ import { ProfileSpectatorInfo } from "~/components/SpectatorMode/ProfileSpectato
 import { PostCard } from "~/components/Feed/PostCard";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { FollowersModal } from "~/components/Profile/FollowersModal";
+import { useFocusEffect } from '@react-navigation/native';
 import { EditProfileModal } from "~/components/Profile/EditProfileModal";
+
+const { width } = Dimensions.get('window');
 import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
-import { useUserComments } from "~/lib/hooks/useUserComments";
-import { extractMediaFromBody } from "~/lib/utils";
+import { useToast } from "~/lib/toast-provider";
+import { API_BASE_URL } from '~/lib/constants';
+import { useUserComments } from '~/lib/hooks/useUserComments';
+import { SnapConfig } from '~/lib/config/SnapConfig';
+import { filterDeletedPosts } from '~/lib/hive-utils';
+import { useScrollLock } from '~/lib/ScrollLockContext';
+import { ConversationDrawer } from '~/components/Feed/ConversationDrawer';
+import type { Discussion } from '@hiveio/dhive';
+import { extractMediaFromBody } from '~/lib/utils';
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
+import { VideoPlayer } from '~/components/Feed/VideoPlayer';
 
 const GRID_COLS = 3;
 const GRID_GAP = 2;
@@ -50,7 +61,7 @@ const SkeletonTile = React.memo(({ size, delay }: { size: number; delay: number 
 });
 
 const GridSkeleton = ({ tileSize }: { tileSize: number }) => (
-  <View style={skeletonStyles.container}>
+  <View style={[skeletonStyles.container, { width: SCREEN_WIDTH }]}>
     {Array.from({ length: 12 }).map((_, i) => (
       <SkeletonTile key={i} size={tileSize} delay={(i % 3) * 150} />
     ))}
@@ -62,6 +73,7 @@ const skeletonStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GRID_GAP,
+    justifyContent: 'flex-start',
   },
 });
 
@@ -94,40 +106,250 @@ function countryToFlag(location: string): string {
     IN: '🇮🇳', INDIA: '🇮🇳',
     PH: '🇵🇭', PHILIPPINES: '🇵🇭',
   };
-  // Try exact match first, then check if location contains a known key
+
+  // Try exact match first
   if (map[loc]) return map[loc];
+
+  // Try finding a known country/code as a full word in the string
   for (const [key, flag] of Object.entries(map)) {
-    if (loc.includes(key)) return flag;
+    const regex = new RegExp(`\\b${key}\\b`, 'i');
+    if (regex.test(loc)) return flag;
   }
-  return '🌍';
+
+  return '🌎';
 }
 
 export default function ProfileScreen() {
   const { username: currentUsername, logout } = useAuth();
+  const { isScrollLocked } = useScrollLock();
   const params = useLocalSearchParams();
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [editProfileVisible, setEditProfileVisible] = useState(false);
-  const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
+  // const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
+  const [conversationPost, setConversationPost] = useState<Discussion | null>(null);
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [isBlockLoading, setIsBlockLoading] = useState(false);
+  const { followingList, blockedList, updateUserRelationship, session, refreshUserRelationships } = useAuth();
+  const { showToast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
 
   // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
   useEffect(() => {
     setFollowersModalVisible(false);
     setEditProfileVisible(false);
-    setSettingsMenuVisible(false);
+    // setSettingsMenuVisible(false);
     setProfileTab('grid');
+    setIsFollowLoading(false);
   }, [profileUsername]);
 
+  // Force refresh relationships when visiting a profile to ensure following status is accurate
+  useEffect(() => {
+    if (typeof currentUsername === 'string' && currentUsername !== "SPECTATOR") {
+      console.log(`[Profile Sync] Forcing relationship refresh for @${currentUsername} while viewing @${profileUsername}`);
+      refreshUserRelationships().catch(console.error);
+    }
+  }, [profileUsername, currentUsername, refreshUserRelationships]);
+
+  // Sync following status with global list
+  useEffect(() => {
+    if (followingList && profileUsername) {
+      const profileLower = profileUsername.toLowerCase();
+      const following = followingList.some((u: string) => u.toLowerCase() === profileLower);
+
+      console.log(`[Profile Sync] Checking if @${profileLower} is in followingList: ${following}`);
+      console.log(` - Current followingList size: ${followingList.length}`);
+
+      if (!following && followingList.length < 10) {
+        console.log(" - followingList (first 10):", followingList.slice(0, 10));
+      }
+
+      setIsFollowing(following);
+    }
+
+    if (blockedList && profileUsername) {
+      const profileLower = profileUsername.toLowerCase();
+      const blocked = blockedList.some((u: string) => u.toLowerCase() === profileLower);
+      setIsBlocked(blocked);
+    }
+  }, [followingList, blockedList, profileUsername]);
+
+  const handleFollow = async () => {
+    if (!profileUsername || profileUsername === "SPECTATOR") return;
+
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsFollowLoading(true);
+      const isCurrentlyFollowing = followingList.some((u: string) => u.toLowerCase() === profileUsername.toLowerCase());
+      const action = isCurrentlyFollowing ? '' : 'blog'; // '' unsets relationship (unfollow)
+
+      const success = await updateUserRelationship(profileUsername, action);
+      if (success) {
+        showToast(isCurrentlyFollowing ? `Unfollowed @${profileUsername}` : `Following @${profileUsername}`, 'success');
+      } else {
+        showToast(`Failed to ${isCurrentlyFollowing ? 'unfollow' : 'follow'} user`, 'error');
+      }
+    } catch (error) {
+      showToast('Error updating relationship', 'error');
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
+  const handleBlock = async () => {
+    if (!profileUsername || profileUsername === "SPECTATOR") return;
+
+    if (!currentUsername || currentUsername === "SPECTATOR" || !session?.decryptedKey) {
+      showToast('Please login first', 'error');
+      return;
+    }
+
+    try {
+      setIsBlockLoading(true);
+      const action = isBlocked ? '' : 'ignore'; // Default to ignore for blocking
+
+      const success = await updateUserRelationship(profileUsername, action);
+      if (success) {
+        showToast(isBlocked ? `Unblocked @${profileUsername}` : `Blocked @${profileUsername}`, 'success');
+        // If we just blocked them, we should also unfollow if we following
+        if (action === 'ignore' && isFollowing) {
+          setIsFollowing(false);
+        }
+      } else {
+        showToast(`Failed to ${isBlocked ? 'unblock' : 'block'} user`, 'error');
+      }
+    } catch (error) {
+      showToast('Error updating relationship', 'error');
+    } finally {
+      setIsBlockLoading(false);
+    }
+  };
+
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
-  const {
-    posts: userPosts,
-    isLoading: isLoadingPosts,
-    loadNextPage,
-    hasMore,
-    refresh: refreshPosts,
-  } = useUserComments(profileUsername);
+
+  // --- Fetching Logic (API vs RPC) ---
+  
+  // 1. RPC Fallback (original hook)
+  // We only pass the username if the API is disabled to save resources
+  const { 
+    posts: rpcPosts, 
+    isLoading: isRpcLoading, 
+    loadNextPage: loadNextPageRpc, 
+    hasMore: rpcHasMore, 
+    refresh: refreshRpc 
+  } = useUserComments(SnapConfig.useApi ? null : profileUsername, blockedList);
+
+  // 2. API Logic (New migration)
+  const [apiPosts, setApiPosts] = useState<any[]>([]);
+  const [isApiLoading, setIsApiLoading] = useState(false);
+  const [apiHasMore, setApiHasMore] = useState(true);
+  const [apiPage, setApiPage] = useState(1);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const API_LIMIT = 20;
+
+  // Use refs to avoid dependency loops in useCallback
+  const isFetchingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+
+  const fetchUserSnaps = useCallback(async (page: number, refresh: boolean = false) => {
+    if (!profileUsername) return;
+
+    // Avoid redundant fetches using refs for stability
+    if (isFetchingRef.current || (!refresh && !hasMoreRef.current)) {
+      return;
+    }
+
+    try {
+      isFetchingRef.current = true;
+      setIsApiLoading(true);
+      setApiError(null);
+      console.log(`[Profile Snaps] Fetching page ${page} for @${profileUsername} (refresh: ${refresh})`);
+      
+      const url = `${API_BASE_URL}/feed?author=${profileUsername}&page=${page}&limit=${API_LIMIT}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(`[Profile Snaps] Successfully fetched ${result.data.length} snaps for @${profileUsername}`);
+        // Map fields for compatibility with PostCard and other components
+        const mappedPosts = result.data.map((p: any) => ({
+          ...p,
+          // Map API 'votes' → dhive 'active_votes' for PostCard compatibility
+          active_votes: p.votes || [],
+        }));
+
+        // Filter by blockedList (if profile user is blocked, show no snaps)
+        const isProfileBlocked = blockedList?.some(u => u.toLowerCase() === profileUsername.toLowerCase());
+        const finalPosts = isProfileBlocked ? [] : mappedPosts;
+
+        // Apply secondary deletion check from blockchain if enabled
+        let verifiedPosts = finalPosts;
+        if (SnapConfig.verifyDeletion && finalPosts.length > 0) {
+          verifiedPosts = await filterDeletedPosts(finalPosts);
+        }
+
+        setApiPosts(prev => refresh ? verifiedPosts : [...prev, ...verifiedPosts]);
+        setApiHasMore(result.pagination.hasNextPage);
+        hasMoreRef.current = result.pagination.hasNextPage;
+        setApiPage(page);
+      } else {
+        throw new Error(result.message || "Failed to fetch snaps");
+      }
+    } catch (error) {
+      console.error("Error fetching user snaps from API:", error);
+      setApiError(error instanceof Error ? error.message : "Network request failed");
+    } finally {
+      setIsApiLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, [profileUsername, blockedList]);
+
+  // Handle pagination and refresh for API
+  const loadNextPageApi = useCallback(() => {
+    if (apiHasMore && !isApiLoading && !apiError) {
+      fetchUserSnaps(apiPage + 1);
+    }
+  }, [apiHasMore, isApiLoading, apiError, apiPage, fetchUserSnaps]);
+
+  const refreshPostsApi = useCallback(async () => {
+    await fetchUserSnaps(1, true);
+  }, [fetchUserSnaps]);
+
+  // Initial load or username change (for API only)
+  useEffect(() => {
+    if (!SnapConfig.useApi) return;
+    
+    console.log(`[Profile Snaps] Resetting and initial load for @${profileUsername}`);
+    setApiPosts([]);
+    setApiPage(1);
+    setIsApiLoading(false);
+    setApiHasMore(true);
+    setApiError(null);
+    isFetchingRef.current = false;
+    hasMoreRef.current = true;
+    fetchUserSnaps(1, true);
+  }, [profileUsername, fetchUserSnaps]);
+
+  // Unified compatibility aliases for the rest of the file
+  const userPosts = SnapConfig.useApi ? apiPosts : rpcPosts;
+  const isLoadingPosts = SnapConfig.useApi ? (isApiLoading && apiPosts.length === 0) : isRpcLoading;
+  const hasMore = SnapConfig.useApi ? apiHasMore : rpcHasMore;
+  const loadNextPage = SnapConfig.useApi ? loadNextPageApi : loadNextPageRpc;
+  const refreshPosts = SnapConfig.useApi ? refreshPostsApi : refreshRpc;
 
   // Get thumbnail for a post — checks multiple sources
   const getPostThumbnail = useCallback((post: any): string | null => {
@@ -136,7 +358,7 @@ export default function ProfileScreen() {
       metadata = typeof post.json_metadata === 'string'
         ? JSON.parse(post.json_metadata)
         : (post.json_metadata || {});
-    } catch {}
+    } catch { }
 
     // 1. Try json_metadata.image (most reliable, set by posting apps)
     if (metadata?.image) {
@@ -180,7 +402,7 @@ export default function ProfileScreen() {
         ? JSON.parse(post.json_metadata)
         : post.json_metadata;
       if (metadata?.image?.length > 0) return true;
-    } catch {}
+    } catch { }
 
     // Check body for media
     const media = extractMediaFromBody(post.body);
@@ -199,22 +421,11 @@ export default function ProfileScreen() {
   );
 
   // Auto-load more when grid doesn't have enough items to fill the screen
-  // A 3-col grid needs ~15 items (5 rows) to be scrollable
-  const MIN_GRID_ITEMS = 15;
-  useEffect(() => {
-    if (
-      profileTab === 'grid' &&
-      !isLoadingPosts &&
-      hasMore &&
-      gridPosts.length < MIN_GRID_ITEMS &&
-      userPosts.length > 0
-    ) {
-      loadNextPage();
-    }
-  }, [profileTab, isLoadingPosts, hasMore, gridPosts.length, userPosts.length, loadNextPage]);
+  // REMOVED: This was causing infinite loops and crashes (OOM) on profiles with many media-less posts.
+  // The user can still scroll down to trigger loadNextPage via onEndReached.
 
   // Render grid item
-  const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+  const tileSize = (SCREEN_WIDTH - (GRID_GAP * (GRID_COLS - 1))) / GRID_COLS - 0.5;
 
   const renderGridItem = useCallback(({ item }: { item: any }) => {
     const media = extractMediaFromBody(item.body);
@@ -226,7 +437,7 @@ export default function ProfileScreen() {
         <GridVideoTile
           videoUrl={videoMedia.url}
           size={tileSize}
-          onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+          onPress={() => setConversationPost(item)}
         />
       );
     }
@@ -236,7 +447,7 @@ export default function ProfileScreen() {
     return (
       <Pressable
         style={[styles.gridTile, { width: tileSize, height: tileSize }]}
-        onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
+        onPress={() => setConversationPost(item)}
       >
         {thumb ? (
           <Image
@@ -347,18 +558,18 @@ export default function ProfileScreen() {
   let hivepower = 0; // Default hive power
   let vp = 100; // Default voting power
   let rc = 100; // Default RC
-  
+
   if (profileUsername !== "SPECTATOR" && hiveAccount) {
     // Use reputation from profile data if available, otherwise calculate it
-    reputation = hiveAccount.profile?.reputation || 
-      (hiveAccount.reputation ? 
+    reputation = hiveAccount.profile?.reputation ||
+      (hiveAccount.reputation ?
         Math.log10(Math.abs(Number(hiveAccount.reputation))) * 9 + 25 : 25);
-    
+
     const vestingShares = parseFloat(typeof hiveAccount.vesting_shares === 'string' ? hiveAccount.vesting_shares.split(' ')[0] : hiveAccount.vesting_shares.amount.toString());
     const receivedVestingShares = parseFloat(typeof hiveAccount.received_vesting_shares === 'string' ? hiveAccount.received_vesting_shares.split(' ')[0] : hiveAccount.received_vesting_shares.amount.toString());
     const delegatedVestingShares = parseFloat(typeof hiveAccount.delegated_vesting_shares === 'string' ? hiveAccount.delegated_vesting_shares.split(' ')[0] : hiveAccount.delegated_vesting_shares.amount.toString());
     const totalVests = vestingShares + receivedVestingShares - delegatedVestingShares;
-    
+
     // Simple HP calculation (actual conversion requires global props)
     hivepower = totalVests / 1000; // Simplified calculation
 
@@ -366,104 +577,147 @@ export default function ProfileScreen() {
   }
 
   // Render the profile header section
-  const renderProfileHeader = () => (
-    <View>
-      {/* Profile Section */}
-      <View style={styles.profileSection}>
-        <View style={styles.profileHeaderRow}>
-          <View style={styles.profileImageContainer}>
-            {renderProfileImage()}
-          </View>
-
-          <View style={styles.nameSection}>
-            {/* Name row with gear icon */}
-            <View style={styles.nameRow}>
-              <Text style={styles.profileName} numberOfLines={1}>
-                {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
-              </Text>
-              {!params.username && (
-                <Pressable
-                  onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
-                  hitSlop={12}
-                  style={styles.gearIcon}
-                >
-                  <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
-                </Pressable>
-              )}
+  const renderProfileHeader = () => {
+    return (
+      <View>
+        {/* Profile Section */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileHeaderRow}>
+            <View style={styles.profileImageContainer}>
+              {renderProfileImage()}
             </View>
+            <View style={styles.nameSection}>
+              {/* Name row with gear icon */}
+              <View style={styles.nameRow}>
+                <Text style={styles.profileName} numberOfLines={1}>
+                  {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
+                </Text>
+                {/* {!params.username && (
+                  // <Pressable
+                  //   onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
+                  //   hitSlop={12}
+                  //   style={styles.gearIcon}
+                  // >
+                  //   <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
+                  // </Pressable>
+                )} */}
+              </View>
+              {/* Username + Action Buttons */}
+              <View style={styles.usernameRow}>
+                <Text style={styles.username}>@{profileUsername}</Text>
+                <View style={styles.headerActionsRaw}>
+                  {currentUsername && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {isBlocked ? (
+                        <Pressable
+                          style={[styles.followActionBtn, styles.mutedActionBtn]}
+                          onPress={handleBlock}
+                          disabled={isBlockLoading}
+                        >
+                          {isBlockLoading ? (
+                            <ActivityIndicator size="small" color={theme.colors.danger} />
+                          ) : (
+                            <Text style={[styles.followActionBtnText, { color: theme.colors.danger }]}>
+                              Blocked
+                            </Text>
+                          )}
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={[
+                            styles.followActionBtn,
+                            isFollowing ? styles.unfollowBtn : styles.followBtn
+                          ]}
+                          onPress={handleFollow}
+                          disabled={isFollowLoading}
+                        >
+                          {isFollowLoading ? (
+                            <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
+                          ) : (
+                            <Text style={[
+                              styles.followActionBtnText,
+                              isFollowing ? styles.unfollowBtnText : styles.followBtnText
+                            ]}>
+                              {isFollowing ? 'Unfollow' : 'Follow'}
+                            </Text>
+                          )}
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </View>
 
-            {/* Username */}
-            <Text style={styles.username}>@{profileUsername}</Text>
-
-            {/* Stats + flag inline */}
-            <View style={styles.statsRow}>
-              {profileUsername === "SPECTATOR" ? (
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
-                </View>
-              ) : (
-                <Pressable style={styles.statItem} onPress={handleFollowingPress}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
-                </Pressable>
-              )}
-              {profileUsername === "SPECTATOR" ? (
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </View>
-              ) : (
-                <Pressable style={styles.statItem} onPress={handleFollowersPress}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </Pressable>
-              )}
-              {hiveAccount?.metadata?.profile?.location && (
-                <View style={styles.statItem}>
-                  <Text style={styles.locationFlag}>
-                    {countryToFlag(hiveAccount.metadata.profile.location)}
-                  </Text>
-                  <Text style={styles.statLabel}>
-                    {hiveAccount.metadata.profile.location}
-                  </Text>
-                </View>
-              )}
+              {/* Stats + flag inline */}
+              <View style={styles.statsRow}>
+                {profileUsername === "SPECTATOR" ? (
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                    <Text style={styles.statLabel}>Following</Text>
+                  </View>
+                ) : (
+                  <Pressable style={styles.statItem} onPress={handleFollowingPress}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+                    <Text style={styles.statLabel}>Following</Text>
+                  </Pressable>
+                )}
+                {profileUsername === "SPECTATOR" ? (
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                    <Text style={styles.statLabel}>Followers</Text>
+                  </View>
+                ) : (
+                  <Pressable style={styles.statItem} onPress={handleFollowersPress}>
+                    <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+                    <Text style={styles.statLabel}>Followers</Text>
+                  </Pressable>
+                )}
+                {hiveAccount?.metadata?.profile?.location && (
+                  <View style={styles.statItem}>
+                    <Text style={styles.locationFlag}>
+                      {countryToFlag(hiveAccount.metadata.profile.location)}
+                    </Text>
+                    <Text style={styles.statLabel}>
+                      {hiveAccount.metadata.profile.location}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </View>
+
+        {/* Show Create Account CTA only for SPECTATOR */}
+        {profileUsername === "SPECTATOR" && <ProfileSpectatorInfo />}
+
+        {/* Tab Switcher */}
+        {profileUsername !== "SPECTATOR" && (
+          <View style={styles.tabBar}>
+            <Pressable
+              style={[styles.tab, profileTab === 'grid' && styles.tabActive]}
+              onPress={() => setProfileTab('grid')}
+            >
+              <Ionicons
+                name="grid-outline"
+                size={20}
+                color={profileTab === 'grid' ? theme.colors.primary : theme.colors.muted}
+              />
+            </Pressable>
+            <Pressable
+              style={[styles.tab, profileTab === 'posts' && styles.tabActive]}
+              onPress={() => setProfileTab('posts')}
+            >
+              <Ionicons
+                name="list-outline"
+                size={20}
+                color={profileTab === 'posts' ? theme.colors.primary : theme.colors.muted}
+              />
+            </Pressable>
+          </View>
+        )}
       </View>
-
-      {/* Show Create Account CTA only for SPECTATOR */}
-      {profileUsername === "SPECTATOR" && <ProfileSpectatorInfo />}
-
-      {/* Tab Switcher */}
-      {profileUsername !== "SPECTATOR" && (
-        <View style={styles.tabBar}>
-          <Pressable
-            style={[styles.tab, profileTab === 'grid' && styles.tabActive]}
-            onPress={() => setProfileTab('grid')}
-          >
-            <Ionicons
-              name="grid-outline"
-              size={20}
-              color={profileTab === 'grid' ? theme.colors.primary : theme.colors.muted}
-            />
-          </Pressable>
-          <Pressable
-            style={[styles.tab, profileTab === 'posts' && styles.tabActive]}
-            onPress={() => setProfileTab('posts')}
-          >
-            <Ionicons
-              name="list-outline"
-              size={20}
-              color={profileTab === 'posts' ? theme.colors.primary : theme.colors.muted}
-            />
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
+    );
+  };
 
   // Render individual post item
   const renderPostItem = ({ item }: { item: any }) => (
@@ -471,6 +725,7 @@ export default function ProfileScreen() {
       key={item.permlink}
       post={item}
       currentUsername={currentUsername || ''}
+      onOpenConversation={(post) => setConversationPost(post)}
     />
   );
 
@@ -479,28 +734,48 @@ export default function ProfileScreen() {
 
   // Render footer loading indicator
   const renderFooter = () => {
+    if (apiError) {
+      return (
+        <View style={styles.errorFooter}>
+          <Text style={styles.errorFooterText}>{apiError}</Text>
+          <Pressable 
+            style={styles.retryButton} 
+            onPress={() => fetchUserSnaps(apiPage + 1)}
+          >
+            <Ionicons name="refresh-outline" size={16} color={theme.colors.primary} />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     if (!isLoadingPosts) return null;
     return (
       <View style={styles.loadingFooter}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <LoadingScreen />
       </View>
     );
   };
 
   // Handle refresh
-  const handleRefresh = () => {
-    refreshPosts();
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshPosts();
+    setIsRefreshing(false);
   };
+
 
   return (
     <View style={styles.container}>
       {profileUsername === "SPECTATOR" ? (
         <ScrollView
           style={styles.container}
+          contentContainerStyle={{ paddingTop: 100, paddingBottom: 100 }}
           refreshControl={
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isScrollLocked}
         >
           {renderProfileHeader()}
         </ScrollView>
@@ -526,16 +801,16 @@ export default function ProfileScreen() {
             ) : null
           }
           onEndReached={hasMore ? loadNextPage : undefined}
-          onEndReachedThreshold={0.8}
+          onEndReachedThreshold={0.5}
           refreshControl={
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
-          initialNumToRender={12}
-          maxToRenderPerBatch={9}
-          windowSize={7}
-          contentContainerStyle={{ gap: GRID_GAP }}
+          initialNumToRender={6}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          contentContainerStyle={{ gap: GRID_GAP, paddingTop: 100, paddingBottom: 100 }}
         />
       ) : (
         <FlatList
@@ -559,6 +834,7 @@ export default function ProfileScreen() {
             <RefreshControl refreshing={isLoadingPosts} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isScrollLocked}
           removeClippedSubviews={true}
           initialNumToRender={5}
           maxToRenderPerBatch={3}
@@ -577,6 +853,15 @@ export default function ProfileScreen() {
         />
       )}
 
+      {/* Single shared conversation drawer */}
+      {conversationPost && (
+        <ConversationDrawer
+          isVisible={!!conversationPost}
+          onClose={() => setConversationPost(null)}
+          post={conversationPost}
+        />
+      )}
+
       {/* Edit Profile Modal */}
       {!params.username && (
         <EditProfileModal
@@ -588,7 +873,7 @@ export default function ProfileScreen() {
       )}
 
       {/* Settings Dialog */}
-      <Modal
+      {/* <Modal
         visible={settingsMenuVisible}
         transparent
         animationType="fade"
@@ -611,6 +896,17 @@ export default function ProfileScreen() {
               style={styles.dialogItem}
               onPress={() => {
                 setSettingsMenuVisible(false);
+                handleMutedPress();
+              }}
+            >
+              <Ionicons name="volume-mute-outline" size={20} color={theme.colors.muted} />
+              <Text style={styles.dialogItemText}>Muted Users</Text>
+            </Pressable>
+            <View style={styles.dialogDivider} />
+            <Pressable
+              style={styles.dialogItem}
+              onPress={() => {
+                setSettingsMenuVisible(false);
                 handleLogout();
               }}
             >
@@ -619,7 +915,8 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
         </Pressable>
-      </Modal>
+      </Modal> */}
+
     </View>
   );
 }
@@ -631,6 +928,8 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
+    paddingTop: 100, // Space for absolute header
+    paddingBottom: 100, // Space for absolute tab bar
   },
   // Profile Section Styles
   profileSection: {
@@ -701,6 +1000,52 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  followActionBtn: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xxs,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followBtn: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  unfollowBtn: {
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.border,
+  },
+  followActionBtnText: {
+    fontSize: theme.fontSizes.xs,
+    fontFamily: theme.fonts.bold,
+  },
+  followBtnText: {
+    color: theme.colors.background,
+  },
+  unfollowBtnText: {
+    color: theme.colors.text,
+  },
+  mutedActionBtn: {
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    borderColor: theme.colors.danger,
+    minWidth: 40,
+  },
+  unmuteActionBtn: {
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.border,
+    minWidth: 40,
+  },
+  headerActionsRaw: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statsRow: {
     flexDirection: 'row',
@@ -847,5 +1192,31 @@ const styles = StyleSheet.create({
   errorText: {
     color: theme.colors.text,
     fontFamily: theme.fonts.regular,
+  },
+  errorFooter: {
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  errorFooterText: {
+    color: theme.colors.danger,
+    fontFamily: theme.fonts.regular,
+    fontSize: theme.fontSizes.sm,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  retryButtonText: {
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.sm,
   },
 });

@@ -12,20 +12,24 @@ import {
   UIManager,
   View,
   StyleSheet,
+  Animated,
 } from "react-native";
 import { LoginForm } from "~/components/auth/LoginForm";
 import {
   AuthError,
   useAuth,
 } from "~/lib/auth-provider";
+import { useAppSettings } from "~/lib/AppSettingsContext";
 import {
   AccountNotFoundError,
   HiveError,
   InvalidKeyError,
   InvalidKeyFormatError,
 } from "~/lib/hive-utils";
-import { prefetchVideoFeed, warmUpVideoAssets } from "~/lib/hooks/useQueries";
+import { prefetchVideoFeed, warmUpVideoAssets, prefetchCommunityFeed, prefetchProfile, prefetchBalance } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
+import { Text } from "~/components/ui/text";
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === "android") {
@@ -33,6 +37,54 @@ if (Platform.OS === "android") {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 }
+
+const DecryptingText = ({ text }: { text: string }) => {
+  const chars = "アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン";
+  const [displayedText, setDisplayedText] = React.useState("");
+
+  React.useEffect(() => {
+    let iteration = 0;
+    let interval: NodeJS.Timeout;
+
+    const startDecryption = () => {
+      iteration = 0;
+      interval = setInterval(() => {
+        setDisplayedText(
+          text
+            .split("")
+            .map((char, index) => {
+              // Bit-flicker: 2% chance to show a random char even if "resolved"
+              const isResolved = index < iteration;
+              const shouldFlicker = isResolved && Math.random() < 0.02;
+
+              if (isResolved && !shouldFlicker) {
+                return text[index];
+              }
+              // Randomly sample from the authentic set
+              return chars[Math.floor(Math.random() * chars.length)];
+            })
+            .join("")
+        );
+
+        if (iteration >= text.length) {
+          clearInterval(interval);
+          // Wait 5 seconds before restarting the decryption loop
+          setTimeout(startDecryption, 5000);
+        }
+
+        iteration += 1 / 3;
+      }, 40) as any;
+    };
+
+    startDecryption();
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [text]);
+
+  return <>{displayedText}</>;
+};
 
 const BackgroundVideo = () => {
   const player = useVideoPlayer(
@@ -44,12 +96,90 @@ const BackgroundVideo = () => {
   );
 
   return (
-    <View style={styles.videoContainer}>
+    <View style={styles.backgroundContainer} pointerEvents="none">
       <VideoView
         style={{ width: "100%", height: "100%" }}
         contentFit="cover"
         player={player}
+        nativeControls={false}
+        pointerEvents="none"
       />
+    </View>
+  );
+};
+
+const LoginBackground = () => {
+  const { settings } = useAppSettings();
+  const isMatrix = settings.loginBackground === "matrix";
+  const glitchX = React.useRef(new Animated.Value(0)).current;
+  const revealAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (isMatrix) {
+      // Glitch flicker loop
+      const glitchLoop = () => {
+        Animated.sequence([
+          Animated.timing(glitchX, {
+            toValue: Math.random() * 6 - 3,
+            duration: 60,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glitchX, {
+            toValue: 0,
+            duration: 60,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setTimeout(glitchLoop, Math.random() * 2000 + 500);
+        });
+      };
+      glitchLoop();
+
+      // Reveal animation
+      Animated.timing(revealAnim, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [isMatrix]);
+
+  const animatedStyle = {
+    transform: [{ translateX: glitchX }],
+  };
+
+  const revealStyle = {
+    overflow: "hidden" as const,
+    height: revealAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 120],
+    }),
+  };
+
+  return (
+    <View style={styles.backgroundContainer}>
+      {isMatrix ? (
+        <>
+          <MatrixRain intensity={1} opacity={0.3} />
+          {/* Logo Overlay */}
+          <View style={styles.logoOverlayContainer} pointerEvents="none">
+            {/* Native animations (Transform/Glitch) */}
+            <Animated.View style={animatedStyle}>
+              {/* JS-driven reveal (Height) */}
+              <Animated.View style={revealStyle}>
+                <View style={{ alignItems: "center", justifyContent: "center" }}>
+                  <Text style={styles.matrixGlow}>skatehive</Text>
+                  <Text style={styles.matrixTextLogo}>
+                    <DecryptingText text="skatehive" />
+                  </Text>
+                </View>
+              </Animated.View>
+            </Animated.View>
+          </View>
+        </>
+      ) : (
+        <BackgroundVideo />
+      )}
     </View>
   );
 };
@@ -66,23 +196,25 @@ export default function Index() {
   } = useAuth();
   const queryClient = useQueryClient();
 
-  const [deletingUser, setDeletingUser] = React.useState<string | null>(null);
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [isFormVisible, setIsFormVisible] = React.useState(false);
 
-  // Prefetch video feed + warm HTTP cache while user is on login screen
+  const { settings } = useAppSettings();
+
+  // Prefetch video feed + community feed + warm HTTP cache while user is on login screen
   React.useEffect(() => {
     prefetchVideoFeed(queryClient);
+    prefetchCommunityFeed(queryClient);
     warmUpVideoAssets(queryClient);
   }, [queryClient]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.push("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}`);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, settings.initialScreen]);
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -95,21 +227,12 @@ export default function Index() {
     router.push("/about");
   };
 
-  const handleDeleteUser = async (username: string) => {
-    setDeletingUser(username);
-    try {
-      await deleteStoredUser(username);
-    } catch (error) {
-      console.error("Error deleting user:", error);
-    } finally {
-      setDeletingUser(null);
-    }
-  };
+
 
   const handleSpectator = async () => {
     try {
       await enterSpectatorMode();
-      router.replace("/(tabs)/videos");
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error) {
       console.error("Error entering spectator mode:", error);
       setMessage("Error entering spectator mode");
@@ -123,7 +246,10 @@ export default function Index() {
         return;
       }
       await login(username, password, method, pin);
-      router.replace("/(tabs)/videos");
+      // Prefetch user data after successful login
+      prefetchProfile(queryClient, username);
+      prefetchBalance(queryClient, username);
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error: any) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -132,7 +258,10 @@ export default function Index() {
         error instanceof AuthError ||
         error instanceof HiveError
       ) {
-        setMessage(error.message);
+        // Suppress biometric failure messages as requested
+        if (!error.message.includes('Biometric authentication')) {
+          setMessage(error.message);
+        }
       } else {
         setMessage("An unexpected error occurred");
       }
@@ -146,7 +275,10 @@ export default function Index() {
   ) => {
     try {
       await loginStoredUser(selectedUsername, pin);
-      router.replace("/(tabs)/videos");
+      // Prefetch user data after successful quick login
+      prefetchProfile(queryClient, selectedUsername);
+      prefetchBalance(queryClient, selectedUsername);
+      router.replace(`/(tabs)/${settings.initialScreen}` as any);
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -155,7 +287,11 @@ export default function Index() {
         error instanceof AuthError ||
         error instanceof HiveError
       ) {
-        setMessage((error as Error).message);
+        // Suppress biometric failure messages as requested
+        const msg = (error as Error).message;
+        if (!msg.includes('Biometric authentication')) {
+          setMessage(msg);
+        }
       } else {
         setMessage("Error with quick login");
       }
@@ -165,16 +301,16 @@ export default function Index() {
   if (isLoading || isAuthenticated) {
     return (
       <View style={styles.container}>
-        <BackgroundVideo />
+        <LoginBackground />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <BackgroundVideo />
+      <LoginBackground />
 
-      <Pressable onPress={handleInfoPress} style={styles.infoButton}>
+      <Pressable onPress={handleInfoPress} style={styles.infoButton} accessibilityRole="button" accessibilityLabel="More Info">
         <View style={styles.infoButtonContent}>
           <Ionicons
             name="information-circle-outline"
@@ -198,11 +334,13 @@ export default function Index() {
       <KeyboardAvoidingView
         style={styles.formWrapper}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        pointerEvents="box-none"
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          pointerEvents="box-none"
         >
           <View style={styles.spacer} />
           <View
@@ -224,8 +362,6 @@ export default function Index() {
               onSpectator={handleSpectator}
               storedUsers={storedUsers}
               onQuickLogin={handleQuickLogin}
-              onDeleteUser={handleDeleteUser}
-              deletingUser={deletingUser}
             />
           </View>
         </ScrollView>
@@ -235,22 +371,23 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  videoContainer: {
+  backgroundContainer: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 0,
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#000000",
   },
   infoButton: {
     position: "absolute",
     top: 48,
     right: 24,
-    zIndex: 10,
+    zIndex: 999,
   },
   infoButtonContent: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
@@ -264,6 +401,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: "60%",
     flexDirection: "column",
+    zIndex: 1,
   },
   fadeBand: {
     flex: 1,
@@ -271,6 +409,7 @@ const styles = StyleSheet.create({
   },
   formWrapper: {
     flex: 1,
+    zIndex: 2,
   },
   scrollContent: {
     flexGrow: 1,
@@ -287,5 +426,39 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 400,
     alignItems: "center",
+  },
+  logoOverlayContainer: {
+    position: "absolute",
+    top: "25%",
+    left: 0,
+    right: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+  },
+  matrixGlow: {
+    position: "absolute",
+    color: "#00ff88",
+    fontSize: 56,
+    fontFamily: theme.fonts.bold,
+    textShadowColor: "#00ff88",
+    textShadowRadius: 40,
+    opacity: 0.4,
+    letterSpacing: 4,
+    textTransform: "lowercase",
+  },
+  matrixTextLogo: {
+    color: "#32CD32",
+    fontSize: 56,
+    fontFamily: theme.fonts.bold,
+    textTransform: "lowercase",
+    textAlign: "center",
+    paddingVertical: 20,
+    lineHeight: 70,
+    letterSpacing: 4,
+    // Neon glow effect
+    textShadowColor: "rgba(50, 205, 50, 0.8)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
 });
