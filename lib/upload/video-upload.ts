@@ -71,8 +71,8 @@ async function getTranscodeUrl(): Promise<string> {
     // Return the transcoding URL of the highest priority healthy service
     return healthyServices[0].transcodeUrl;
   } catch (error) {
-    // Fallback to the hardcoded URL if the status API fails
-    return 'https://146-235-239-243.sslip.io/transcode';
+    // Fallback to Mac Mini if the status API fails
+    return 'https://minivlad.tail83ea3e.ts.net/video/transcode';
   }
 }
 

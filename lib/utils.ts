@@ -36,13 +36,9 @@ export function extractMediaFromBody(body: string): Media[] {
                              url.includes('.mov');
 
         if (isDirectVideo) {
-          // Append Pinata gateway hints to IPFS URLs:
-          // - stream=true: enables streaming mode (2-3x faster start)
-          // - filename=video.mp4: fixes wrong content-type for some CIDs
-          const videoUrl = url.includes('ipfs') && !url.includes('?')
-            ? `${url}?stream=true&filename=video.mp4`
-            : url;
-          media.push({ type: 'video', url: videoUrl });
+          // IPFS videos use faststart (moov atom upfront) so iOS can play
+          // without Range request support. No query params needed.
+          media.push({ type: 'video', url });
         } else {
           // It's a platform embed (YouTube, Odysee, etc.) - needs WebView
           let embedUrl = url;
