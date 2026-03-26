@@ -30,6 +30,10 @@ import {
   uploadImageToHive,
   createImageMarkdown,
 } from "~/lib/upload/image-upload";
+import {
+  generateVideoThumbnail,
+  cleanupThumbnail,
+} from "~/lib/upload/thumbnail-generator";
 import { createHiveComment } from "~/lib/upload/post-utils";
 import {
   SNAPS_CONTAINER_AUTHOR,
@@ -54,6 +58,7 @@ export default function CreatePost() {
   const [uploadProgress, setUploadProgress] = useState<string>("");
   const [videoProgress, setVideoProgress] = useState<number>(0);
   const [videoStage, setVideoStage] = useState<string>("");
+  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
 
   const pickMedia = async () => {
     try {
@@ -99,6 +104,17 @@ export default function CreatePost() {
             setMediaMimeType(
               videoMimeTypes[fileExtension || ""] || "video/mp4"
             );
+          }
+        }
+
+        // Generate thumbnail for videos
+        if (asset.type === "video") {
+          try {
+            const thumbnail = await generateVideoThumbnail(asset.uri);
+            setVideoThumbnail(thumbnail.base64 || null);
+          } catch (error) {
+            console.error("Failed to generate thumbnail:", error);
+            setVideoThumbnail(null);
           }
         }
 
@@ -237,6 +253,7 @@ export default function CreatePost() {
               mediaMimeType,
               {
                 creator: username,
+                thumbnailUrl: videoThumbnail || undefined,
                 onProgress: (progress, stage) => {
                   setVideoProgress(progress);
                   setVideoStage(stage);
@@ -369,12 +386,33 @@ export default function CreatePost() {
             {/* Upload Progress */}
             {uploadProgress ? (
               <View style={styles.progressCard}>
-                <Text style={styles.progressText}>{uploadProgress}</Text>
-                {mediaType === 'video' && videoProgress > 0 && (
-                  <View style={styles.progressBarContainer}>
-                    <View style={[styles.progressBarFill, { width: `${Math.min(videoProgress, 100)}%` }]} />
-                    <Text style={styles.progressPercent}>{videoProgress}%</Text>
+                {mediaType === 'video' && videoThumbnail && videoProgress < 100 ? (
+                  <View style={styles.thumbnailProgressContainer}>
+                    <Image 
+                      source={{ uri: videoThumbnail }} 
+                      style={styles.thumbnailProgress}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.thumbnailOverlay}>
+                      <Text style={styles.progressText}>{uploadProgress}</Text>
+                      {videoProgress > 0 && (
+                        <View style={styles.progressBarContainer}>
+                          <View style={[styles.progressBarFill, { width: `${Math.min(videoProgress, 100)}%` }]} />
+                          <Text style={styles.progressPercent}>{videoProgress}%</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
+                ) : (
+                  <>
+                    <Text style={styles.progressText}>{uploadProgress}</Text>
+                    {mediaType === 'video' && videoProgress > 0 && (
+                      <View style={styles.progressBarContainer}>
+                        <View style={[styles.progressBarFill, { width: `${Math.min(videoProgress, 100)}%` }]} />
+                        <Text style={styles.progressPercent}>{videoProgress}%</Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
             ) : null}
@@ -537,6 +575,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: theme.colors.primary,
     fontFamily: theme.fonts.default,
+  },
+  thumbnailProgressContainer: {
+    position: 'relative' as const,
+    borderRadius: theme.borderRadius.md,
+    overflow: 'hidden' as const,
+  },
+  thumbnailProgress: {
+    width: '100%' as any,
+    height: 200,
+    borderRadius: theme.borderRadius.md,
+  },
+  thumbnailOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: theme.spacing.md,
   },
   actionBar: {
     flexDirection: "row",
