@@ -234,7 +234,8 @@ export async function toggleFollow(privateKey: string, follower: string, followi
  *   const sig = await signImageHash(hash, privateKey);
  */
 export async function signImageHash(hash: string, wif?: string): Promise<string> {
-  const key = PrivateKey.fromString(wif || (process.env.HIVE_POSTING_KEY || ''));
+  if (!wif) throw new Error('Private key is required for signing');
+  const key = PrivateKey.fromString(wif);
   const hashBuffer = Buffer.from(hash, 'hex');
   const signature = key.sign(hashBuffer);
   return signature.toString();

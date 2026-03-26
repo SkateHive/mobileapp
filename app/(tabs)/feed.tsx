@@ -5,6 +5,13 @@ import { Feed } from "~/components/Feed/Feed";
 import { theme } from "~/lib/theme";
 import { useNotifications } from "~/lib/hooks/useNotifications";
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+});
+
 export default function FeedPage() {
   const [refreshKey, setRefreshKey] = React.useState(0);
   const { refresh: refreshNotifications } = useNotifications();
@@ -16,16 +23,8 @@ export default function FeedPage() {
   );
 
   const handleFeedRefresh = React.useCallback(() => {
-    // Trigger notifications refresh when feed is refreshed
     refreshNotifications();
   }, [refreshNotifications]);
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-  });
 
   return (
     <View style={styles.container}>

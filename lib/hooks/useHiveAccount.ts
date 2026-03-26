@@ -1,16 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import { Client, ExtendedAccount } from "@hiveio/dhive";
-import { getProfile } from "../hive-utils";
-
-// Use the same client configuration as hive-utils.ts
-const HiveClient = new Client([
-  "https://api.deathwing.me",
-  "https://techcoderx.com",
-  "https://api.hive.blog",
-  "https://anyx.io",
-  "https://hive-api.arcange.eu",
-  "https://hive-api.3speak.tv",
-]);
+import { ExtendedAccount } from "@hiveio/dhive";
+import { HiveClient, getProfile } from "../hive-utils";
 
 interface HiveAccountMetadataProps {
   [key: string]: any;

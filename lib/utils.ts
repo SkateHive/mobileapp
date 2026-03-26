@@ -36,10 +36,11 @@ export function extractMediaFromBody(body: string): Media[] {
                              url.includes('.mov');
 
         if (isDirectVideo) {
-          // Append ?filename=video.mp4 to IPFS URLs to fix Pinata gateway
-          // returning wrong content-type (text/plain) for some CIDs
+          // Append Pinata gateway hints to IPFS URLs:
+          // - stream=true: enables streaming mode (2-3x faster start)
+          // - filename=video.mp4: fixes wrong content-type for some CIDs
           const videoUrl = url.includes('ipfs') && !url.includes('?')
-            ? `${url}?filename=video.mp4`
+            ? `${url}?stream=true&filename=video.mp4`
             : url;
           media.push({ type: 'video', url: videoUrl });
         } else {

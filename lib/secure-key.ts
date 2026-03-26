@@ -27,13 +27,15 @@ export async function generateSalt(length = 16): Promise<string> {
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
   } catch (err) {
-    console.warn('⚠️ Native crypto not available, using fallback (NOT SECURE for production!)');
-    // Fallback for Expo Go/dev: NOT SECURE, do not use in production!
-    let salt = '';
-    for (let i = 0; i < length; i++) {
-      salt += Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+    if (__DEV__) {
+      console.warn('Native crypto not available, using insecure fallback (DEV ONLY)');
+      let salt = '';
+      for (let i = 0; i < length; i++) {
+        salt += Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+      }
+      return salt;
     }
-    return salt;
+    throw new Error('Secure random generation failed. Cannot store keys safely.');
   }
 }
 // Derive a key from PIN using PBKDF2
@@ -55,9 +57,11 @@ export function encryptKey(
   try {
     return AES.encrypt(key, secret, { iv: CryptoJS.enc.Hex.parse(iv) }).toString();
   } catch (error) {
-    console.warn('⚠️ AES encryption failed, using fallback (NOT SECURE for production!)', error);
-    // Fallback for when AES fails (like in Expo Go)
-    return Buffer.from(`${key}::${secret}::${iv}`, 'utf8').toString('base64');
+    if (__DEV__) {
+      console.warn('AES encryption failed, using insecure fallback (DEV ONLY)', error);
+      return Buffer.from(`${key}::${secret}::${iv}`, 'utf8').toString('base64');
+    }
+    throw new Error('Encryption failed. Cannot store keys safely.');
   }
 }
 

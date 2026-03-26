@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Inactivity timeout (5 minutes)
+  // Inactivity timeout (60 minutes)
   const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
 
   useEffect(() => {

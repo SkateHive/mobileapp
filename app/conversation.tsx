@@ -27,7 +27,12 @@ export default function ConversationScreen() {
   const { username } = useAuth();
   
   // Parse the post data if passed
-  const mainPost: Discussion | null = postData ? JSON.parse(postData) : null;
+  let mainPost: Discussion | null = null;
+  try {
+    mainPost = postData ? JSON.parse(postData) : null;
+  } catch {
+    // Malformed JSON from URL params — will fetch from blockchain instead
+  }
   
   const { comments, isLoading, error } = useReplies(
     author || '',
@@ -39,11 +44,6 @@ export default function ConversationScreen() {
 
   const handleBack = () => {
     router.back();
-  };
-
-  const handleNewReply = (newComment: Partial<Discussion>) => {
-    const newReply = newComment as Discussion;
-    setOptimisticReplies((prev) => [...prev, newReply]);
   };
 
   const handleReplySuccess = (newReply: Discussion) => {

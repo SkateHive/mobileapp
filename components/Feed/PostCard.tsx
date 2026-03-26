@@ -1,11 +1,9 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { FontAwesome } from '@expo/vector-icons';
-// import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-// import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
 import { useVoteValue } from '~/lib/hooks/useVoteValue';
@@ -219,13 +217,6 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation,
 
   const calculateTotalValue = () => {
     return payoutValue.toFixed(3);
-  };
-
-  const navigateToProfile = (username: string) => {
-    router.push({
-      pathname: "/(tabs)/profile",
-      params: { username }
-    });
   };
 
   const handleProfilePress = () => {

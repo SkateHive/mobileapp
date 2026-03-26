@@ -84,22 +84,21 @@ export default function VideosScreen() {
       // Prevent double-tapping
       if (votingStates[key]) return;
 
+      // Capture pre-vote state for revert on error
+      const wasLiked = likedStates[key];
+      const prevCount = voteCountStates[key] || video.votes;
+
       try {
         setVotingStates((prev) => ({ ...prev, [key]: true }));
 
         // Haptic feedback
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        const isCurrentlyLiked = likedStates[key];
-        const previousVoteCount = voteCountStates[key] || video.votes;
-
         // Optimistic update
-        setLikedStates((prev) => ({ ...prev, [key]: !isCurrentlyLiked }));
+        setLikedStates((prev) => ({ ...prev, [key]: !wasLiked }));
         setVoteCountStates((prev) => ({
           ...prev,
-          [key]: isCurrentlyLiked
-            ? previousVoteCount - 1
-            : previousVoteCount + 1,
+          [key]: wasLiked ? prevCount - 1 : prevCount + 1,
         }));
 
         // Submit vote to blockchain (100% weight for like, 0 for unlike)
@@ -108,18 +107,14 @@ export default function VideosScreen() {
           session.username,
           video.author,
           video.permlink,
-          isCurrentlyLiked ? 0 : 10000 // 10000 = 100%
+          wasLiked ? 0 : 10000 // 10000 = 100%
         );
 
-        showToast(isCurrentlyLiked ? "Vote removed" : "Voted!", "success");
+        showToast(wasLiked ? "Vote removed" : "Voted!", "success");
       } catch (error) {
-        // Revert optimistic update on error
-        const isCurrentlyLiked = likedStates[key];
-        setLikedStates((prev) => ({ ...prev, [key]: !isCurrentlyLiked }));
-        setVoteCountStates((prev) => ({
-          ...prev,
-          [key]: voteCountStates[key] || video.votes,
-        }));
+        // Revert to pre-vote state (captured before optimistic update)
+        setLikedStates((prev) => ({ ...prev, [key]: wasLiked }));
+        setVoteCountStates((prev) => ({ ...prev, [key]: prevCount }));
 
         let errorMessage = "Failed to vote";
         if (error instanceof Error) {
