@@ -52,6 +52,8 @@ export default function CreatePost() {
   const [hasVideoInteraction, setHasVideoInteraction] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>("");
+  const [videoProgress, setVideoProgress] = useState<number>(0);
+  const [videoStage, setVideoStage] = useState<string>("");
 
   const pickMedia = async () => {
     try {
@@ -183,6 +185,8 @@ export default function CreatePost() {
     setIsUploading(true);
     setErrorMessage(null);
     setUploadProgress("");
+    setVideoProgress(0);
+    setVideoStage("");
 
     try {
       let postBody = content;
@@ -222,7 +226,9 @@ export default function CreatePost() {
             throw new Error("Failed to upload image. Please try again.");
           }
         } else if (mediaType === "video") {
-          setUploadProgress("Uploading video to IPFS...");
+          setUploadProgress("Uploading video...");
+          setVideoProgress(0);
+          setVideoStage('receiving');
 
           try {
             const videoResult = await uploadVideoToWorker(
@@ -231,6 +237,19 @@ export default function CreatePost() {
               mediaMimeType,
               {
                 creator: username,
+                onProgress: (progress, stage) => {
+                  setVideoProgress(progress);
+                  setVideoStage(stage);
+                  const stageLabels: Record<string, string> = {
+                    receiving: 'Sending to server...',
+                    transcoding: 'Transcoding video...',
+                    optimized: 'Video already optimized!',
+                    uploading: 'Uploading to IPFS...',
+                    complete: 'Done!',
+                    error: 'Error',
+                  };
+                  setUploadProgress(stageLabels[stage] || `Processing... ${progress}%`);
+                },
               }
             );
 
@@ -351,6 +370,12 @@ export default function CreatePost() {
             {uploadProgress ? (
               <View style={styles.progressCard}>
                 <Text style={styles.progressText}>{uploadProgress}</Text>
+                {mediaType === 'video' && videoProgress > 0 && (
+                  <View style={styles.progressBarContainer}>
+                    <View style={[styles.progressBarFill, { width: `${Math.min(videoProgress, 100)}%` }]} />
+                    <Text style={styles.progressPercent}>{videoProgress}%</Text>
+                  </View>
+                )}
               </View>
             ) : null}
 
@@ -490,6 +515,27 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: theme.fontSizes.sm,
     color: theme.colors.gray,
+    fontFamily: theme.fonts.default,
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: theme.colors.border,
+    borderRadius: 3,
+    marginTop: theme.spacing.xs,
+    overflow: 'hidden' as const,
+    position: 'relative' as const,
+  },
+  progressBarFill: {
+    height: '100%' as any,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 3,
+  },
+  progressPercent: {
+    position: 'absolute' as const,
+    right: 0,
+    top: -16,
+    fontSize: 10,
+    color: theme.colors.primary,
     fontFamily: theme.fonts.default,
   },
   actionBar: {

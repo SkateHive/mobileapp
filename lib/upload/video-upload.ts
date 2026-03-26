@@ -10,9 +10,10 @@ interface VideoUploadResult {
 export interface VideoUploadOptions {
   creator: string;
   thumbnailUrl?: string;
-  // Optional fields for enhanced tracking (won't break older server versions)
   userHP?: number;
   appVersion?: string;
+  /** Progress callback: (percent 0-100, stage: 'receiving'|'transcoding'|'uploading'|'optimized'|'complete'|'error') */
+  onProgress?: (progress: number, stage: string) => void;
 }
 
 interface TranscodeService {
@@ -96,6 +97,8 @@ export async function uploadVideoToWorker(
 
     // Get the dynamic transcoding URL from the status API
     const WORKER_API_URL = await getTranscodeUrl();
+    // Derive base URL for progress polling (strip /transcode from end)
+    const BASE_URL = WORKER_API_URL.replace(/\/transcode$/, '');
 
     // Generate correlation ID for progress tracking
     const correlationId = `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
@@ -109,54 +112,73 @@ export async function uploadVideoToWorker(
     } as any;
 
     formData.append('video', fileData);
-
-    // REQUIRED: Creator username
     formData.append('creator', options.creator);
-
-    // SOURCE APP IDENTIFIER - Always send 'mobile' from mobile app
     formData.append('source_app', 'mobile');
+    formData.append('correlationId', correlationId);
+    formData.append('platform', 'expo-react-native');
 
-    // OPTIONAL: App version (for analytics)
     if (options.appVersion) {
       formData.append('app_version', options.appVersion);
     }
-
-    // OPTIONAL: User's Hive Power (for priority handling)
     if (options.userHP !== undefined) {
       formData.append('userHP', options.userHP.toString());
     }
-
-    // OPTIONAL: Thumbnail URL
     if (options.thumbnailUrl) {
       formData.append('thumbnail', options.thumbnailUrl);
     }
 
-    // OPTIONAL: Correlation ID for SSE progress tracking
-    formData.append('correlationId', correlationId);
-
-    // OPTIONAL: Platform info
-    formData.append('platform', 'expo-react-native');
-
-    const uploadResponse = await fetch(WORKER_API_URL, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      throw new Error(`Video upload failed: ${uploadResponse.status} - ${errorText}`);
+    // Start polling for progress in the background
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    if (options.onProgress) {
+      options.onProgress(5, 'receiving');
+      pollInterval = setInterval(async () => {
+        try {
+          const resp = await fetch(`${BASE_URL}/progress/${correlationId}`, {
+            headers: { 'Accept': 'text/event-stream' },
+          });
+          if (!resp.ok) return;
+          const text = await resp.text();
+          // Parse last SSE data line
+          const lines = text.split('\n').filter(l => l.startsWith('data:'));
+          if (lines.length > 0) {
+            const lastLine = lines[lines.length - 1];
+            const data = JSON.parse(lastLine.replace('data: ', ''));
+            if (data.progress !== undefined) {
+              options.onProgress?.(data.progress, data.stage || 'processing');
+            }
+          }
+        } catch {
+          // Polling errors are non-fatal
+        }
+      }, 1500);
     }
 
-    const result = await uploadResponse.json();
+    try {
+      const uploadResponse = await fetch(WORKER_API_URL, {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (!result.cid || !result.gatewayUrl) {
-      throw new Error('Invalid response from video upload service');
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Video upload failed: ${uploadResponse.status} - ${errorText}`);
+      }
+
+      const result = await uploadResponse.json();
+
+      if (!result.cid || !result.gatewayUrl) {
+        throw new Error('Invalid response from video upload service');
+      }
+
+      options.onProgress?.(100, 'complete');
+
+      return {
+        cid: result.cid,
+        gatewayUrl: result.gatewayUrl,
+      };
+    } finally {
+      if (pollInterval) clearInterval(pollInterval);
     }
-
-    return {
-      cid: result.cid,
-      gatewayUrl: result.gatewayUrl,
-    };
   } catch (error) {
     throw new Error(`Video upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
