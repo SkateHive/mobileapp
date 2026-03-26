@@ -87,7 +87,13 @@ export function useUserComments(username: string | null) {
       }
     }
 
-    fetchedPermlinksRef.current = allPermlinks;
+    // Cap permlinks Set to prevent unbounded memory growth
+    if (allPermlinks.size > 500) {
+      const arr = Array.from(allPermlinks);
+      fetchedPermlinksRef.current = new Set(arr.slice(-500));
+    } else {
+      fetchedPermlinksRef.current = allPermlinks;
+    }
     allFilteredPosts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
     return allFilteredPosts;
   }
@@ -129,7 +135,9 @@ export function useUserComments(username: string | null) {
             setHasMore(false);
           }
 
-          return [...prevPosts, ...uniquePosts];
+          const updated = [...prevPosts, ...uniquePosts];
+          // Cap to 500 items to prevent unbounded memory growth
+          return updated.length > 500 ? updated.slice(-500) : updated;
         });
       } catch (err) {
         console.error('Error in fetchPosts:', err);

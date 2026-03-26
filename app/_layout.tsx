@@ -8,7 +8,6 @@ import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
-import { ViewportTrackerProvider } from '~/lib/ViewportTracker';
 import { NotificationProvider } from '~/lib/notifications-context';
 import { theme } from '~/lib/theme';
 
@@ -27,7 +26,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60, // 1 minute
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      gcTime: 1000 * 60 * 10, // 10 minutes — prevents unbounded cache growth on mobile
       retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },
@@ -86,8 +85,7 @@ export default function RootLayout() {
         <NavigationGuard>
           <NotificationProvider>
             <ToastProvider>
-              <ViewportTrackerProvider>
-                <SafeAreaProvider>
+              <SafeAreaProvider>
                   <ActivityWrapper>
                     <View style={styles.container}>
                       <Stack
@@ -134,7 +132,6 @@ export default function RootLayout() {
                     </View>
                   </ActivityWrapper>
                 </SafeAreaProvider>
-              </ViewportTrackerProvider>
             </ToastProvider>
           </NotificationProvider>
         </NavigationGuard>

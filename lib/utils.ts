@@ -22,21 +22,26 @@ export function extractMediaFromBody(body: string): Media[] {
     });
   }
 
-  // Extract videos from iframes
-  const iframeMatches = body.match(/<iframe.*?src="(.*?)".*?><\/iframe>/g);
+  // Extract videos from iframes (multiline — real iframes span multiple lines)
+  const iframeMatches = body.match(/<iframe[\s\S]*?src="(.*?)"[\s\S]*?<\/iframe>/gi);
   if (iframeMatches) {
     iframeMatches.forEach(match => {
       const url = match.match(/src="(.*?)"/)?.[1];
       if (url && !processedUrls.has(url)) {
-        // Check if it's a direct video URL (IPFS, mp4, webm, m3u8)
-        // These can be played with expo-video
-        const isDirectVideo = url.includes('ipfs') || 
-                             url.includes('.mp4') || 
-                             url.includes('.webm') || 
-                             url.includes('.m3u8');
-        
+        // All iframes in SkateHive posts are videos (IPFS, mp4, webm, etc.)
+        const isDirectVideo = url.includes('ipfs') ||
+                             url.includes('.mp4') ||
+                             url.includes('.webm') ||
+                             url.includes('.m3u8') ||
+                             url.includes('.mov');
+
         if (isDirectVideo) {
-          media.push({ type: 'video', url });
+          // Append ?filename=video.mp4 to IPFS URLs to fix Pinata gateway
+          // returning wrong content-type (text/plain) for some CIDs
+          const videoUrl = url.includes('ipfs') && !url.includes('?')
+            ? `${url}?filename=video.mp4`
+            : url;
+          media.push({ type: 'video', url: videoUrl });
         } else {
           // It's a platform embed (YouTube, Odysee, etc.) - needs WebView
           let embedUrl = url;
@@ -61,33 +66,38 @@ export function extractMediaFromBody(body: string): Media[] {
     });
   }
 
-  // Extract plain YouTube URLs (not in iframes)
-  // Matches: youtube.com/watch?v=, youtu.be/, youtube.com/embed/
-  const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/g;
-  let youtubeMatch;
-  while ((youtubeMatch = youtubeRegex.exec(body)) !== null) {
-    const videoId = youtubeMatch[1];
-    const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
-    
-    if (!processedUrls.has(embedUrl) && !processedUrls.has(youtubeMatch[0])) {
-      media.push({ type: 'embed', url: embedUrl });
-      processedUrls.add(embedUrl);
-      processedUrls.add(youtubeMatch[0]);
-    }
-  }
+  // Only extract plain YouTube/Odysee URLs if the post doesn't already have
+  // an IPFS video iframe — plain URLs alongside IPFS iframes are usually just
+  // reference/source links, not additional videos to embed.
+  const hasIpfsVideo = media.some(m => m.type === 'video' && m.url.includes('ipfs'));
 
-  // Extract plain Odysee URLs (not in iframes)
-  // Matches: odysee.com/@channel/video:id
-  const odyseeRegex = /(?:https?:\/\/)?(?:www\.)?odysee\.com\/(@[^\/]+\/[^:]+:[a-zA-Z0-9]+)/g;
-  let odyseeMatch;
-  while ((odyseeMatch = odyseeRegex.exec(body)) !== null) {
-    const videoPath = odyseeMatch[1];
-    const embedUrl = `https://odysee.com/$/embed/${videoPath}`;
-    
-    if (!processedUrls.has(embedUrl) && !processedUrls.has(odyseeMatch[0])) {
-      media.push({ type: 'embed', url: embedUrl });
-      processedUrls.add(embedUrl);
-      processedUrls.add(odyseeMatch[0]);
+  if (!hasIpfsVideo) {
+    // Extract plain YouTube URLs (not in iframes)
+    const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/g;
+    let youtubeMatch;
+    while ((youtubeMatch = youtubeRegex.exec(body)) !== null) {
+      const videoId = youtubeMatch[1];
+      const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+
+      if (!processedUrls.has(embedUrl) && !processedUrls.has(youtubeMatch[0])) {
+        media.push({ type: 'embed', url: embedUrl });
+        processedUrls.add(embedUrl);
+        processedUrls.add(youtubeMatch[0]);
+      }
+    }
+
+    // Extract plain Odysee URLs (not in iframes)
+    const odyseeRegex = /(?:https?:\/\/)?(?:www\.)?odysee\.com\/(@[^\/]+\/[^:]+:[a-zA-Z0-9]+)/g;
+    let odyseeMatch;
+    while ((odyseeMatch = odyseeRegex.exec(body)) !== null) {
+      const videoPath = odyseeMatch[1];
+      const embedUrl = `https://odysee.com/$/embed/${videoPath}`;
+
+      if (!processedUrls.has(embedUrl) && !processedUrls.has(odyseeMatch[0])) {
+        media.push({ type: 'embed', url: embedUrl });
+        processedUrls.add(embedUrl);
+        processedUrls.add(odyseeMatch[0]);
+      }
     }
   }
 

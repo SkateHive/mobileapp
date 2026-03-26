@@ -56,14 +56,56 @@ export function useBlockchainWallet(username: string | null) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchWalletData = async () => {
-    if (!username || username === "SPECTATOR") {
-      setBalanceData(null);
-      setRewardsData(null);
-      setIsLoading(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchWalletData = async () => {
+      if (!username || username === "SPECTATOR") {
+        setBalanceData(null);
+        setRewardsData(null);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
+
+      setIsLoading(true);
       setError(null);
-      return;
-    }
+
+      try {
+        const [balanceResult, rewardsResult] = await Promise.all([
+          getBlockchainAccountData(username),
+          getBlockchainRewards(username),
+        ]);
+
+        if (cancelled) return;
+
+        setBalanceData({
+          account_name: username,
+          ...balanceResult,
+        });
+        setRewardsData(rewardsResult);
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Error fetching blockchain wallet data:", err);
+        setError(err instanceof Error ? err.message : "Failed to fetch wallet data");
+        setBalanceData(null);
+        setRewardsData(null);
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchWalletData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  const refresh = async () => {
+    if (!username || username === "SPECTATOR") return;
 
     setIsLoading(true);
     setError(null);
@@ -82,19 +124,9 @@ export function useBlockchainWallet(username: string | null) {
     } catch (err) {
       console.error("Error fetching blockchain wallet data:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch wallet data");
-      setBalanceData(null);
-      setRewardsData(null);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchWalletData();
-  }, [username]);
-
-  const refresh = async () => {
-    await fetchWalletData();
   };
 
   return {

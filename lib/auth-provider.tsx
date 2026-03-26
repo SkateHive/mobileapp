@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { STORED_USERS_KEY } from './constants';
 import {
   AccountNotFoundError,
@@ -129,6 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       clearInactivityTimer();
     }
+    return () => {
+      clearInactivityTimer();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
@@ -462,28 +465,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const contextValue = useMemo(() => ({
+    isAuthenticated,
+    username,
+    isLoading,
+    storedUsers,
+    session,
+    followingList,
+    mutedList,
+    blacklistedList,
+    login,
+    loginStoredUser,
+    logout,
+    enterSpectatorMode,
+    deleteAllStoredUsers,
+    deleteStoredUser: removeStoredUser,
+    resetInactivityTimer,
+    updateUserRelationship,
+    refreshUserRelationships,
+  }), [
+    isAuthenticated, username, isLoading, storedUsers, session,
+    followingList, mutedList, blacklistedList,
+  ]);
+
   return (
-    <AuthContext.Provider
-      value={{
-        isAuthenticated,
-        username,
-        isLoading,
-        storedUsers,
-        session,
-        followingList,
-        mutedList,
-        blacklistedList,
-        login,
-        loginStoredUser,
-        logout,
-        enterSpectatorMode,
-        deleteAllStoredUsers,
-        deleteStoredUser: removeStoredUser,
-        resetInactivityTimer,
-        updateUserRelationship,
-        refreshUserRelationships,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

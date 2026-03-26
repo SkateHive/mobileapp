@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
+import { IpfsVideoPlayer } from "~/components/Feed/IpfsVideoPlayer";
 import { useAuth } from "~/lib/auth-provider";
 import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
@@ -194,17 +195,21 @@ export default function VideosScreen() {
           />
         )}
 
-        {/* Only mount VideoPlayer for current and adjacent items */}
+        {/* Only mount video for current and adjacent items */}
         {isNearby ? (
-          <VideoPlayer
-            url={item.videoUrl}
-            playing={isActive}
-            contentFit="cover"
-            showControls={false}
-            onPlaybackStarted={() => {
-              setPlayingStates((prev) => ({ ...prev, [key]: true }));
-            }}
-          />
+          item.videoUrl.includes('ipfs') ? (
+            <IpfsVideoPlayer url={item.videoUrl} contentFit="cover" playing={isActive} />
+          ) : (
+            <VideoPlayer
+              url={item.videoUrl}
+              playing={isActive}
+              contentFit="cover"
+              showControls={false}
+              onPlaybackStarted={() => {
+                setPlayingStates((prev) => ({ ...prev, [key]: true }));
+              }}
+            />
+          )
         ) : (
           <View style={styles.thumbnailPlaceholder}>
             {!item.thumbnailUrl && (

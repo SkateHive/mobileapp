@@ -61,8 +61,12 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
         const existingIds = new Set(notifications.map(n => n.id));
         const newNotifications = moreNotifications.filter(n => !existingIds.has(n.id));
         
-        setNotifications(prev => [...prev, ...newNotifications]);
-        
+        setNotifications(prev => {
+          const updated = [...prev, ...newNotifications];
+          // Cap to 500 items to prevent unbounded memory growth
+          return updated.length > 500 ? updated.slice(-500) : updated;
+        });
+
         if (newNotifications.length < 50) {
           setHasMore(false);
         }

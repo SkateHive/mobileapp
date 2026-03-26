@@ -34,6 +34,17 @@ export function useReplies(
     try {
       const replies = await getContentReplies({ author, permlink });
       
+      // Process an array in batches to avoid request storms
+      const processBatch = async <T, R>(items: T[], fn: (item: T) => Promise<R>, batchSize: number = 5): Promise<R[]> => {
+        const results: R[] = [];
+        for (let i = 0; i < items.length; i += batchSize) {
+          const batch = items.slice(i, i + batchSize);
+          const batchResults = await Promise.all(batch.map(fn));
+          results.push(...batchResults);
+        }
+        return results;
+      };
+
       // Helper function to recursively fetch and build nested reply structure
       const buildNestedReplies = async (reply: ExtendedComment, currentDepth: number = 0): Promise<NestedDiscussion> => {
         // Convert ExtendedComment to NestedDiscussion format
@@ -53,33 +64,32 @@ export function useReplies(
         } as unknown as NestedDiscussion;
 
         // Recursively fetch nested replies if this comment has children and we haven't hit max depth
-        if (reply.children > 0 && currentDepth < 5) { // Limit to 5 levels deep to prevent infinite recursion
+        if (reply.children > 0 && currentDepth < 5) {
           try {
-            const childReplies = await getContentReplies({ 
-              author: reply.author, 
-              permlink: reply.permlink 
+            const childReplies = await getContentReplies({
+              author: reply.author,
+              permlink: reply.permlink
             });
-            
-            // Build nested structure for each child reply
-            const nestedReplies = await Promise.all(
-              childReplies.map(childReply => 
-                buildNestedReplies(childReply, currentDepth + 1)
-              )
+
+            // Build nested structure in batches of 5 to avoid request storms
+            discussionReply.replies = await processBatch(
+              childReplies,
+              childReply => buildNestedReplies(childReply, currentDepth + 1),
+              5
             );
-            
-            discussionReply.replies = nestedReplies;
           } catch (error) {
             console.warn(`Failed to fetch nested replies for ${reply.author}/${reply.permlink}:`, error);
-            // Continue without nested replies if fetch fails
           }
         }
 
         return discussionReply;
       };
 
-      // Build nested structure for all top-level replies
-      const discussionReplies: NestedDiscussion[] = await Promise.all(
-        replies.map(reply => buildNestedReplies(reply, 0))
+      // Build nested structure for top-level replies in batches of 5
+      const discussionReplies: NestedDiscussion[] = await processBatch(
+        replies,
+        reply => buildNestedReplies(reply, 0),
+        5
       );
 
       setComments(discussionReplies);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Image, Modal, Pressable, View, Dimensions, StyleSheet } from 'react-native';
+import { Modal, Pressable, View, Dimensions, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { VideoPlayer } from './VideoPlayer';
 import { VideoWithAutoplay } from './VideoWithAutoplay';
 import { EmbedPlayer } from './EmbedPlayer';
@@ -81,7 +82,10 @@ export function MediaPreview({
             key={index}
             style={[
               styles.mediaContainer,
-              media.length === 1 ? styles.singleMedia : styles.multipleMedia,
+              // Videos and embeds always full-width; images can grid when multiple
+              (item.type === 'video' || item.type === 'embed' || media.length === 1)
+                ? styles.singleMedia
+                : styles.multipleMedia,
               // Only set height for images and videos, embeds control their own height
               item.type === 'embed' ? {} : { height: item.type === 'video' ? getVideoHeight() : getImageHeight(index) }
             ]}
@@ -102,9 +106,9 @@ export function MediaPreview({
                 <Image
                   source={{ uri: item.url }}
                   style={styles.fullSize}
-                  resizeMode="cover"
+                  contentFit="cover"
                   onLoad={(e) => {
-                    const { width, height } = e.nativeEvent.source;
+                    const { width, height } = e.source;
                     handleImageLoad(index, width, height);
                   }}
                 />
@@ -129,7 +133,7 @@ export function MediaPreview({
               <Image
                 source={{ uri: selectedMedia.url }}
                 style={styles.fullSize}
-                resizeMode="contain"
+                contentFit="contain"
               />
             ) : selectedMedia?.type === 'video' ? (
               <VideoPlayer url={selectedMedia.url} playing={true} />

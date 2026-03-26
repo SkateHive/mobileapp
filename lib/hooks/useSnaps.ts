@@ -82,7 +82,13 @@ export function useSnaps() {
       }
     }
 
-    fetchedPermlinksRef.current = allPermlinks;
+    // Cap permlinks Set to prevent unbounded memory growth
+    if (allPermlinks.size > 500) {
+      const arr = Array.from(allPermlinks);
+      fetchedPermlinksRef.current = new Set(arr.slice(-500));
+    } else {
+      fetchedPermlinksRef.current = allPermlinks;
+    }
     lastContainerRef.current = { permlink, date };
     allFilteredComments.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
     return allFilteredComments;
@@ -102,7 +108,9 @@ export function useSnaps() {
           const existingPermlinks = new Set(prevPosts.map((post) => post.permlink));
           const uniqueSnaps = newSnaps.filter((snap) => !existingPermlinks.has(snap.permlink));
           if (uniqueSnaps.length === 0) setHasMore(false);
-          return [...prevPosts, ...uniqueSnaps];
+          const updated = [...prevPosts, ...uniqueSnaps];
+          // Cap to 500 items to prevent unbounded memory growth
+          return updated.length > 500 ? updated.slice(-500) : updated;
         });
       } catch {
         if (!cancelled) setHasMore(false);

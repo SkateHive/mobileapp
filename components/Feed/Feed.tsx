@@ -18,6 +18,8 @@ import {
   ViewportTrackerProvider,
   useViewportTracker,
 } from "~/lib/ViewportTracker";
+import { ConversationDrawer } from "./ConversationDrawer";
+import { FullConversationDrawer } from "./FullConversationDrawer";
 import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
 import type { Discussion } from "@hiveio/dhive";
@@ -34,6 +36,18 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { updateVisibleItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
+
+  // Single shared drawer instances — avoids mounting 1 per PostCard
+  const [conversationPost, setConversationPost] = React.useState<Discussion | null>(null);
+  const [fullConversationPost, setFullConversationPost] = React.useState<Discussion | null>(null);
+
+  const handleOpenConversation = React.useCallback((post: Discussion) => {
+    setConversationPost(post);
+  }, []);
+
+  const handleOpenFullConversation = React.useCallback((post: Discussion) => {
+    setFullConversationPost(post);
+  }, []);
 
   // Handle pull-to-refresh
   const handleRefresh = React.useCallback(async () => {
@@ -91,9 +105,11 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         key={item.permlink}
         post={item}
         currentUsername={username || ""}
+        onOpenConversation={handleOpenConversation}
+        onOpenFullConversation={handleOpenFullConversation}
       />
     ),
-    [username]
+    [username, handleOpenConversation, handleOpenFullConversation]
   );
 
   const keyExtractor = React.useCallback(
@@ -173,6 +189,22 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         updateCellsBatchingPeriod={50}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       />
+
+      {/* Single shared drawer instances — 1 instead of N per PostCard */}
+      {conversationPost && (
+        <ConversationDrawer
+          visible={!!conversationPost}
+          onClose={() => setConversationPost(null)}
+          discussion={conversationPost}
+        />
+      )}
+      {fullConversationPost && (
+        <FullConversationDrawer
+          visible={!!fullConversationPost}
+          onClose={() => setFullConversationPost(null)}
+          discussion={fullConversationPost}
+        />
+      )}
     </View>
   );
 }

@@ -1,27 +1,24 @@
 import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
-import { useInView } from '~/lib/hooks/useInView';
 import { theme } from '~/lib/theme';
 
 interface GridVideoTileProps {
   videoUrl: string;
   size: number;
   onPress: () => void;
+  isVisible?: boolean;
 }
 
-export const GridVideoTile = React.memo(({ videoUrl, size, onPress }: GridVideoTileProps) => {
-  const { ref, isInView } = useInView({ threshold: 0.3 });
-
+export const GridVideoTile = React.memo(({ videoUrl, size, onPress, isVisible = false }: GridVideoTileProps) => {
   return (
     <Pressable
-      ref={ref}
       style={[styles.tile, { width: size, height: size }]}
       onPress={onPress}
     >
       <VideoPlayer
         url={videoUrl}
-        playing={isInView}
+        playing={isVisible}
         contentFit="cover"
         showControls={false}
         showMuteButton={false}

@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { View, Image, ScrollView, StyleSheet } from "react-native";
+import { View, ScrollView, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { Text } from "~/components/ui/text";
 import { Ionicons } from "@expo/vector-icons";
 import { Crown } from "lucide-react-native";

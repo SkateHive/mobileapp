@@ -135,6 +135,10 @@ export default function TabLayout() {
                         iconFamily={tab.iconFamily}
                       />
                     ),
+                  // Unmount videos tab when switching away to free native video player memory
+                  ...(tab.name === "videos" && {
+                    unmountOnBlur: true,
+                  }),
                   ...(tab.name === "profile" && {
                     href: {
                       pathname: "/(tabs)/profile",

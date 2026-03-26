@@ -52,10 +52,16 @@ export function ViewportTrackerProvider({ children }: ViewportTrackerProviderPro
   );
 }
 
+// Safe fallback when used outside a provider — treats all items as visible
+const fallbackContext: ViewportTrackerContextType = {
+  visibleItems: new Set(),
+  registerItem: () => {},
+  unregisterItem: () => {},
+  updateVisibleItems: () => {},
+  isItemVisible: () => true, // Default to visible when no provider
+};
+
 export function useViewportTracker() {
   const context = useContext(ViewportTrackerContext);
-  if (context === undefined) {
-    throw new Error('useViewportTracker must be used within a ViewportTrackerProvider');
-  }
-  return context;
+  return context ?? fallbackContext;
 }

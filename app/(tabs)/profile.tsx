@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import {
   View,
   ScrollView,
-  Image,
   ActivityIndicator,
   Pressable,
   RefreshControl,
@@ -11,6 +10,7 @@ import {
   Modal,
   Dimensions,
   Animated,
+  ViewToken,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +25,7 @@ import { theme } from "~/lib/theme";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
 import { extractMediaFromBody } from "~/lib/utils";
+import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 
 const GRID_COLS = 3;
@@ -110,6 +111,22 @@ export default function ProfileScreen() {
   const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
+  const [visibleGridItems, setVisibleGridItems] = useState<Set<string>>(new Set());
+
+  // Event-driven visibility tracking for grid video tiles (no polling)
+  const onViewableGridItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const permlinks = viewableItems
+        .filter(item => item.isViewable && item.item)
+        .map(item => item.item.permlink);
+      setVisibleGridItems(new Set(permlinks));
+    }
+  ).current;
+
+  const gridViewabilityConfig = useRef({
+    viewAreaCoveragePercentThreshold: 30,
+    minimumViewTime: 150,
+  }).current;
 
   // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
@@ -198,20 +215,9 @@ export default function ProfileScreen() {
     [userPosts, postHasMedia]
   );
 
-  // Auto-load more when grid doesn't have enough items to fill the screen
-  // A 3-col grid needs ~15 items (5 rows) to be scrollable
-  const MIN_GRID_ITEMS = 15;
-  useEffect(() => {
-    if (
-      profileTab === 'grid' &&
-      !isLoadingPosts &&
-      hasMore &&
-      gridPosts.length < MIN_GRID_ITEMS &&
-      userPosts.length > 0
-    ) {
-      loadNextPage();
-    }
-  }, [profileTab, isLoadingPosts, hasMore, gridPosts.length, userPosts.length, loadNextPage]);
+  // Removed auto-load loop: it caused infinite fetching and OOM on profiles
+  // with many text-only posts (no media = no grid items = keeps fetching).
+  // Users can scroll to load more via onEndReached instead.
 
   // Render grid item
   const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
@@ -220,12 +226,13 @@ export default function ProfileScreen() {
     const media = extractMediaFromBody(item.body);
     const videoMedia = media.find((m: any) => m.type === 'video');
 
-    // Video posts autoplay muted when in view
+    // Video posts autoplay muted when in view (event-driven via onViewableItemsChanged)
     if (videoMedia) {
       return (
         <GridVideoTile
           videoUrl={videoMedia.url}
           size={tileSize}
+          isVisible={visibleGridItems.has(item.permlink)}
           onPress={() => router.push({ pathname: '/conversation', params: { author: item.author, permlink: item.permlink } })}
         />
       );
@@ -242,7 +249,7 @@ export default function ProfileScreen() {
           <Image
             source={{ uri: thumb }}
             style={styles.gridImage}
-            resizeMode="cover"
+            contentFit="cover"
           />
         ) : (
           <View style={styles.gridPlaceholder}>
@@ -251,7 +258,7 @@ export default function ProfileScreen() {
         )}
       </Pressable>
     );
-  }, [tileSize, getPostThumbnail]);
+  }, [tileSize, getPostThumbnail, visibleGridItems]);
 
   const handleLogout = async () => {
     try {
@@ -536,6 +543,8 @@ export default function ProfileScreen() {
           maxToRenderPerBatch={9}
           windowSize={7}
           contentContainerStyle={{ gap: GRID_GAP }}
+          onViewableItemsChanged={onViewableGridItemsChanged}
+          viewabilityConfig={gridViewabilityConfig}
         />
       ) : (
         <FlatList

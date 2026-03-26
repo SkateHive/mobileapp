@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { fetchNewNotifications } from './hive-utils';
 import { useAuth } from './auth-provider';
 
@@ -18,6 +18,7 @@ interface NotificationProviderProps {
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const { username } = useAuth();
   const [badgeCount, setBadgeCount] = useState(0);
+  const markedAsReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateBadgeCount = useCallback(async () => {
     if (!username || username === 'SPECTATOR') {
@@ -41,8 +42,13 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const onNotificationsMarkedAsRead = useCallback(() => {
     // Immediately clear the badge
     setBadgeCount(0);
+    // Clear any pending timer before setting a new one
+    if (markedAsReadTimerRef.current) {
+      clearTimeout(markedAsReadTimerRef.current);
+    }
     // Then refresh to make sure it's accurate
-    setTimeout(() => {
+    markedAsReadTimerRef.current = setTimeout(() => {
+      markedAsReadTimerRef.current = null;
       updateBadgeCount();
     }, 1000); // Wait 1 second for the mark as read operation to complete on blockchain
   }, [updateBadgeCount]);
@@ -63,12 +69,21 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     return () => clearInterval(interval);
   }, [updateBadgeCount, username]);
 
-  const value = {
+  // Cleanup pending timers on unmount
+  useEffect(() => {
+    return () => {
+      if (markedAsReadTimerRef.current) {
+        clearTimeout(markedAsReadTimerRef.current);
+      }
+    };
+  }, []);
+
+  const value = useMemo(() => ({
     badgeCount,
     refreshBadge: updateBadgeCount,
     clearBadge,
     onNotificationsMarkedAsRead,
-  };
+  }), [badgeCount, updateBadgeCount, clearBadge, onNotificationsMarkedAsRead]);
 
   return (
     <NotificationContext.Provider value={value}>

@@ -2,7 +2,8 @@ import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { FontAwesome } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { Image, Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
 import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
@@ -54,10 +55,12 @@ const formatTimeAbbreviated = (date: Date): string => {
 interface PostCardProps {
   post: Discussion;
   currentUsername: string | null;
+  onOpenConversation?: (post: Discussion) => void;
+  onOpenFullConversation?: (post: Discussion) => void;
 }
 
 
-export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) => {
+export const PostCard = React.memo(({ post, currentUsername, onOpenConversation, onOpenFullConversation }: PostCardProps) => {
   const { session, followingList, updateUserRelationship } = useAuth();
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
@@ -67,6 +70,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   const [showSlider, setShowSlider] = useState(false);
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
+  // Only use local drawer state when parent doesn't provide callbacks
   const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
   const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -112,8 +116,8 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   // Memoize post content processing - remove iframes, images, and video links
   const postContent = useMemo(() => {
     let content = post.body;
-    // Remove iframes and images
-    content = content.replace(/<iframe.*?<\/iframe>|!\[.*?\]\(.*?\)/g, '');
+    // Remove iframes (multiline) and images
+    content = content.replace(/<iframe[\s\S]*?<\/iframe>|!\[.*?\]\(.*?\)/gi, '');
     // Remove plain video URLs (YouTube and Odysee)
     content = removeVideoLinksFromBody(content);
     return content.trim();
@@ -232,11 +236,19 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
   };
 
   const handleConversationPress = () => {
-    setIsConversationDrawerVisible(true);
+    if (onOpenConversation) {
+      onOpenConversation(post);
+    } else {
+      setIsConversationDrawerVisible(true);
+    }
   };
 
   const handleBodyPress = () => {
-    setIsFullConversationVisible(true);
+    if (onOpenFullConversation) {
+      onOpenFullConversation(post);
+    } else {
+      setIsFullConversationVisible(true);
+    }
   };
 
   const handleUserMenuPress = () => {
@@ -341,7 +353,8 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
               <Image
                 source={{ uri: `https://images.hive.blog/u/${post.author}/avatar/small` }}
                 style={styles.profileImage}
-                alt={`${post.author}'s avatar`}
+                transition={200}
+                recyclingKey={post.author}
               />
             </Pressable>
           </View>
@@ -468,8 +481,8 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         </View>
       </View>
 
-      {/* Conversation Drawer - Quick reply only */}
-      {isConversationDrawerVisible && (
+      {/* Conversation drawers — only mounted when parent doesn't provide callbacks (fallback mode) */}
+      {!onOpenConversation && isConversationDrawerVisible && (
         <React.Suspense fallback={null}>
           <ConversationDrawer
             visible={isConversationDrawerVisible}
@@ -479,8 +492,7 @@ export const PostCard = React.memo(({ post, currentUsername }: PostCardProps) =>
         </React.Suspense>
       )}
 
-      {/* Full Conversation Drawer - Entire conversation thread */}
-      {isFullConversationVisible && (
+      {!onOpenFullConversation && isFullConversationVisible && (
         <React.Suspense fallback={null}>
           <FullConversationDrawer
             visible={isFullConversationVisible}

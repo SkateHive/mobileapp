@@ -108,21 +108,20 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
 
   if (!data || data.length === 0) return;
 
-  // Prefetch thumbnails for the first 5 videos
+  // Prefetch thumbnails and avatars for the first 2 videos (light on login screen)
   const thumbnailUrls = data
-    .slice(0, 5)
+    .slice(0, 2)
     .map((v: VideoPost) => v.thumbnailUrl)
     .filter(Boolean) as string[];
 
-  thumbnailUrls.forEach((url: string) => {
-    Image.prefetch(url).catch(() => {});
-  });
+  const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
 
-  // Prefetch avatar images
-  const avatarUrls = [...new Set(data.slice(0, 5).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
-  avatarUrls.forEach((url: string) => {
-    Image.prefetch(url).catch(() => {});
-  });
+  // Batch prefetches 3 at a time to avoid overwhelming the network
+  const allUrls = [...thumbnailUrls, ...avatarUrls];
+  for (let i = 0; i < allUrls.length; i += 3) {
+    const batch = allUrls.slice(i, i + 3);
+    await Promise.allSettled(batch.map(url => Image.prefetch(url)));
+  }
 }
 
 interface ProfileData {
