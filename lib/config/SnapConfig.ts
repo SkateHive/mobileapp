@@ -32,7 +32,7 @@ export interface SnapSettings {
  */
 export const SnapConfig: SnapSettings = Platform.select({
   ios: {
-    useApi: true,
+    useApi: false, // Reverted iOS to use native DHive fallback for better stability
     verifyDeletion: true,
     pageSize: 10,
     fetchLimit: 40,

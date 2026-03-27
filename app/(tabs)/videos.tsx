@@ -10,6 +10,7 @@ import {
   Pressable,
   Share,
   Animated,
+  Platform,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -354,8 +355,8 @@ export default function VideosScreen() {
           style={StyleSheet.absoluteFill}
           onPress={handleTap}
         >
-          {/* Only mount VideoPlayer for current and adjacent items */}
-          {isNearby ? (
+          {/* Only mount VideoPlayer for current and adjacent items on Android, but keep iOS mounted for stable native playback */}
+          {Platform.OS === 'ios' || isNearby ? (
             <VideoPlayer
               url={item.videoUrl}
               playing={isActive}

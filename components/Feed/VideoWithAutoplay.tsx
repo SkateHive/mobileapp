@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
+import { View, Pressable, StyleSheet, ViewStyle, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { VideoPlayer } from './VideoPlayer';
@@ -39,7 +39,7 @@ export function VideoWithAutoplay({
   return (
     <View ref={ref} style={[styles.container, style]}>
       <Pressable style={styles.pressable} onPress={handlePress}>
-        {isInView && (
+        {(Platform.OS === 'ios' || isInView) && (
           <VideoPlayer 
             url={url} 
             playing={shouldPlay}
