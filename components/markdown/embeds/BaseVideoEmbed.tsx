@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator, Pressable, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useIsFocused } from '@react-navigation/native';
 import { theme } from '~/lib/theme';
+import { ThemedLoading } from '~/components/ui/ThemedLoading';
 import { VideoConfig } from '~/lib/config/VideoConfig';
 import { useAppSettings } from '~/lib/AppSettingsContext';
 
@@ -180,7 +181,7 @@ export const BaseVideoEmbed = ({ url, isVisible, isPrefetch, author, provider = 
       />
       {loading && (
         <View style={styles.loading}>
-          <ActivityIndicator color={theme.colors.green} />
+          <ThemedLoading />
         </View>
       )}
     </View>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { useNotifications } from '~/lib/hooks/useNotifications';
 import { useNotificationContext } from '~/lib/notifications-context';
 import { NotificationItem } from './NotificationItem';
@@ -8,7 +8,8 @@ import { Button } from '../ui/button';
 import { theme } from '~/lib/theme';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
-import { MatrixRain } from '~/components/ui/loading-effects/MatrixRain';
+import { ThemedLoading } from '../ui/ThemedLoading';
+import { LoadingScreen } from '../ui/LoadingScreen';
 import type { HiveNotification } from '~/lib/types';
 
 export const NotificationsScreen = React.memo(() => {
@@ -41,18 +42,17 @@ export const NotificationsScreen = React.memo(() => {
   };
 
   const handleLoadMore = () => {
-    if (hasMore && !isLoadingMore) {
+    if (hasMore && !isLoadingMore && notifications.length > 0) {
       loadMore();
     }
   };
 
   const renderFooter = () => {
-    if (!isLoadingMore) return null;
+    if (!isLoadingMore || notifications.length === 0) return null;
 
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={theme.colors.green} />
-        <Text style={styles.loadingText}>Loading more...</Text>
+        <ThemedLoading size="small" label="Loading more..." />
       </View>
     );
   };
@@ -60,10 +60,7 @@ export const NotificationsScreen = React.memo(() => {
   const renderEmptyState = () => {
     if (isLoading) {
       return (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={theme.colors.green} />
-          <Text style={styles.emptyText}>Loading notifications...</Text>
-        </View>
+        <LoadingScreen />
       );
     }
 
@@ -81,7 +78,7 @@ export const NotificationsScreen = React.memo(() => {
     if (username === 'SPECTATOR') {
       return (
         <View style={styles.emptyContainer}>
-          <MatrixRain opacity={0.2} />
+          <ThemedLoading type="auto" />
           <Text style={styles.loginText}>
             Please log in to view notifications
           </Text>
@@ -207,15 +204,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
   },
   footerLoader: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '100%',
     padding: theme.spacing.md,
-    gap: theme.spacing.xs,
-  },
-  loadingText: {
-    fontSize: theme.fontSizes.sm,
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
   },
 });

@@ -5,7 +5,6 @@ import {
   Pressable,
   Image,
   StyleSheet,
-  ActivityIndicator,
   Alert,
   Keyboard,
 } from 'react-native';
@@ -13,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
+import { ThemedLoading } from '../ui/ThemedLoading';
 import { VideoPlayer } from '../Feed/VideoPlayer';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
@@ -340,7 +340,7 @@ export function ReplyComposer({
             disabled={(!content.trim() && !media) || isUploading}
           >
             {isUploading ? (
-              <ActivityIndicator size="small" color={theme.colors.background} />
+              <ThemedLoading size="small" color={theme.colors.background} />
             ) : (
               <Text style={styles.replyButtonText}>{buttonLabel}</Text>
             )}

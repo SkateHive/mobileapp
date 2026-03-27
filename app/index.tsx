@@ -110,7 +110,7 @@ const BackgroundVideo = () => {
 
 const LoginBackground = () => {
   const { settings } = useAppSettings();
-  const isMatrix = settings.loginBackground === "matrix";
+  const isMatrix = settings.theme === "matrix";
   const glitchX = React.useRef(new Animated.Value(0)).current;
   const revealAnim = React.useRef(new Animated.Value(0)).current;
 

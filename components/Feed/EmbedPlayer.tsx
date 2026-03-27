@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { theme } from '../../lib/theme';
+import { ThemedLoading } from '../ui/ThemedLoading';
 
 interface EmbedPlayerProps {
   url: string;
@@ -45,7 +46,7 @@ export const EmbedPlayer = ({ url }: EmbedPlayerProps) => {
         />
         {isLoading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <ThemedLoading size="large" />
           </View>
         )}
       </View>
@@ -120,7 +121,7 @@ export const EmbedPlayer = ({ url }: EmbedPlayerProps) => {
       />
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ThemedLoading size="large" />
         </View>
       )}
     </View>
