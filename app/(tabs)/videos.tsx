@@ -68,6 +68,16 @@ export default function VideosScreen() {
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const uiFadeTimeout = useRef<any>(null);
 
+  // Listen for logout to gracefully release VideoPlayer before unmounting the screen
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  useEffect(() => {
+    if (!session && username !== 'SPECTATOR') {
+      setIsLoggingOut(true);
+    } else {
+      setIsLoggingOut(false);
+    }
+  }, [session, username]);
+
   const resetUiFade = useCallback(() => {
     // Cancel existing timeout
     if (uiFadeTimeout.current) {
@@ -133,6 +143,7 @@ export default function VideosScreen() {
           useNativeDriver: true,
         }).start(() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setScrollDirection('up'); // Ensure bars are visible when navigating back to feed
           router.push('/(tabs)/feed');
           // Reset after a short delay to ensure navigation transition finishes
           setTimeout(() => {
@@ -356,7 +367,7 @@ export default function VideosScreen() {
           onPress={handleTap}
         >
           {/* Only mount VideoPlayer for current and adjacent items on Android, but keep iOS mounted for stable native playback */}
-          {Platform.OS === 'ios' || isNearby ? (
+          {!isLoggingOut && (Platform.OS === 'ios' || isNearby) ? (
             <VideoPlayer
               url={item.videoUrl}
               playing={isActive}
