@@ -110,6 +110,19 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation,
 
   // Memoize media extraction
   const media = useMemo(() => extractMediaFromBody(post.body), [post.body]);
+
+  // Extract thumbnail for video posts from json_metadata
+  const videoThumbnailUrl = useMemo(() => {
+    if (!media.some(m => m.type === 'video')) return null;
+    try {
+      const raw = (post as any).post_json_metadata || (post as any).json_metadata;
+      const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (metadata?.image?.[0]) return metadata.image[0];
+    } catch {}
+    // Fallback: first image in the body
+    const firstImage = media.find(m => m.type === 'image');
+    return firstImage?.url || null;
+  }, [post, media]);
   
   // Memoize post content processing - remove iframes, images, and video links
   const postContent = useMemo(() => {
@@ -388,6 +401,7 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation,
                   isModalVisible={isModalVisible}
                   onCloseModal={() => setIsModalVisible(false)}
                   isVisible={isVisible}
+                  thumbnailUrl={videoThumbnailUrl}
                 />
               </View>
             )}

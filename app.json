@@ -67,7 +67,8 @@
           "savePhotosPermission": "SkateHive needs permission to save photos to your library."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

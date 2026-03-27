@@ -12,6 +12,7 @@ interface IpfsVideoPlayerProps {
   loop?: boolean;
   contentFit?: 'contain' | 'cover';
   playing?: boolean;
+  onPlaybackStarted?: () => void;
 }
 
 /**
@@ -26,6 +27,7 @@ export function IpfsVideoPlayer({
   loop = true,
   contentFit = 'contain',
   playing = true,
+  onPlaybackStarted,
 }: IpfsVideoPlayerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -150,6 +152,7 @@ export function IpfsVideoPlayer({
           }
           if (event.nativeEvent.data === 'VIDEO_PLAYING') {
             setIsLoading(false);
+            onPlaybackStarted?.();
           }
         }}
       />

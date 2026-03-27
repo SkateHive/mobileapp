@@ -76,9 +76,12 @@ export async function uploadImageToHive(
     let uploadMimeType = mimeType;
     let uploadFileName = fileName;
 
-    if (!options.skipConversion && isHeicImage(fileUri, mimeType)) {
+    // Always convert to JPEG on iOS to avoid HEIC compatibility issues.
+    // iOS ImagePicker often returns HEIC even when the MIME type says jpeg,
+    // and images.hive.blog serves them as image/heic which breaks on web/Android.
+    if (!options.skipConversion) {
       const prepared = await prepareImageForUpload(fileUri, mimeType, {
-        quality: options.conversionQuality ?? 0.8,
+        quality: options.conversionQuality ?? 0.85,
         forceConvert: true,
       });
       uploadUri = prepared.uri;

@@ -2,7 +2,8 @@ import { useQuery, QueryClient } from '@tanstack/react-query';
 import {
   getFeed,
   getBalance,
-  getRewards } from '../api';
+  getRewards,
+  getVideoFeed } from '../api';
 import { API_BASE_URL, LEADERBOARD_API_URL } from '../constants';
 import { extractMediaFromBody } from '../utils';
 import type { Post } from '../types';
@@ -17,24 +18,24 @@ export interface VideoPost {
   permlink: string;
   author: string;
   title: string;
-  body: string;
   created: string;
   votes: number;
   payout: string;
   replies: number;
   thumbnailUrl?: string;
   tags: string[];
-  json_metadata: any;
-  active_votes: any[];
+  active_votes: { voter: string; weight: number }[];
 }
 
 const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
-const VIDEO_FEED_STALE_TIME = 1000 * 60 * 2; // 2 minutes
+const VIDEO_FEED_STALE_TIME = 1000 * 60 * 1; // 1 minute (API caches for 60s)
 
-async function fetchVideoFeed(): Promise<VideoPost[]> {
-  const posts = await getFeed(1, 50);
+/**
+ * Fallback: extract videos client-side from the general feed endpoint.
+ * Used when /api/v2/videos is not deployed yet.
+ */
+function extractVideosFromFeed(posts: Post[]): VideoPost[] {
   const videoList: VideoPost[] = [];
-
   posts.forEach((post: Post) => {
     const media = extractMediaFromBody(post.body);
     const videoMedia = media.filter((m) => m.type === 'video');
@@ -46,12 +47,9 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
         metadata = typeof rawPost.json_metadata === 'string'
           ? JSON.parse(rawPost.json_metadata)
           : rawPost.json_metadata;
-      } catch (e) {
-        metadata = {};
-      }
+      } catch { metadata = {}; }
 
       const imageMedia = media.filter((m) => m.type === 'image');
-
       videoMedia.forEach((video) => {
         const thumbnail = metadata?.image?.[0] || imageMedia[0]?.url;
         videoList.push({
@@ -60,21 +58,33 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
           permlink: post.permlink,
           author: post.author,
           title: post.title || '',
-          body: post.body || '',
           created: post.created || '',
           votes: rawPost.net_votes || 0,
-          payout: rawPost.pending_payout_value || rawPost.total_payout_value || '0.000 HBD',
+          payout: rawPost.pending_payout_value || rawPost.total_payout_value || '0',
           replies: rawPost.children || 0,
           thumbnailUrl: thumbnail,
           tags: metadata?.tags || [],
-          json_metadata: metadata,
           active_votes: rawPost.active_votes || [],
         });
       });
     }
   });
-
   return videoList;
+}
+
+async function fetchVideoFeed(): Promise<VideoPost[]> {
+  // Try the dedicated /videos endpoint first
+  const result = await getVideoFeed(1, 30);
+  if (result) {
+    return result.data.map((entry: any) => ({
+      ...entry,
+      username: entry.author,
+    }));
+  }
+
+  // Fallback: use general feed + client-side extraction
+  const posts = await getFeed(1, 50);
+  return extractVideosFromFeed(posts);
 }
 
 export function useVideoFeed() {
@@ -108,7 +118,6 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
 
   if (!data || data.length === 0) return;
 
-  // Prefetch thumbnails and avatars for the first 2 videos (light on login screen)
   const thumbnailUrls = data
     .slice(0, 2)
     .map((v: VideoPost) => v.thumbnailUrl)
@@ -116,7 +125,6 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
 
   const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
 
-  // Batch prefetches 3 at a time to avoid overwhelming the network
   const allUrls = [...thumbnailUrls, ...avatarUrls];
   for (let i = 0; i < allUrls.length; i += 3) {
     const batch = allUrls.slice(i, i + 3);
