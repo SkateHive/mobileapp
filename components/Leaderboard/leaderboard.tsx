@@ -112,7 +112,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Header Removed for more space */}
 
         <View style={styles.listContainer}>
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     width: '100%',
     paddingTop: 100, // Space for absolute header
-    paddingBottom: 100, // Space for absolute tab bar
+    paddingBottom: 130, // Space for absolute tab bar + extra space for last item
   },
   loadingContainer: {
     flex: 1,
