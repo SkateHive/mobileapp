@@ -33,37 +33,57 @@ const DEFAULT_SETTINGS: AppSettings = {
 interface AppSettingsContextType {
   settings: AppSettings;
   updateSettings: (updates: Partial<AppSettings>) => void;
+  setUserForSettings: (username: string | null) => void;
 }
 
 const AppSettingsContext = createContext<AppSettingsContextType | undefined>(undefined);
 
 export const AppSettingsProvider = ({ children }: { children: ReactNode }) => {
+  const [activeUser, setActiveUser] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
-  // Load settings on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const stored = await SecureStore.getItemAsync(SETTINGS_KEY);
-        if (stored) {
-          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
-        }
-      } catch (error) {
-        console.error('Error loading settings:', error);
+  const getSettingsKey = (username: string | null) => {
+    return username && username !== 'SPECTATOR' 
+      ? `app_settings_${username}` 
+      : 'app_settings';
+  };
+
+  const loadSettings = async (username: string | null) => {
+    try {
+      const stored = await SecureStore.getItemAsync(getSettingsKey(username));
+      if (stored) {
+        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
+      } else {
+        // If specific user settings not found, check if we should fallback, 
+        // but for now creating fresh default settings is safer to avoid polluting from spectator
+        setSettings(DEFAULT_SETTINGS);
       }
-    })();
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      setSettings(DEFAULT_SETTINGS);
+    }
+  };
+
+  // Load generic settings on initial mount
+  useEffect(() => {
+    loadSettings(null);
   }, []);
+
+  const setUserForSettings = (username: string | null) => {
+    setActiveUser(username);
+    loadSettings(username);
+  };
 
   const updateSettings = (updates: Partial<AppSettings>) => {
     setSettings(prev => {
       const next = { ...prev, ...updates };
-      SecureStore.setItemAsync(SETTINGS_KEY, JSON.stringify(next)).catch(console.error);
+      SecureStore.setItemAsync(getSettingsKey(activeUser), JSON.stringify(next)).catch(console.error);
       return next;
     });
   };
 
   return (
-    <AppSettingsContext.Provider value={{ settings, updateSettings }}>
+    <AppSettingsContext.Provider value={{ settings, updateSettings, setUserForSettings }}>
       {children}
     </AppSettingsContext.Provider>
   );
