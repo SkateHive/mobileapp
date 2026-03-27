@@ -15,6 +15,7 @@ interface MediaPreviewProps {
   isModalVisible: boolean;
   onCloseModal: () => void;
   isVisible?: boolean; // For autoplay control
+  thumbnailUrl?: string | null;
 }
 
 // For calculating image dimensions
@@ -28,6 +29,7 @@ export function MediaPreview({
   isModalVisible,
   onCloseModal,
   isVisible = true,
+  thumbnailUrl,
 }: MediaPreviewProps) {
   // Track dimensions for each image to maintain proper aspect ratio
   const [imageDimensions, setImageDimensions] = useState<Record<number, { width: number, height: number }>>({});
@@ -91,6 +93,7 @@ export function MediaPreview({
               <VideoWithAutoplay 
                 url={item.url} 
                 isVisible={isVisible}
+                thumbnailUrl={thumbnailUrl}
                 style={styles.fullSize}
               />
             ) : item.type === 'embed' ? (

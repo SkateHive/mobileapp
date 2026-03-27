@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, ViewStyle, Platform } from 'react-native';
+import { View, Pressable, StyleSheet, ViewStyle, Platform, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { FontAwesome } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { VideoPlayer } from './VideoPlayer';
@@ -9,17 +10,20 @@ import { theme } from '../../lib/theme';
 interface VideoWithAutoplayProps {
   url: string;
   isVisible?: boolean;
+  thumbnailUrl?: string | null;
   style?: ViewStyle;
   requireInteraction?: boolean; // New prop to control autoplay behavior
 }
 
 export function VideoWithAutoplay({ 
   url, 
+  thumbnailUrl,
   isVisible = true, 
   style, 
   requireInteraction = false 
 }: VideoWithAutoplayProps) {
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const isFocused = useIsFocused();
   const { ref, isInView } = useInView({ threshold: 0.5 });
   
@@ -43,6 +47,7 @@ export function VideoWithAutoplay({
           <VideoPlayer 
             url={url} 
             playing={shouldPlay}
+            onPlaybackStarted={() => setIsPlaying(true)}
           />
         )}
         
@@ -51,6 +56,35 @@ export function VideoWithAutoplay({
           <View style={styles.playOverlay}>
             <FontAwesome name="play-circle" size={50} color="white" />
           </View>
+        )}
+
+        {/* Thumbnail overlay until video plays */}
+        {!isPlaying && (
+          <>
+            {thumbnailUrl ? (
+              <View style={styles.posterOverlay}>
+                <Image
+                  source={{ uri: thumbnailUrl }}
+                  style={styles.posterImage}
+                  contentFit="cover"
+                  transition={0}
+                />
+                {(!requireInteraction || hasInteracted) && (
+                  <View style={styles.playIconOverlay}>
+                    <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.spinnerOverlay}>
+                {(!requireInteraction || hasInteracted) ? (
+                  <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+                ) : (
+                  <FontAwesome name="play-circle" size={50} color="white" />
+                )}
+              </View>
+            )}
+          </>
         )}
       </Pressable>
     </View>
@@ -67,6 +101,26 @@ const styles = StyleSheet.create({
   pressable: {
     width: '100%',
     height: '100%',
+  },
+  posterOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+  },
+  posterImage: {
+    width: '100%',
+    height: '100%',
+  },
+  playIconOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  spinnerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
   },
   playOverlay: {
     position: 'absolute',
