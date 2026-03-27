@@ -4,10 +4,10 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Text } from '../ui/text';
+import { ThemedLoading } from '../ui/ThemedLoading';
 import { PostCard } from '../Feed/PostCard';
 import { useReplies } from '~/lib/hooks/useReplies';
 import { useAuth } from '~/lib/auth-provider';
@@ -59,7 +59,7 @@ export function Conversation({ discussion, onClose }: ConversationProps) {
         <View style={styles.repliesContainer}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.green} />
+              <ThemedLoading size="large" />
               <Text style={styles.loadingText}>Loading comments...</Text>
             </View>
           ) : error ? (

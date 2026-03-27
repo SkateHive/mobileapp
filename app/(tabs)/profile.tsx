@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   Image,
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -37,45 +36,12 @@ import type { Discussion } from '@hiveio/dhive';
 import { extractMediaFromBody } from '~/lib/utils';
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
+import { ThemedLoading } from "~/components/ui/ThemedLoading";
+import { GridSkeleton } from "~/components/ui/Skeletons";
 
 const GRID_COLS = 3;
 const GRID_GAP = 2;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-
-// Skeleton grid shown while posts load
-const SkeletonTile = React.memo(({ size, delay }: { size: number; delay: number }) => {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-
-  useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.6, duration: 800, delay, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.3, duration: 800, useNativeDriver: true }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, []);
-
-  return <Animated.View style={{ width: size, height: size, backgroundColor: theme.colors.secondaryCard, opacity }} />;
-});
-
-const GridSkeleton = ({ tileSize }: { tileSize: number }) => (
-  <View style={[skeletonStyles.container, { width: SCREEN_WIDTH }]}>
-    {Array.from({ length: 12 }).map((_, i) => (
-      <SkeletonTile key={i} size={tileSize} delay={(i % 3) * 150} />
-    ))}
-  </View>
-);
-
-const skeletonStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: GRID_GAP,
-    justifyContent: 'flex-start',
-  },
-});
 
 // Map common country names/codes to flag emojis
 function countryToFlag(location: string): string {
@@ -237,15 +203,15 @@ export default function ProfileScreen() {
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
 
   // --- Fetching Logic (API vs RPC) ---
-  
+
   // 1. RPC Fallback (original hook)
   // We only pass the username if the API is disabled to save resources
-  const { 
-    posts: rpcPosts, 
-    isLoading: isRpcLoading, 
-    loadNextPage: loadNextPageRpc, 
-    hasMore: rpcHasMore, 
-    refresh: refreshRpc 
+  const {
+    posts: rpcPosts,
+    isLoading: isRpcLoading,
+    loadNextPage: loadNextPageRpc,
+    hasMore: rpcHasMore,
+    refresh: refreshRpc
   } = useUserComments(SnapConfig.useApi ? null : profileUsername, blockedList);
 
   // 2. API Logic (New migration)
@@ -273,14 +239,14 @@ export default function ProfileScreen() {
       setIsApiLoading(true);
       setApiError(null);
       console.log(`[Profile Snaps] Fetching page ${page} for @${profileUsername} (refresh: ${refresh})`);
-      
+
       const url = `${API_BASE_URL}/feed?author=${profileUsername}&page=${page}&limit=${API_LIMIT}`;
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const result = await response.json();
 
       if (result.success) {
@@ -332,7 +298,7 @@ export default function ProfileScreen() {
   // Initial load or username change (for API only)
   useEffect(() => {
     if (!SnapConfig.useApi) return;
-    
+
     console.log(`[Profile Snaps] Resetting and initial load for @${profileUsername}`);
     setApiPosts([]);
     setApiPage(1);
@@ -539,7 +505,11 @@ export default function ProfileScreen() {
   };
 
   if (isLoadingProfile) {
-    return <LoadingScreen />;
+    return (
+      <View style={styles.container}>
+        <ThemedLoading type="auto" size="large" />
+      </View>
+    );
   }
 
   // Only show error for non-SPECTATOR users when there's an actual error or missing account
@@ -615,7 +585,7 @@ export default function ProfileScreen() {
                           disabled={isBlockLoading}
                         >
                           {isBlockLoading ? (
-                            <ActivityIndicator size="small" color={theme.colors.danger} />
+                            <ThemedLoading size="small" color={theme.colors.danger} />
                           ) : (
                             <Text style={[styles.followActionBtnText, { color: theme.colors.danger }]}>
                               Blocked
@@ -632,7 +602,7 @@ export default function ProfileScreen() {
                           disabled={isFollowLoading}
                         >
                           {isFollowLoading ? (
-                            <ActivityIndicator size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
+                            <ThemedLoading size="small" color={isFollowing ? theme.colors.text : theme.colors.background} />
                           ) : (
                             <Text style={[
                               styles.followActionBtnText,
@@ -738,8 +708,8 @@ export default function ProfileScreen() {
       return (
         <View style={styles.errorFooter}>
           <Text style={styles.errorFooterText}>{apiError}</Text>
-          <Pressable 
-            style={styles.retryButton} 
+          <Pressable
+            style={styles.retryButton}
             onPress={() => fetchUserSnaps(apiPage + 1)}
           >
             <Ionicons name="refresh-outline" size={16} color={theme.colors.primary} />
@@ -749,10 +719,10 @@ export default function ProfileScreen() {
       );
     }
 
-    if (!isLoadingPosts) return null;
+    if (!isLoadingPosts || userPosts.length === 0) return null;
     return (
       <View style={styles.loadingFooter}>
-        <LoadingScreen />
+        <ThemedLoading size="small" />
       </View>
     );
   };

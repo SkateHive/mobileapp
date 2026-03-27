@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, ViewStyle, Platform, ActivityIndicator } from 'react-native';
+import { View, Pressable, StyleSheet, ViewStyle, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { FontAwesome } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { VideoPlayer } from './VideoPlayer';
 import { useInView } from '../../lib/hooks/useInView';
 import { theme } from '../../lib/theme';
+import { ThemedLoading } from '../ui/ThemedLoading';
 
 interface VideoWithAutoplayProps {
   url: string;
@@ -71,14 +72,14 @@ export function VideoWithAutoplay({
                 />
                 {(!requireInteraction || hasInteracted) && (
                   <View style={styles.playIconOverlay}>
-                    <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+                    <ThemedLoading size="small" />
                   </View>
                 )}
               </View>
             ) : (
               <View style={styles.spinnerOverlay}>
                 {(!requireInteraction || hasInteracted) ? (
-                  <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+                  <ThemedLoading size="small" />
                 ) : (
                   <FontAwesome name="play-circle" size={50} color="white" />
                 )}

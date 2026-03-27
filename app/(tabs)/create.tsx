@@ -8,7 +8,6 @@ import {
   TouchableWithoutFeedback,
   View,
   ScrollView,
-  ActivityIndicator,
   Alert,
   StyleSheet,
 } from "react-native";
@@ -37,6 +36,7 @@ import {
   getLastSnapsContainer,
 } from "~/lib/hive-utils";
 import { theme } from "~/lib/theme";
+import { ThemedLoading } from "~/components/ui/ThemedLoading";
 
 export default function CreatePost() {
   const { username, session } = useAuth();
@@ -363,10 +363,7 @@ export default function CreatePost() {
                 {isSelectingMedia ? (
                   <>
                     <View style={styles.loadingContainer}>
-                      <ActivityIndicator
-                        size="small"
-                        color={theme.colors.text}
-                      />
+                      <ThemedLoading size="small" />
                     </View>
                     <Text style={styles.buttonTextSecondary}>Selecting...</Text>
                   </>
@@ -388,9 +385,12 @@ export default function CreatePost() {
                 onPress={handlePost}
                 disabled={(!content.trim() && !media) || isUploading}
               >
-                <Text style={styles.shareButtonText}>
-                  {isUploading ? "Publishing..." : "Share"}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {isUploading && <ThemedLoading size="small" />}
+                  <Text style={styles.shareButtonText}>
+                    {isUploading ? "Publishing..." : "Share"}
+                  </Text>
+                </View>
               </Button>
             </View>
 

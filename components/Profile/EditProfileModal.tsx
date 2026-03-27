@@ -6,7 +6,6 @@ import {
   FlatList,
   Pressable,
   Image,
-  ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '~/components/ui/text';
 import { Input } from '~/components/ui/input';
 import { theme } from '~/lib/theme';
+import { ThemedLoading } from '~/components/ui/ThemedLoading';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
 import { HiveClient, updateProfile } from '~/lib/hive-utils';
@@ -242,7 +242,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
             style={[styles.saveButton, (!hasChanges || saving) && styles.saveButtonDisabled]}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={theme.colors.background} />
+              <ThemedLoading size="small" color={theme.colors.background} />
             ) : (
               <Text style={styles.saveButtonText}>Save</Text>
             )}
@@ -262,7 +262,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
               )}
               <View style={styles.avatarOverlay}>
                 {uploadingAvatar ? (
-                  <ActivityIndicator size="small" color={theme.colors.white} />
+                  <ThemedLoading size="small" color={theme.colors.white} />
                 ) : (
                   <Ionicons name="camera" size={16} color={theme.colors.white} />
                 )}

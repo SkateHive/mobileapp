@@ -28,7 +28,7 @@ import { useScrollDirection } from "~/lib/ScrollDirectionContext";
 import { theme } from "~/lib/theme";
 import { useAppSettings } from "~/lib/AppSettingsContext";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
-import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
+import { ThemedLoading } from "~/components/ui/ThemedLoading";
 
 
 const { height: WINDOW_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -382,7 +382,7 @@ export default function VideosScreen() {
         {/* Loading indicator — only while video is actively buffering */}
         {isActive && !isVideoPlaying && (
           <View style={styles.bufferingIndicator}>
-            <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+            <ThemedLoading size="small" />
           </View>
         )}
 
@@ -431,7 +431,7 @@ export default function VideosScreen() {
             disabled={isVoting}
           >
             {isVoting ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <ThemedLoading size="small" />
             ) : (
               <Ionicons
                 name={isLiked ? "heart" : "heart-outline"}
@@ -547,9 +547,7 @@ export default function VideosScreen() {
             ListFooterComponent={
               isFetchingNextPage ? (
                 <View style={[styles.loadingFooter, { height: SCREEN_HEIGHT }]}>
-                  <MatrixRain opacity={0.3} />
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                  <Text style={styles.loadingText}>Loading more bangers...</Text>
+                  <ThemedLoading label="Loading more bangers..." />
                 </View>
               ) : null
             }

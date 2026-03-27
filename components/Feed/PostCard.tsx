@@ -2,7 +2,7 @@ import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 // import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Pressable, View, Linking, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 // import { API_BASE_URL } from '~/lib/constants';
@@ -24,6 +24,7 @@ import { useAppSettings } from '~/lib/AppSettingsContext';
 import { MediaPreview } from './MediaPreview';
 import { CommentBottomSheet } from '../ui/CommentBottomSheet';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
+import { ThemedLoading } from '../ui/ThemedLoading';
 const ConversationDrawer = React.lazy(() =>
   import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
 );
@@ -525,9 +526,11 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
                     disabled={isFollowLoading}
                   >
                     {isFollowLoading ? (
-                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      <ThemedLoading size="small" />
                     ) : (
-                      <Text style={styles.followButtonText}>Follow</Text>
+                      <Text style={styles.followButtonText}>
+                        {isFollowing ? 'Following' : 'Follow'}
+                      </Text>
                     )}
                   </Pressable>
                 )}
@@ -597,7 +600,9 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
                     disabled={isVoting}
                   >
                     {isVoting ? (
-                      <ActivityIndicator size="small" color={theme.colors.green} />
+                      <View style={styles.actionItem}>
+                        <ThemedLoading size="small" />
+                      </View>
                     ) : (
                       <Ionicons name="thumbs-up" size={22} color={theme.colors.green} />
                     )}
@@ -630,7 +635,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
                   hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                 >
                   {isVoting ? (
-                    <ActivityIndicator
+                    <ThemedLoading
                       size="small"
                       color={isLiked ? theme.colors.green : theme.colors.gray}
                     />
@@ -716,7 +721,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
                   disabled={isDeleting}
                 >
                   {isDeleting ? (
-                    <ActivityIndicator size="small" color={theme.colors.gray} />
+                    <ThemedLoading size="small" color={theme.colors.gray} />
                   ) : (
                     <Text style={[styles.userMenuButtonText, { color: theme.colors.gray }]}>Delete Snap</Text>
                   )}
@@ -791,7 +796,7 @@ export const PostCard = React.memo(({ post, currentUsername, isStatic, isMinimiz
                   disabled={!selectedReportReason || isSubmittingReport}
                 >
                   {isSubmittingReport ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ThemedLoading size="small" color="#fff" />
                   ) : (
                     <Text style={styles.reportSubmitButtonText}>Submit Report</Text>
                   )}

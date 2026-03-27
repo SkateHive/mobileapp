@@ -12,7 +12,7 @@ export interface AppSettings {
   sessionDuration: number; // minutes: 0 (Auto), 5, 60, 480, 1440
   initialScreen: 'videos' | 'feed';
   isColorsUnlocked: boolean;
-  loginBackground: 'video' | 'matrix';
+  theme: 'skatehive' | 'matrix';
   videoMuted: boolean;
   videoAutoPlay: boolean;
 }
@@ -25,7 +25,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   isColorsUnlocked: false,
   sessionDuration: 1440,
   initialScreen: 'videos',
-  loginBackground: 'video',
+  theme: 'skatehive',
   videoMuted: VideoConfig.autoPlayMuted,
   videoAutoPlay: VideoConfig.enableAutoPlay,
 };

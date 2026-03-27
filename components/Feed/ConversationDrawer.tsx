@@ -7,7 +7,6 @@ import {
   PanResponder,
   Dimensions,
   Pressable,
-  ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../ui/text';
+import { ThemedLoading } from '../ui/ThemedLoading';
 import { PostCard } from './PostCard';
 import { ConversationReply } from './ConversationReply';
 import { ReplyComposer } from '../ui/ReplyComposer';
@@ -183,7 +183,7 @@ export function ConversationDrawer({
               <View style={styles.postContext}>
                 {isPostLoading ? (
                   <View style={styles.postLoadingContainer}>
-                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <ThemedLoading size="small" />
                   </View>
                 ) : post ? (
                   <PostCard 
@@ -215,7 +215,7 @@ export function ConversationDrawer({
                   {post?.children || 0} Comments
                 </Text>
                 {(isCommentsLoading || isPostLoading) && (
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                  <ThemedLoading size="small" />
                 )}
               </View>
 

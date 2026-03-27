@@ -200,9 +200,10 @@ export function SideMenu({ isVisible, onClose }: SideMenuProps) {
       {
         title: "Theme",
         icon: "color-palette-outline" as const,
-        value: settings.loginBackground === 'video' ? 'Skatehive' : 'Matrix',
+        value: settings.theme === 'skatehive' ? 'Skatehive' : 'Matrix',
         onPress: () => {
-          updateSettings({ loginBackground: settings.loginBackground === 'video' ? 'matrix' : 'video' });
+          const nextTheme = settings.theme === 'skatehive' ? 'matrix' : 'skatehive';
+          updateSettings({ theme: nextTheme });
         }
       },
       { title: "Language", icon: "language-outline" as const, value: "English", hideChevron: true, onPress: () => { } },
