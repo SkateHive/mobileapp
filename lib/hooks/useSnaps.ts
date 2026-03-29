@@ -179,17 +179,25 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
 
       const results = await getDiscussions(type, {
         tag,
-        limit: SnapConfig.pageSize,
+        limit: SnapConfig.pageSize * 2, // Fetch extra in case many aren't from Skatehive
         start_author: lastPost?.author,
         start_permlink: lastPost?.permlink
       });
 
       // Filter out blocked users and duplicates
       const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
-      const filteredResults = results.filter(r =>
-        !blockedSet.has(r.author.toLowerCase()) &&
-        !fetchedPermlinksRef.current.has(r.permlink)
-      );
+      const filteredResults = results.filter(r => {
+        // Must match community tag (category or tags metadata)
+        const inCommunity = r.category === COMMUNITY_TAG || 
+                           (r.json_metadata && typeof r.json_metadata === 'object' && 
+                            (r.json_metadata as any).tags && (r.json_metadata as any).tags.includes(COMMUNITY_TAG)) ||
+                           (r.json_metadata && typeof r.json_metadata === 'string' &&
+                            r.json_metadata.includes(COMMUNITY_TAG));
+
+        return inCommunity &&
+               !blockedSet.has(r.author.toLowerCase()) && 
+               !fetchedPermlinksRef.current.has(r.permlink);
+      });
 
       filteredResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
 
