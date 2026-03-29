@@ -125,10 +125,13 @@ export async function getSnapsFeed(page = 1, limit = 10): Promise<Post[]> {
 export async function getFollowingFeedAPI(username: string, page = 1, limit = 10): Promise<Post[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/feed/${username}/following?page=${page}&limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
     const data = await response.json();
     return normalizeFeedData(data);
   } catch (error) {
-    console.error('Error fetching following feed from API:', error);
+    console.warn('Error fetching following feed from API:', error);
     throw error;
   }
 }
@@ -138,11 +141,14 @@ export async function getFollowingFeedAPI(username: string, page = 1, limit = 10
  */
 export async function getTrendingFeedAPI(page = 1, limit = 10): Promise<Post[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/trending?page=${page}&limit=${limit}`);
+    const response = await fetch(`${API_BASE_URL}/feed/trending?page=${page}&limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
     const data = await response.json();
     return normalizeFeedData(data);
   } catch (error) {
-    console.error('Error fetching trending feed from API:', error);
+    console.warn('Error fetching trending feed from API:', error);
     throw error;
   }
 }
