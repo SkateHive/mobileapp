@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getSnapsContainers, getContentReplies, ExtendedComment, SNAPS_CONTAINER_AUTHOR, SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG, getDiscussions } from '../hive-utils';
+import {
+  getSnapsContainers, getContentReplies,
+  ExtendedComment, SNAPS_CONTAINER_AUTHOR,
+  SNAPS_PAGE_MIN_SIZE, COMMUNITY_TAG,
+  getDiscussions
+} from '../hive-utils';
 import { Discussion } from '@hiveio/dhive';
 import { SnapConfig } from '../config/SnapConfig';
 import { FeedFilterType } from '../FeedFilterContext';
 import { useAuth } from '../auth-provider';
-import { getSnapsFeed } from '../api';
-
+import { getSnapsFeed, getFollowingFeedAPI, getTrendingFeedAPI } from '../api';
 interface LastContainerInfo {
   permlink: string;
   date: string;
@@ -49,19 +53,18 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
 
   // Fetch comments with progressive loading
   async function getMoreSnaps(): Promise<ExtendedComment[]> {
-    // MOCKED: For now, we only show the Curated feed regardless of filter
-    const effectiveFilter = 'Curated';
-    
-    if (effectiveFilter === 'Curated') {
+    const effectiveFilter = filter;
+
+    if (effectiveFilter === 'Curated' || effectiveFilter === 'Recent' || effectiveFilter === 'Skatehive') {
       try {
         const currentPage = apiPageRef.current;
         const apiSnaps = await getSnapsFeed(currentPage, SnapConfig.pageSize);
-        
+
         if (apiSnaps && apiSnaps.length > 0) {
           apiPageRef.current += 1;
           const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
           const safelyFilteredComments = apiSnaps.filter(c => !blockedSet.has(c.author.toLowerCase())) as unknown as ExtendedComment[];
-          
+
           safelyFilteredComments.forEach(c => fetchedPermlinksRef.current.add(c.permlink));
           return safelyFilteredComments;
         } else if (apiSnaps && apiSnaps.length === 0 && currentPage > 1) {
@@ -81,43 +84,43 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
       let date = lastContainerRef.current?.date || new Date().toISOString();
       let iterationCount = 0;
       const maxIterations = 10; // Prevent infinite loops
-      
+
       const allPermlinks = new Set(fetchedPermlinksRef.current);
 
       while (allFilteredComments.length < pageSize && hasMoreData && iterationCount < maxIterations) {
         iterationCount++;
-        
+
         try {
           const result = await getSnapsContainers({
             lastPermlink: permlink,
             lastDate: date,
           });
-          
+
           if (!result.length) {
             hasMoreData = false;
             break;
           }
-          
+
           for (const resultItem of result) {
             if (allPermlinks.has(resultItem.permlink)) continue;
-            
+
             const replies = await getContentReplies({
               author: SNAPS_CONTAINER_AUTHOR,
               permlink: resultItem.permlink,
             });
-            
+
             const filteredComments = filterCommentsByTag(replies, tag);
-            
+
             // Filter by blocked users
             const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
             const safelyFilteredComments = filteredComments.filter(c => !blockedSet.has(c.author.toLowerCase()));
-            
+
             allPermlinks.add(resultItem.permlink);
             safelyFilteredComments.forEach(c => allPermlinks.add(c.permlink));
             allFilteredComments.push(...safelyFilteredComments);
             permlink = resultItem.permlink;
             date = resultItem.created;
-            
+
             if (allFilteredComments.length >= pageSize) break;
           }
         } catch (error) {
@@ -125,13 +128,43 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
           hasMoreData = false;
         }
       }
-      
+
       fetchedPermlinksRef.current = allPermlinks;
       lastContainerRef.current = { permlink, date };
       allFilteredComments.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
       return allFilteredComments;
     } else {
-      // Use getDiscussions for other filters
+      // Try Skatehive API if enabled
+      if (SnapConfig.useApi) {
+        try {
+          const currentPage = apiPageRef.current;
+          let apiSnaps: any[] = [];
+          
+          if (filter === 'Following') {
+            if (!username || username === 'SPECTATOR') return [];
+            apiSnaps = await getFollowingFeedAPI(username, currentPage, SnapConfig.pageSize);
+          } else if (filter === 'Trending') {
+            apiSnaps = await getTrendingFeedAPI(currentPage, SnapConfig.pageSize);
+          }
+          
+          if (apiSnaps && apiSnaps.length > 0) {
+            apiPageRef.current += 1;
+            const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
+            const safelyFilteredComments = apiSnaps.filter(c => !blockedSet.has(c.author.toLowerCase())) as unknown as ExtendedComment[];
+            
+            safelyFilteredComments.forEach(c => fetchedPermlinksRef.current.add(c.permlink));
+            return safelyFilteredComments;
+          } else if (apiSnaps && apiSnaps.length === 0 && currentPage > 1) {
+            // Reached the end of the API feed
+            return [];
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch ${filter} feed from skatehive-api, falling back to dhive natively:`, error);
+        }
+      }
+
+      // --- NATIVE DHIVE FALLBACK ---
+      // Use getDiscussions for other filters ('Following', 'Trending')
       let type: 'created' | 'trending' | 'hot' | 'feed' = 'created';
       let tag = COMMUNITY_TAG;
 
@@ -143,7 +176,7 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
       }
 
       const lastPost = comments.length > 0 ? comments[comments.length - 1] : null;
-      
+
       const results = await getDiscussions(type, {
         tag,
         limit: SnapConfig.pageSize,
@@ -153,13 +186,13 @@ export function useSnaps(filter: FeedFilterType = 'Recent', username: string | n
 
       // Filter out blocked users and duplicates
       const blockedSet = new Set(blockedList.map(u => u.toLowerCase()));
-      const filteredResults = results.filter(r => 
-        !blockedSet.has(r.author.toLowerCase()) && 
+      const filteredResults = results.filter(r =>
+        !blockedSet.has(r.author.toLowerCase()) &&
         !fetchedPermlinksRef.current.has(r.permlink)
       );
-      
+
       filteredResults.forEach(r => fetchedPermlinksRef.current.add(r.permlink));
-      
+
       return filteredResults as unknown as ExtendedComment[];
     }
   }

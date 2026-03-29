@@ -98,20 +98,20 @@ function FeedHeaderTitle() {
   const { filter, setFilter } = useFeedFilter();
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const filters:
-    ('Skatehive' | 'Recent' | 'Following' | 'Curated' | 'Trending')[] =
-    ['Skatehive', 'Recent', 'Following', 'Curated', 'Trending'];
+  const filters: ('Recent' | 'Following' | 'Trending')[] = ['Recent', 'Following', 'Trending'];
+
+  const isSkatehiveOrRecent = filter === 'Skatehive' || filter === 'Recent';
 
   return (
     <View>
-      {/* TODO: Add filter dropdown back in */}
-      {/* <Pressable onPress={() => setShowDropdown(true)} style={{ flexDirection: 'row', alignItems: 'center' }}> */}
-      <Text style={{ fontSize: theme.fontSizes.lg, fontFamily: theme.fonts.bold, color: theme.colors.text }}>
-        {/* {filter} */}
-        Skatehive
-      </Text>
-      {/* <Ionicons name="chevron-down" size={18} color={theme.colors.text} style={{ marginLeft: 4 }} /> */}
-      {/* </Pressable> */}
+      <Pressable onPress={() => setShowDropdown(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ fontSize: theme.fontSizes.lg, fontFamily: theme.fonts.bold, color: theme.colors.text }}>
+          {isSkatehiveOrRecent ? 'Skatehive' : filter}
+        </Text>
+        {!isSkatehiveOrRecent && (
+          <Ionicons name="chevron-down" size={18} color={theme.colors.text} style={{ marginLeft: 4 }} />
+        )}
+      </Pressable>
 
       <Modal
         visible={showDropdown}
@@ -124,33 +124,36 @@ function FeedHeaderTitle() {
           onPress={() => setShowDropdown(false)}
         >
           <View style={{ backgroundColor: theme.colors.secondaryCard, borderRadius: 12, padding: 8, width: 200, borderWidth: 1, borderColor: theme.colors.border }}>
-            {filters.map((f) => (
-              <Pressable
-                key={f}
-                onPress={() => {
-                  setFilter(f);
-                  setShowDropdown(false);
-                }}
-                style={{
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  backgroundColor: filter === f ? 'rgba(50, 205, 50, 0.1)' : 'transparent',
-                  borderRadius: 8,
-                  marginBottom: 4,
-                }}
-              >
-                <Text style={{
-                  color: filter === f ? theme.colors.primary : theme.colors.text,
-                  fontFamily: filter === f ? theme.fonts.bold : theme.fonts.regular
-                }}>
-                  {f}
-                </Text>
-              </Pressable>
-            ))}
+            {filters.map((f) => {
+              const isActive = filter === f || (f === 'Recent' && filter === 'Skatehive');
+              return (
+                <Pressable
+                  key={f}
+                  onPress={() => {
+                    setFilter(f);
+                    setShowDropdown(false);
+                  }}
+                  style={{
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    backgroundColor: isActive ? 'rgba(50, 205, 50, 0.1)' : 'transparent',
+                    borderRadius: 8,
+                    marginBottom: 4,
+                  }}
+                >
+                  <Text style={{
+                    color: isActive ? theme.colors.primary : theme.colors.text,
+                    fontFamily: isActive ? theme.fonts.bold : theme.fonts.regular
+                  }}>
+                    {f}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </Pressable>
       </Modal>
-    </View >
+    </View>
   );
 }
 
