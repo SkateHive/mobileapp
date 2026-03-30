@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { theme } from '~/lib/theme';
+import { ThemedLoading } from '~/components/ui/ThemedLoading';
 
 interface InstagramEmbedProps {
   url: string;
@@ -23,7 +24,7 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
       />
       {loading && (
         <View style={styles.loading}>
-          <ActivityIndicator color={theme.colors.green} />
+          <ThemedLoading />
         </View>
       )}
     </View>

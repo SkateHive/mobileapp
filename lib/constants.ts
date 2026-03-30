@@ -9,7 +9,7 @@ export const APP_NAME="Skatehive";
 export const STORED_USERS_KEY = 'myc_users';
 export const API_BASE_URL = ENV_API_BASE_URL || 'https://api.skatehive.app/api/v2';
 export const LEADERBOARD_API_URL = ENV_LEADERBOARD_API_URL || 'https://api.skatehive.app/api/v2/leaderboard';
-export const LOGIN_BACKGROUND_TYPE = AppConfig.loginBackgroundType;
+export const DEFAULT_THEME = AppConfig.theme;
 export const API_SEARCH_URL = ENV_API_SEARCH_URL || API_BASE_URL;
 
 export const NAV_THEME = {

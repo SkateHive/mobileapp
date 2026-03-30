@@ -4,12 +4,12 @@ import {
   Pressable,
   Image,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Text } from '../ui/text';
+import { ThemedLoading } from '../ui/ThemedLoading';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
 import { MediaPreview } from './MediaPreview';
 import { ReplyComposer } from '../ui/ReplyComposer';
@@ -226,8 +226,8 @@ export function ConversationReply({
               disabled={isVoting}
             >
               {isVoting ? (
-                <ActivityIndicator size="small" color={theme.colors.green} />
-              ) : (
+               <ThemedLoading size="small" />
+             ) : (
                 <>
                   <Text style={[styles.voteCount, { color: isLiked ? theme.colors.green : theme.colors.gray }]}>
                     {voteCount}

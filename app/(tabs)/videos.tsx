@@ -10,6 +10,7 @@ import {
   Pressable,
   Share,
   Animated,
+  Platform,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,7 +28,7 @@ import { useScrollDirection } from "~/lib/ScrollDirectionContext";
 import { theme } from "~/lib/theme";
 import { useAppSettings } from "~/lib/AppSettingsContext";
 import { LoadingScreen } from "~/components/ui/LoadingScreen";
-import { MatrixRain } from "~/components/ui/loading-effects/MatrixRain";
+import { ThemedLoading } from "~/components/ui/ThemedLoading";
 
 
 const { height: WINDOW_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -66,6 +67,16 @@ export default function VideosScreen() {
   const lastTapTime = useRef(0);
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const uiFadeTimeout = useRef<any>(null);
+
+  // Listen for logout to gracefully release VideoPlayer before unmounting the screen
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  useEffect(() => {
+    if (!session && username !== 'SPECTATOR') {
+      setIsLoggingOut(true);
+    } else {
+      setIsLoggingOut(false);
+    }
+  }, [session, username]);
 
   const resetUiFade = useCallback(() => {
     // Cancel existing timeout
@@ -132,6 +143,7 @@ export default function VideosScreen() {
           useNativeDriver: true,
         }).start(() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setScrollDirection('up'); // Ensure bars are visible when navigating back to feed
           router.push('/(tabs)/feed');
           // Reset after a short delay to ensure navigation transition finishes
           setTimeout(() => {
@@ -354,8 +366,8 @@ export default function VideosScreen() {
           style={StyleSheet.absoluteFill}
           onPress={handleTap}
         >
-          {/* Only mount VideoPlayer for current and adjacent items */}
-          {isNearby ? (
+          {/* Only mount VideoPlayer for current and adjacent items on Android, but keep iOS mounted for stable native playback */}
+          {!isLoggingOut && (Platform.OS === 'ios' || isNearby) ? (
             <VideoPlayer
               url={item.videoUrl}
               playing={isActive}
@@ -381,7 +393,7 @@ export default function VideosScreen() {
         {/* Loading indicator — only while video is actively buffering */}
         {isActive && !isVideoPlaying && (
           <View style={styles.bufferingIndicator}>
-            <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+            <ThemedLoading size="small" />
           </View>
         )}
 
@@ -430,7 +442,7 @@ export default function VideosScreen() {
             disabled={isVoting}
           >
             {isVoting ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <ThemedLoading size="small" />
             ) : (
               <Ionicons
                 name={isLiked ? "heart" : "heart-outline"}
@@ -546,9 +558,7 @@ export default function VideosScreen() {
             ListFooterComponent={
               isFetchingNextPage ? (
                 <View style={[styles.loadingFooter, { height: SCREEN_HEIGHT }]}>
-                  <MatrixRain opacity={0.3} />
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                  <Text style={styles.loadingText}>Loading more bangers...</Text>
+                  <ThemedLoading label="Loading more bangers..." />
                 </View>
               ) : null
             }

@@ -5,7 +5,6 @@ import {
   FlatList,
   Pressable,
   Image,
-  ActivityIndicator,
   StyleSheet,
   Animated,
   PanResponder,
@@ -16,6 +15,7 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
+import { ThemedLoading } from '../ui/ThemedLoading';
 
 import { getFollowing, getFollowers, setUserRelationship } from '~/lib/hive-utils';
 import { useAuth } from '~/lib/auth-provider';
@@ -242,7 +242,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     if (!loadingMore) return null;
     return (
       <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color={theme.colors.green} />
+        <ThemedLoading size="small" />
       </View>
     );
   };
@@ -295,7 +295,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {/* User List */}
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.green} />
+              <ThemedLoading size="large" />
               <Text style={styles.loadingText}>Loading {type === 'muted' || type === 'blocked' ? 'blocked users' : type}...</Text>
             </View>
           ) : (

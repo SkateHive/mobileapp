@@ -15,7 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
-import { ActivityIndicator } from "react-native";
+import { useAppSettings } from "~/lib/AppSettingsContext";
+import { ThemedLoading } from "../ui/ThemedLoading";
 import { useAuth } from "~/lib/auth-provider";
 import { Post } from '~/lib/types';
 import { useFeedFilter } from '~/lib/FeedFilterContext';
@@ -238,7 +239,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
 
   const ListFooterComponent = isLoading ? (
     <View style={styles.footer}>
-      <ActivityIndicator size="large" color={theme.colors.text} />
+      <ThemedLoading size="large" />
     </View>
   ) : null;
 

@@ -2,16 +2,30 @@ import React from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { getLoadingEffect } from "./loading-effects";
 import { theme } from "~/lib/theme";
+import { useAppSettings } from "~/lib/AppSettingsContext";
+import { SkeletonBackground } from "./loading-effects/SkeletonBackground";
 
 export function LoadingScreen() {
-  const BackgroundEffect = getLoadingEffect("matrix").component;
+  const { settings } = useAppSettings();
+  
+  const renderBackground = () => {
+    switch (settings.theme) {
+      case 'matrix':
+        const MatrixRainComp = getLoadingEffect("matrix").component;
+        return <MatrixRainComp />;
+      case 'skatehive':
+      default:
+        return (
+          <View style={styles.activityContainer}>
+            <ActivityIndicator size="large" color={theme.colors.green} />
+          </View>
+        );
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <BackgroundEffect />
-      {/* <View style={styles.activityContainer}>
-        <ActivityIndicator size="large" color={"green"} />
-      </View> */}
+      {renderBackground()}
     </View>
   );
 }

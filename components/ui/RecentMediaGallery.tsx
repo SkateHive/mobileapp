@@ -5,11 +5,11 @@ import {
   Pressable,
   StyleSheet,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as MediaLibrary from "expo-media-library";
 import { Text } from "./text";
+import { ThemedLoading } from "./ThemedLoading";
 import { theme } from "~/lib/theme";
 
 interface MediaAsset {
@@ -101,7 +101,7 @@ export function RecentMediaGallery({
     return (
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <ThemedLoading size="small" />
           <Text style={styles.statusText}>Requesting permissions...</Text>
         </View>
       </View>
@@ -132,7 +132,7 @@ export function RecentMediaGallery({
     return (
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <ThemedLoading size="small" />
           <Text style={styles.statusText}>Loading recent media...</Text>
         </View>
       </View>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Animated, Dimensions, TouchableOpacity, StyleSheet } from 'react-native';
 import { Text } from './text';
 import { theme } from '../../lib/theme';
+import { useAppSettings } from '~/lib/AppSettingsContext';
 import { MatrixRain } from '~/components/ui/loading-effects/MatrixRain';
 
 const { width } = Dimensions.get('window');
@@ -13,6 +14,7 @@ interface ToastProps {
 }
 
 export function Toast({ message, type = 'error', onHide }: ToastProps) {
+  const { settings } = useAppSettings();
   const translateY = React.useRef(new Animated.Value(-100)).current;
   const opacity = React.useRef(new Animated.Value(0)).current;
 
@@ -82,7 +84,7 @@ export function Toast({ message, type = 'error', onHide }: ToastProps) {
           }
         ]}
       >
-        {(type === 'error' || type === 'success') && <MatrixRain containerHeight={100} intensity={0.3} />}
+        {settings.theme === 'matrix' && (type === 'error' || type === 'success') && <MatrixRain containerHeight={100} intensity={0.3} />}
         <Text style={[
           styles.message,
           (type === 'error' || type === 'success') && styles.messageTextBold
