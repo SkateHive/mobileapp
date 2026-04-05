@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { HiveNotification } from '~/lib/types';
 import { Text } from '../ui/text';
-import { ConversationDrawer } from '../Feed/ConversationDrawer';
+import { FullConversationDrawer } from '../Feed/FullConversationDrawer';
 import { getContent } from '~/lib/hive-utils';
 import { theme } from '~/lib/theme';
 import type { Discussion } from '@hiveio/dhive';
@@ -282,9 +282,11 @@ export const NotificationItem = React.memo(({ notification }: NotificationItemPr
 
       {/* Conversation Drawer for replies and mentions */}
       {postData && (
-        <ConversationDrawer
+        <FullConversationDrawer
           visible={isConversationDrawerVisible}
           onClose={() => setIsConversationDrawerVisible(false)}
+          author={postData.author}
+          permlink={postData.permlink}
           discussion={postData}
         />
       )}

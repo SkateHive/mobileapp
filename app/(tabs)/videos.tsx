@@ -19,6 +19,7 @@ import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -179,7 +180,6 @@ function VideoItem({
 // ─── Main screen ────────────────────────────────────────────────────────────
 
 export default function VideosScreen() {
-  const router = useRouter();
   const { session, username } = useAuth();
   const { showToast } = useToast();
   const { data: videos = [], isLoading } = useVideoFeed();
@@ -187,6 +187,7 @@ export default function VideosScreen() {
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
   const [likedStates, setLikedStates] = useState<Record<string, boolean>>({});
   const [voteCountStates, setVoteCountStates] = useState<Record<string, number>>({});
+  const [conversationVideo, setConversationVideo] = useState<VideoPost | null>(null);
 
   // Init liked/vote states when data arrives
   useEffect(() => {
@@ -237,8 +238,8 @@ export default function VideosScreen() {
   }, [session, votingStates, likedStates, voteCountStates, showToast]);
 
   const handleComment = useCallback((video: VideoPost) => {
-    router.push({ pathname: "/conversation", params: { author: video.author, permlink: video.permlink } });
-  }, [router]);
+    setConversationVideo(video);
+  }, []);
 
   const handleShare = useCallback(async (video: VideoPost) => {
     try {
@@ -303,6 +304,16 @@ export default function VideosScreen() {
           <Ionicons name="videocam-off-outline" size={64} color={theme.colors.gray} />
           <Text style={styles.emptyText}>No videos found</Text>
         </View>
+      )}
+
+      {conversationVideo && (
+        <FullConversationDrawer
+          visible={!!conversationVideo}
+          onClose={() => setConversationVideo(null)}
+          author={conversationVideo.author}
+          permlink={conversationVideo.permlink}
+          partial
+        />
       )}
     </View>
   );

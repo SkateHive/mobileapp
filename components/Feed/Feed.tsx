@@ -18,7 +18,6 @@ import {
   ViewportTrackerProvider,
   useViewportTracker,
 } from "~/lib/ViewportTracker";
-import { ConversationDrawer } from "./ConversationDrawer";
 import { FullConversationDrawer } from "./FullConversationDrawer";
 import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
@@ -37,13 +36,8 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const { updateVisibleItems } = useViewportTracker();
   const { badgeCount } = useNotificationContext();
 
-  // Single shared drawer instances — avoids mounting 1 per PostCard
-  const [conversationPost, setConversationPost] = React.useState<Discussion | null>(null);
+  // Single shared drawer instance — avoids mounting 1 per PostCard
   const [fullConversationPost, setFullConversationPost] = React.useState<Discussion | null>(null);
-
-  const handleOpenConversation = React.useCallback((post: Discussion) => {
-    setConversationPost(post);
-  }, []);
 
   const handleOpenFullConversation = React.useCallback((post: Discussion) => {
     setFullConversationPost(post);
@@ -105,11 +99,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         key={item.permlink}
         post={item}
         currentUsername={username || ""}
-        onOpenConversation={handleOpenConversation}
         onOpenFullConversation={handleOpenFullConversation}
       />
     ),
-    [username, handleOpenConversation, handleOpenFullConversation]
+    [username, handleOpenFullConversation]
   );
 
   const keyExtractor = React.useCallback(
@@ -190,19 +183,14 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       />
 
-      {/* Single shared drawer instances — 1 instead of N per PostCard */}
-      {conversationPost && (
-        <ConversationDrawer
-          visible={!!conversationPost}
-          onClose={() => setConversationPost(null)}
-          discussion={conversationPost}
-        />
-      )}
+      {/* Single shared drawer instance — 1 instead of N per PostCard */}
       {fullConversationPost && (
         <FullConversationDrawer
           visible={!!fullConversationPost}
           onClose={() => setFullConversationPost(null)}
-          discussion={fullConversationPost}
+          author={fullConversationPost.author}
+          permlink={fullConversationPost.permlink}
+          partial
         />
       )}
     </View>

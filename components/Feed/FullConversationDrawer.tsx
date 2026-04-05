@@ -27,15 +27,18 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 interface FullConversationDrawerProps {
   visible: boolean;
   onClose: () => void;
-  discussion: Discussion;
+  author: string;
+  permlink: string;
+  discussion?: Discussion; // optional — if provided, renders the original post card at the top
+  partial?: boolean; // when true, drawer occupies 80% height anchored to the bottom
 }
 
-export function FullConversationDrawer({ visible, onClose, discussion }: FullConversationDrawerProps) {
+export function FullConversationDrawer({ visible, onClose, author, permlink, discussion, partial }: FullConversationDrawerProps) {
   const { username } = useAuth();
   const insets = useSafeAreaInsets();
   const { comments, isLoading, error } = useReplies(
-    discussion.author,
-    discussion.permlink,
+    author,
+    permlink,
     visible // Only fetch when visible
   );
 
@@ -118,10 +121,11 @@ export function FullConversationDrawer({ visible, onClose, discussion }: FullCon
           <Pressable style={styles.backdropPress} onPress={handleClose} />
         </Animated.View>
 
-        {/* Full Screen Drawer */}
+        {/* Drawer */}
         <Animated.View
           style={[
             styles.drawer,
+            partial && styles.drawerPartial,
             {
               transform: [{ translateY }],
             },
@@ -150,9 +154,11 @@ export function FullConversationDrawer({ visible, onClose, discussion }: FullCon
               keyboardShouldPersistTaps="handled"
             >
               {/* Original Post */}
-              <View style={styles.mainPost}>
-                <PostCard post={discussion} currentUsername={username} />
-              </View>
+              {discussion && (
+                <View style={styles.mainPost}>
+                  <PostCard post={discussion} currentUsername={username} />
+                </View>
+              )}
 
               <View style={styles.divider} />
 
@@ -181,8 +187,8 @@ export function FullConversationDrawer({ visible, onClose, discussion }: FullCon
           {username && username !== 'SPECTATOR' && (
             <View style={[styles.replySection, { paddingBottom: insets.bottom || theme.spacing.md }]}>
               <ReplyComposer
-                parentAuthor={discussion.author}
-                parentPermlink={discussion.permlink}
+                parentAuthor={author}
+                parentPermlink={permlink}
                 onReplySuccess={() => {}}
                 placeholder="Write your reply..."
                 buttonLabel="POST"
@@ -215,6 +221,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: SCREEN_HEIGHT,
     backgroundColor: theme.colors.background,
+  },
+  drawerPartial: {
+    top: undefined,
+    height: SCREEN_HEIGHT * 0.8,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
   },
   keyboardAvoidingView: {
     flex: 1,

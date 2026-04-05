@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Pressable, View, Linking, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { Pressable, View, ActivityIndicator, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { vote as hiveVote, submitEncryptedReport } from '~/lib/hive-utils';
@@ -12,12 +12,8 @@ import { Text } from '../ui/text';
 import { VotingSlider } from '../ui/VotingSlider';
 import { MediaPreview } from './MediaPreview';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
-// Lazy imports break the require cycle:
-// PostCard → ConversationDrawer → PostCard
+// Lazy import breaks the require cycle:
 // PostCard → FullConversationDrawer → PostCard
-const ConversationDrawer = React.lazy(() =>
-  import('./ConversationDrawer').then(m => ({ default: m.ConversationDrawer }))
-);
 const FullConversationDrawer = React.lazy(() =>
   import('./FullConversationDrawer').then(m => ({ default: m.FullConversationDrawer }))
 );
@@ -53,12 +49,11 @@ const formatTimeAbbreviated = (date: Date): string => {
 interface PostCardProps {
   post: Discussion;
   currentUsername: string | null;
-  onOpenConversation?: (post: Discussion) => void;
   onOpenFullConversation?: (post: Discussion) => void;
 }
 
 
-export const PostCard = React.memo(({ post, currentUsername, onOpenConversation, onOpenFullConversation }: PostCardProps) => {
+export const PostCard = React.memo(({ post, currentUsername, onOpenFullConversation }: PostCardProps) => {
   const { session, followingList, updateUserRelationship } = useAuth();
   const { estimateVoteValue, isLoading: isVoteValueLoading } = useVoteValue(currentUsername);
   const { isItemVisible, registerItem, unregisterItem } = useViewportTracker();
@@ -68,8 +63,7 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation,
   const [showSlider, setShowSlider] = useState(false);
   const [voteWeight, setVoteWeight] = useState(100);
   const [isLiked, setIsLiked] = useState(false);
-  // Only use local drawer state when parent doesn't provide callbacks
-  const [isConversationDrawerVisible, setIsConversationDrawerVisible] = useState(false);
+  // Only use local drawer state when parent doesn't provide a callback
   const [isFullConversationVisible, setIsFullConversationVisible] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -240,10 +234,10 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation,
   };
 
   const handleConversationPress = () => {
-    if (onOpenConversation) {
-      onOpenConversation(post);
+    if (onOpenFullConversation) {
+      onOpenFullConversation(post);
     } else {
-      setIsConversationDrawerVisible(true);
+      setIsFullConversationVisible(true);
     }
   };
 
@@ -486,23 +480,14 @@ export const PostCard = React.memo(({ post, currentUsername, onOpenConversation,
         </View>
       </View>
 
-      {/* Conversation drawers — only mounted when parent doesn't provide callbacks (fallback mode) */}
-      {!onOpenConversation && isConversationDrawerVisible && (
-        <React.Suspense fallback={null}>
-          <ConversationDrawer
-            visible={isConversationDrawerVisible}
-            onClose={() => setIsConversationDrawerVisible(false)}
-            discussion={post}
-          />
-        </React.Suspense>
-      )}
-
+      {/* Conversation drawer — only mounted when parent doesn't provide a callback (fallback mode) */}
       {!onOpenFullConversation && isFullConversationVisible && (
         <React.Suspense fallback={null}>
           <FullConversationDrawer
             visible={isFullConversationVisible}
             onClose={() => setIsFullConversationVisible(false)}
-            discussion={post}
+            author={post.author}
+            permlink={post.permlink}
           />
         </React.Suspense>
       )}
