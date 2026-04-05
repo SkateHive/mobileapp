@@ -65,7 +65,8 @@
     "@babel/core": "^7.25.0",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "~19.1.10",
-    "babel-plugin-dotenv-import": "^3.0.1"
+    "babel-plugin-dotenv-import": "^3.0.1",
+    "cosmiconfig": "^9.0.1"
   },
   "private": true
 }
