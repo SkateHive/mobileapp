@@ -60,10 +60,14 @@ export const VideoPlayer = React.memo(
     }, [playing, player]);
 
     useEffect(() => {
-      if (playing) {
-        player.play();
-      } else {
-        player.pause();
+      try {
+        if (playing) {
+          player.play();
+        } else {
+          player.pause();
+        }
+      } catch {
+        // Native player may already be released during unmount
       }
     }, [playing, player]);
 

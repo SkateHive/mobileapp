@@ -4,7 +4,7 @@ import {
   getBalance,
   getRewards,
   getVideoFeed } from '../api';
-import { API_BASE_URL, LEADERBOARD_API_URL } from '../constants';
+import { API_BASE_URL, LEADERBOARD_API_URL, HIVE_AVATAR_URL } from '../constants';
 import { extractMediaFromBody } from '../utils';
 import type { Post } from '../types';
 
@@ -123,7 +123,7 @@ export async function warmUpVideoAssets(queryClient: QueryClient) {
     .map((v: VideoPost) => v.thumbnailUrl)
     .filter(Boolean) as string[];
 
-  const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `https://images.hive.blog/u/${v.username}/avatar`))];
+  const avatarUrls = [...new Set(data.slice(0, 2).map((v: VideoPost) => `${HIVE_AVATAR_URL}/${v.username}/avatar`))];
 
   const allUrls = [...thumbnailUrls, ...avatarUrls];
   for (let i = 0; i < allUrls.length; i += 3) {

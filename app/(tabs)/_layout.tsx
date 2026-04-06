@@ -4,6 +4,7 @@ import { StyleSheet, View, PanResponder } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRef } from "react";
 import { theme } from "~/lib/theme";
+import { ErrorBoundary } from "~/components/ui/ErrorBoundary";
 
 interface TabItem {
   name: string;
@@ -96,6 +97,7 @@ export default function TabLayout() {
   ).current;
 
   return (
+    <ErrorBoundary>
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.gestureContainer} {...panResponder.panHandlers}>
           <Tabs
@@ -160,6 +162,7 @@ export default function TabLayout() {
           </Tabs>
         </View>
       </SafeAreaView>
+    </ErrorBoundary>
   );
 }
 

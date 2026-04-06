@@ -11,7 +11,8 @@
     "web": "expo start -c --web",
     "clean": "rm -rf .expo node_modules",
     "build": "expo build",
-    "start": "expo start --dev-client"
+    "start": "expo start --dev-client",
+    "logs:ios": "xcrun simctl spawn booted log stream --level error --predicate 'process == \"SkateHive\"'"
   },
   "dependencies": {
     "@expo-google-fonts/fira-code": "^0.4.0",

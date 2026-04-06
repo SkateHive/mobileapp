@@ -22,6 +22,7 @@ import { FullConversationDrawer } from "./FullConversationDrawer";
 import { BadgedIcon } from "../ui/BadgedIcon";
 import { useNotificationContext } from "~/lib/notifications-context";
 import type { Discussion } from "@hiveio/dhive";
+import type { NestedDiscussion } from "~/lib/types";
 
 interface FeedProps {
   refreshTrigger?: number;
@@ -37,11 +38,16 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const { badgeCount } = useNotificationContext();
 
   // Single shared drawer instance — avoids mounting 1 per PostCard
-  const [fullConversationPost, setFullConversationPost] = React.useState<Discussion | null>(null);
+  const [fullConversationPost, setFullConversationPost] = React.useState<
+    Discussion | NestedDiscussion | null
+  >(null);
 
-  const handleOpenFullConversation = React.useCallback((post: Discussion) => {
-    setFullConversationPost(post);
-  }, []);
+  const handleOpenFullConversation = React.useCallback(
+    (post: Discussion | NestedDiscussion) => {
+      setFullConversationPost(post);
+    },
+    [],
+  );
 
   // Handle pull-to-refresh
   const handleRefresh = React.useCallback(async () => {
@@ -62,7 +68,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         .map((item) => (item.item as Discussion).permlink);
       updateVisibleItems(visiblePermlinks);
     },
-    [updateVisibleItems]
+    [updateVisibleItems],
   );
 
   // Viewability config - item is considered viewable when 60% is visible
@@ -71,17 +77,15 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
       viewAreaCoveragePercentThreshold: 60,
       minimumViewTime: 100,
     }),
-    []
+    [],
   );
 
-  // Map blockchain comments (Discussion) to Post for PostCard compatibility
-  const feedData: Discussion[] = comments as unknown as Discussion[];
-
-  // Filter out posts from muted and blacklisted users
+  // Filter out posts from muted and blacklisted users.
+  // ExtendedComment is structurally compatible with Discussion (both are HIVE post objects).
   const filteredFeedData = React.useMemo(() => {
-    if (!feedData || feedData.length === 0) return [];
+    if (!comments || comments.length === 0) return [];
 
-    return feedData.filter((post) => {
+    return comments.filter((post) => {
       // Don't filter out the user's own posts
       if (post.author === username) return true;
 
@@ -90,8 +94,8 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         !mutedList.includes(post.author) &&
         !blacklistedList.includes(post.author)
       );
-    });
-  }, [feedData, mutedList, blacklistedList, username]);
+    }) as unknown as Discussion[];
+  }, [comments, mutedList, blacklistedList, username]);
 
   const renderItem = React.useCallback(
     ({ item }: { item: Discussion }) => (
@@ -102,17 +106,17 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         onOpenFullConversation={handleOpenFullConversation}
       />
     ),
-    [username, handleOpenFullConversation]
+    [username, handleOpenFullConversation],
   );
 
   const keyExtractor = React.useCallback(
     (item: Discussion) => item.permlink,
-    []
+    [],
   );
 
   const ItemSeparatorComponent = React.useCallback(
     () => <View style={styles.separator} />,
-    []
+    [],
   );
 
   const handleNotificationsPress = React.useCallback(() => {
@@ -141,7 +145,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
         </Pressable>
       </View>
     ),
-    [handleNotificationsPress, badgeCount]
+    [handleNotificationsPress, badgeCount],
   );
 
   const ListFooterComponent = isLoading ? (

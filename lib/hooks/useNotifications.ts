@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAllNotifications, fetchNewNotifications, markNotificationsAsRead, HiveNotification } from '../hive-utils';
 import { useAuth } from '../auth-provider';
 
@@ -7,6 +7,8 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
   const [notifications, setNotifications] = useState<HiveNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  // Ref so the interval callback always reads the latest value without causing interval recreation
+  const isLoadingMoreRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(0);
   const [hasMore, setHasMore] = useState(true);
@@ -47,6 +49,7 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
     }
 
     try {
+      isLoadingMoreRef.current = true;
       setIsLoadingMore(true);
       setError(null);
       
@@ -63,8 +66,8 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
         
         setNotifications(prev => {
           const updated = [...prev, ...newNotifications];
-          // Cap to 500 items to prevent unbounded memory growth
-          return updated.length > 500 ? updated.slice(-500) : updated;
+          // Cap to 200 items to prevent unbounded memory growth on mobile
+          return updated.length > 200 ? updated.slice(-200) : updated;
         });
 
         if (newNotifications.length < 50) {
@@ -75,6 +78,7 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
       console.error('Error loading more notifications:', err);
       setError(err instanceof Error ? err.message : 'Failed to load more notifications');
     } finally {
+      isLoadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
   }, [username, notifications, isLoadingMore, hasMore]);
@@ -104,19 +108,19 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
   }, [fetchNotifications]);
 
   // Auto-refresh notifications every 2 minutes (only the first page to check for new ones)
-  // Disabled when disableAutoRefresh is true (e.g., when on notifications screen)
+  // Disabled when disableAutoRefresh is true (e.g., when on notifications screen).
+  // Uses isLoadingMoreRef to avoid recreating the interval when loading state changes.
   useEffect(() => {
     if (!username || username === 'SPECTATOR' || disableAutoRefresh) return;
 
     const interval = setInterval(() => {
-      // Only refresh if we're not loading more to avoid conflicts
-      if (!isLoadingMore) {
+      if (!isLoadingMoreRef.current) {
         fetchNotifications(true);
       }
     }, 120000); // 2 minutes
 
     return () => clearInterval(interval);
-  }, [fetchNotifications, username, isLoadingMore, disableAutoRefresh]);
+  }, [fetchNotifications, username, disableAutoRefresh]);
 
   // Calculate unread count
   const unreadCount = notifications.filter(n => !n.isRead).length;

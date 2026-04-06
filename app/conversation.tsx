@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -25,7 +25,13 @@ export default function ConversationScreen() {
     postData?: string;
   }>();
   const { username } = useAuth();
-  
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Reset scroll position when navigating to a different post
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [author, permlink]);
+
   // Parse the post data if passed
   let mainPost: Discussion | null = null;
   try {
@@ -79,7 +85,7 @@ export default function ConversationScreen() {
       </View>
 
       <View style={styles.contentContainer}>
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Main Post */}
           {mainPost && (
             <View style={styles.mainPostContainer}>

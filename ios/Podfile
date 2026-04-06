@@ -57,5 +57,17 @@ target 'SkateHive' do
         config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
       end
     end
+
+    # Silence "will be run during every build" warning for the Hermes script phase.
+    # The phase intentionally has no declared outputs, so we mark it as always out-of-date
+    # to suppress the Xcode dependency-analysis warning.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'hermes-engine'
+      target.build_phases.each do |phase|
+        next unless phase.respond_to?(:name) &&
+                    phase.name == '[CP-User] [Hermes] Replace Hermes for the right configuration, if needed'
+        phase.always_out_of_date = '1'
+      end
+    end
   end
 end

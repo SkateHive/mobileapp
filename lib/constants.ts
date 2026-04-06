@@ -1,4 +1,5 @@
 export const APP_NAME="SkateHive";
+export const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
 export const STORED_USERS_KEY = 'myc_users';
 export const API_BASE_URL = 'https://api.skatehive.app/api/v2';
 export const LEADERBOARD_API_URL = 'https://api.skatehive.app/api/v2/leaderboard';

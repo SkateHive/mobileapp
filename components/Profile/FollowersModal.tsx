@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
+import { HIVE_AVATAR_URL } from '~/lib/constants';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
 import { getFollowing, getFollowers, getMuted, setUserRelationship } from '~/lib/hive-utils';
@@ -36,7 +37,7 @@ const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton
       onPress={() => onPress(username)}
     >
       <Image
-        source={{ uri: `https://images.hive.blog/u/${username}/avatar/small` }}
+        source={{ uri: `${HIVE_AVATAR_URL}/${username}/avatar/small` }}
         style={styles.userAvatar}
       />
       <View style={styles.userInfo}>

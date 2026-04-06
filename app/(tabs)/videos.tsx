@@ -2,12 +2,13 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
-  Dimensions,
   FlatList,
   Text,
   ActivityIndicator,
   Pressable,
   Share,
+  useWindowDimensions,
+  ViewToken,
 } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -19,9 +20,8 @@ import { vote as hiveVote } from "~/lib/hive-utils";
 import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
-
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // ─── Native video item ─────────────────────────────────────────────────────
 // Each item gets its own expo-video player — no WebView overhead.
@@ -47,13 +47,14 @@ function VideoItem({
   likedStates: Record<string, boolean>;
   voteCountStates: Record<string, number>;
 }) {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const [isPlaying, setIsPlaying] = useState(false);
   const key = `${item.author}-${item.permlink}`;
   const isLiked = likedStates[key] ?? false;
   const isVoting = votingStates[key] ?? false;
   const voteCount = voteCountStates[key] ?? item.votes;
   const router = useRouter();
-  const avatarUrl = `https://images.hive.blog/u/${item.username}/avatar`;
+  const avatarUrl = `${HIVE_AVATAR_URL}/${item.username}/avatar`;
 
   // Native video player — fast, no WebView
   const player = useVideoPlayer(item.videoUrl, (p) => {
@@ -70,13 +71,13 @@ function VideoItem({
     }
   }, [isActive, player]);
 
-  // Track when video actually starts playing
+  // Track when video actually starts playing — depends only on player to avoid duplicate subscriptions
   useEffect(() => {
     const sub = player.addListener("playingChange", (e: { isPlaying: boolean }) => {
-      if (e.isPlaying && !isPlaying) setIsPlaying(true);
+      if (e.isPlaying) setIsPlaying(true);
     });
     return () => sub?.remove();
-  }, [player, isPlaying]);
+  }, [player]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -89,7 +90,7 @@ function VideoItem({
   };
 
   return (
-    <View style={styles.videoContainer}>
+    <View style={[styles.videoContainer, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }]}>
       {/* Native video — renders underneath thumbnail */}
       <VideoView
         style={styles.nativeVideo}
@@ -126,17 +127,12 @@ function VideoItem({
         </Pressable>
       </View>
 
-      {/* Bottom: title + tags */}
-      <View style={styles.bottomOverlay}>
-        {item.title ? (
+      {/* Bottom: title */}
+      {item.title ? (
+        <View style={styles.bottomOverlay}>
           <Text style={styles.titleText} numberOfLines={2}>{item.title}</Text>
-        ) : null}
-        {item.tags?.length > 0 && (
-          <Text style={styles.tagsText} numberOfLines={1}>
-            #{item.tags.slice(0, 3).join(" #")}
-          </Text>
-        )}
-      </View>
+        </View>
+      ) : null}
 
       {/* Left: action buttons */}
       <View style={styles.leftActions}>
@@ -180,11 +176,13 @@ function VideoItem({
 // ─── Main screen ────────────────────────────────────────────────────────────
 
 export default function VideosScreen() {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const { session, username } = useAuth();
   const { showToast } = useToast();
   const { data: videos = [], isLoading } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
+  const votingLockRef = useRef<Record<string, boolean>>({});
   const [likedStates, setLikedStates] = useState<Record<string, boolean>>({});
   const [voteCountStates, setVoteCountStates] = useState<Record<string, number>>({});
   const [conversationVideo, setConversationVideo] = useState<VideoPost | null>(null);
@@ -203,8 +201,8 @@ export default function VideosScreen() {
     setVoteCountStates(counts);
   }, [videos, username]);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index || 0);
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index ?? 0);
   }).current;
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
@@ -215,7 +213,9 @@ export default function VideosScreen() {
       showToast("Please login first", "error");
       return;
     }
-    if (votingStates[key]) return;
+    // Use ref for immediate synchronous lock — prevents double-tap race before state update lands
+    if (votingLockRef.current[key]) return;
+    votingLockRef.current[key] = true;
 
     const wasLiked = likedStates[key];
     const prevCount = voteCountStates[key] || video.votes;
@@ -233,6 +233,7 @@ export default function VideosScreen() {
       setVoteCountStates((p) => ({ ...p, [key]: prevCount }));
       showToast(error instanceof Error ? error.message : "Failed to vote", "error");
     } finally {
+      votingLockRef.current[key] = false;
       setVotingStates((p) => ({ ...p, [key]: false }));
     }
   }, [session, votingStates, likedStates, voteCountStates, showToast]);
@@ -281,7 +282,7 @@ export default function VideosScreen() {
         <FlatList
           data={videos}
           renderItem={renderItem}
-          keyExtractor={(item, i) => `${item.permlink}-${i}`}
+          keyExtractor={(item) => `${item.author}-${item.permlink}`}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           snapToAlignment="start"
@@ -324,7 +325,8 @@ export default function VideosScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  videoContainer: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, backgroundColor: "#000" },
+  // videoContainer dimensions are set inline via useWindowDimensions in VideoItem
+  videoContainer: { backgroundColor: "#000" },
   nativeVideo: { ...StyleSheet.absoluteFillObject },
   thumbnail: { ...StyleSheet.absoluteFillObject, zIndex: 2 },
   spinnerOverlay: {

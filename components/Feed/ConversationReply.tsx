@@ -10,6 +10,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Text } from '../ui/text';
+import { HIVE_AVATAR_URL } from '~/lib/constants';
 import { EnhancedMarkdownRenderer } from '../markdown/EnhancedMarkdownRenderer';
 import { MediaPreview } from './MediaPreview';
 import { ReplyComposer } from '../ui/ReplyComposer';
@@ -167,7 +168,7 @@ export function ConversationReply({
         <View style={dynamicStyles.leftColumn}>
           <Pressable onPress={handleProfilePress}>
             <Image
-              source={{ uri: `https://images.hive.blog/u/${post.author}/avatar/small` }}
+              source={{ uri: `${HIVE_AVATAR_URL}/${post.author}/avatar/small` }}
               style={dynamicStyles.profileImage}
               alt={`${post.author}'s avatar`}
             />

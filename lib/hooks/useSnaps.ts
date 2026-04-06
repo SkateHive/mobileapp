@@ -83,9 +83,9 @@ export function useSnaps() {
     }
 
     // Cap permlinks Set to prevent unbounded memory growth
-    if (allPermlinks.size > 500) {
+    if (allPermlinks.size > 200) {
       const arr = Array.from(allPermlinks);
-      fetchedPermlinksRef.current = new Set(arr.slice(-500));
+      fetchedPermlinksRef.current = new Set(arr.slice(-200));
     } else {
       fetchedPermlinksRef.current = allPermlinks;
     }
@@ -109,10 +109,11 @@ export function useSnaps() {
           const uniqueSnaps = newSnaps.filter((snap) => !existingPermlinks.has(snap.permlink));
           if (uniqueSnaps.length === 0) setHasMore(false);
           const updated = [...prevPosts, ...uniqueSnaps];
-          // Cap to 500 items to prevent unbounded memory growth
-          return updated.length > 500 ? updated.slice(-500) : updated;
+          // Cap to 200 items to prevent unbounded memory growth on mobile
+          return updated.length > 200 ? updated.slice(-200) : updated;
         });
-      } catch {
+      } catch (error) {
+        console.error('Error fetching posts:', error);
         if (!cancelled) setHasMore(false);
       } finally {
         if (!cancelled) setIsLoading(false);

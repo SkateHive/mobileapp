@@ -4,7 +4,7 @@ import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, FiraCode_400Regular, FiraCode_700Bold } from '@expo-google-fonts/fira-code';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
@@ -43,6 +43,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const isRedirectingRef = useRef(false);
 
   useEffect(() => {
     // Don't redirect while loading
@@ -53,10 +54,11 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     const inProtectedRoutes = inAuthGroup || inConversation;
 
     if (!isAuthenticated && inProtectedRoutes) {
-      // User is not authenticated but trying to access protected routes
-      // Redirect to login
-      // console.log('User logged out, redirecting to login...');
+      if (isRedirectingRef.current) return;
+      isRedirectingRef.current = true;
       router.replace('/');
+    } else {
+      isRedirectingRef.current = false;
     }
   }, [isAuthenticated, isLoading, segments, router]);
 

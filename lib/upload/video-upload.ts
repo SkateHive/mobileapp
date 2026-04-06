@@ -187,6 +187,15 @@ export async function uploadVideoToWorker(
   }
 }
 
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 /**
  * Create video iframe markup for Hive post
  * @param gatewayUrl - Gateway URL returned from upload
@@ -194,5 +203,7 @@ export async function uploadVideoToWorker(
  * @returns HTML iframe string
  */
 export function createVideoIframe(gatewayUrl: string, title?: string): string {
-  return `<iframe src="${gatewayUrl}" width="100%" height="400" frameborder="0" allowfullscreen title="${title || 'Video'}"></iframe>`;
+  const safeUrl = escapeHtmlAttr(gatewayUrl);
+  const safeTitle = escapeHtmlAttr(title || 'Video');
+  return `<iframe src="${safeUrl}" width="100%" height="400" frameborder="0" allowfullscreen title="${safeTitle}"></iframe>`;
 }

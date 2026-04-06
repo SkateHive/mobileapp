@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { STORED_USERS_KEY } from './constants';
+import { STORED_USERS_KEY, INACTIVITY_TIMEOUT_MS } from './constants';
 import {
   AccountNotFoundError,
   InvalidKeyError,
@@ -113,9 +113,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Inactivity timeout (60 minutes)
-  const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
-
   useEffect(() => {
     loadStoredUsers();
     checkCurrentUser();
@@ -135,6 +132,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
+  // Load user relationships whenever a real user logs in (replaces the setTimeout hacks in login/loginStoredUser)
+  useEffect(() => {
+    if (username && username !== 'SPECTATOR') {
+      refreshUserRelationships();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username]);
+
   const resetInactivityTimer = () => {
     // Only reset timer if user is authenticated and has a session
     if (!session || !isAuthenticated) return;
@@ -142,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearInactivityTimer();
     inactivityTimer.current = setTimeout(() => {
       handleInactivityLogout();
-    }, INACTIVITY_TIMEOUT);
+    }, INACTIVITY_TIMEOUT_MS);
   };
 
   const clearInactivityTimer = () => {
@@ -340,8 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(true);
       setSession({ username: normalizedUsername, decryptedKey: postingKey, loginTime: Date.now() });
       
-      // Load user relationships after successful login
-      setTimeout(() => refreshUserRelationships(), 100);
+      // User relationships are loaded by the useEffect that watches username
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||
@@ -400,8 +404,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession({ username: selectedUsername, decryptedKey, loginTime: Date.now() });
       await updateStoredUsers({ username: selectedUsername, method: encryptedKey.method, createdAt: encryptedKey.createdAt });
       
-      // Load user relationships after successful login
-      setTimeout(() => refreshUserRelationships(), 100);
+      // User relationships are loaded by the useEffect that watches username
     } catch (error) {
       if (
         error instanceof InvalidKeyFormatError ||

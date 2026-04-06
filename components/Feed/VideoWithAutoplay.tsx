@@ -30,20 +30,25 @@ export function VideoWithAutoplay({
   });
 
   useEffect(() => {
-    if (shouldPlay) {
-      player.play();
-    } else {
-      player.pause();
+    try {
+      if (shouldPlay) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    } catch {
+      // Native player may already be released (e.g. during tab switch / unmount)
     }
   }, [shouldPlay, player]);
 
   // Track when video actually starts rendering frames
+  // Depends only on player — not isPlaying, to avoid accumulating duplicate subscriptions
   useEffect(() => {
     const sub = player.addListener('playingChange', (e: { isPlaying: boolean }) => {
-      if (e.isPlaying && !isPlaying) setIsPlaying(true);
+      if (e.isPlaying) setIsPlaying(true);
     });
     return () => sub?.remove();
-  }, [player, isPlaying]);
+  }, [player]);
 
   // Cleanup on unmount
   useEffect(() => {

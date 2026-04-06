@@ -145,7 +145,7 @@ export function IpfsVideoPlayer({
         javaScriptEnabled
         scrollEnabled={false}
         bounces={false}
-        originWhitelist={['*']}
+        originWhitelist={['blob:', 'about:']}
         onMessage={(event) => {
           if (event.nativeEvent.data === 'VIDEO_ERROR') {
             setHasError(true);

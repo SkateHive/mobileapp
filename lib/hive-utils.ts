@@ -92,6 +92,15 @@ export async function vote(
  * @example
  *   await comment(privateKey, '', 'hive-173115', 'alice', 'my-post', 'Title', 'Body', {});
  */
+/** Strip any keys whose values are not JSON-safe primitives/arrays/plain-objects */
+function sanitizeMetadata(meta: object): object {
+  try {
+    return JSON.parse(JSON.stringify(meta));
+  } catch {
+    return {};
+  }
+}
+
 export async function comment(
   privateKey: string,
   parentAuthor: string,
@@ -111,7 +120,7 @@ export async function comment(
       permlink,
       title,
       body,
-      json_metadata: JSON.stringify(jsonMetadata),
+      json_metadata: JSON.stringify(sanitizeMetadata(jsonMetadata)),
     },
   ];
   return sendOperation(privateKey, [operation]);
@@ -965,17 +974,19 @@ export async function getUserRelationshipList(
   startFollowing: string = '',
   limit: number = 100
 ): Promise<string[]> {
+  // 'blacklist' was a follow_api-only feature that no longer exists on modern nodes.
+  if (type === 'blacklist') return [];
+
   try {
-    // Use the traditional follow_api for getting full lists
-    const result = await HiveClient.call('follow_api', 'get_following', [
+    // Use the same pattern as getFollowing/getMuted which call database.call('get_following')
+    const result = await HiveClient.database.call('get_following', [
       username,
       startFollowing,
       type,
       limit,
     ]);
 
-    // Extract usernames from the result
-    return result.map((item: any) => item.following);
+    return result.map((item: any) => item.following).filter(Boolean);
   } catch (error) {
     console.error('Error fetching user relationship list:', error);
     return [];

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from "react";
 import {
   View,
   Modal,
@@ -10,19 +10,19 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Text } from '~/components/ui/text';
-import { PostCard } from './PostCard';
-import { ReplyComposer } from '~/components/ui/ReplyComposer';
-import { useReplies } from '~/lib/hooks/useReplies';
-import { useAuth } from '~/lib/auth-provider';
-import { theme } from '~/lib/theme';
-import type { Discussion } from '@hiveio/dhive';
-import type { NestedDiscussion } from '~/lib/types';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { Text } from "~/components/ui/text";
+import { PostCard } from "./PostCard";
+import { ReplyComposer } from "~/components/ui/ReplyComposer";
+import { useReplies } from "~/lib/hooks/useReplies";
+import { useAuth } from "~/lib/auth-provider";
+import { theme } from "~/lib/theme";
+import type { Discussion } from "@hiveio/dhive";
+import type { NestedDiscussion } from "~/lib/types";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface FullConversationDrawerProps {
   visible: boolean;
@@ -33,13 +33,20 @@ interface FullConversationDrawerProps {
   partial?: boolean; // when true, drawer occupies 80% height anchored to the bottom
 }
 
-export function FullConversationDrawer({ visible, onClose, author, permlink, discussion, partial }: FullConversationDrawerProps) {
+export function FullConversationDrawer({
+  visible,
+  onClose,
+  author,
+  permlink,
+  discussion,
+  partial,
+}: FullConversationDrawerProps) {
   const { username } = useAuth();
   const insets = useSafeAreaInsets();
   const { comments, isLoading, error } = useReplies(
     author,
     permlink,
-    visible // Only fetch when visible
+    visible, // Only fetch when visible
   );
 
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -80,26 +87,24 @@ export function FullConversationDrawer({ visible, onClose, author, permlink, dis
   };
 
   // Recursive function to render all nested replies as PostCards with only 1 level of indentation
-  const renderNestedReplies = (replies: NestedDiscussion[], depth: number = 0): React.ReactElement[] => {
+  const renderNestedReplies = (
+    replies: NestedDiscussion[],
+    depth: number = 0,
+  ): React.ReactElement[] => {
     return replies.map((reply, index) => (
       <View key={`${reply.author}/${reply.permlink}-${depth}-${index}`}>
         {/* Add indentation only for depth > 0 (replies to replies) */}
         <View style={depth > 0 ? styles.indentedReply : undefined}>
-          {/* Each reply is a full PostCard */}
-          <PostCard post={reply as unknown as Discussion} currentUsername={username} />
+          {/* Each reply is a full PostCard. PostCard now accepts NestedDiscussion as well as Discussion. */}
+          <PostCard post={reply} currentUsername={username} />
         </View>
-        
         {/* Recursively render nested replies - they'll all get the same indentation */}
         {reply.replies && reply.replies.length > 0 && (
-          <View>
-            {renderNestedReplies(reply.replies, depth + 1)}
-          </View>
+          <View>{renderNestedReplies(reply.replies, depth + 1)}</View>
         )}
-        
+
         {/* Separator between same-level replies */}
-        {index < replies.length - 1 && (
-          <View style={styles.separator} />
-        )}
+        {index < replies.length - 1 && <View style={styles.separator} />}
       </View>
     ));
   };
@@ -115,9 +120,7 @@ export function FullConversationDrawer({ visible, onClose, author, permlink, dis
     >
       <View style={styles.modalContainer}>
         {/* Backdrop */}
-        <Animated.View 
-          style={[styles.backdrop, { opacity: backdropOpacity }]}
-        >
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <Pressable style={styles.backdropPress} onPress={handleClose} />
         </Animated.View>
 
@@ -133,14 +136,18 @@ export function FullConversationDrawer({ visible, onClose, author, permlink, dis
         >
           <KeyboardAvoidingView
             style={styles.keyboardAvoidingView}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={partial ? 0 : insets.top}
           >
             {/* Header with safe area padding */}
             <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
               <View style={styles.header}>
                 <Pressable onPress={handleClose} style={styles.backButton}>
-                  <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+                  <Ionicons
+                    name="arrow-back"
+                    size={24}
+                    color={theme.colors.text}
+                  />
                 </Pressable>
                 <Text style={styles.headerTitle}>Conversation</Text>
                 <View style={styles.headerSpacer} />
@@ -148,8 +155,8 @@ export function FullConversationDrawer({ visible, onClose, author, permlink, dis
             </View>
 
             {/* Content */}
-            <ScrollView 
-              style={styles.content} 
+            <ScrollView
+              style={styles.content}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
@@ -162,39 +169,48 @@ export function FullConversationDrawer({ visible, onClose, author, permlink, dis
 
               <View style={styles.divider} />
 
-            {/* All Replies (Recursive) */}
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.green} />
-                <Text style={styles.loadingText}>Loading conversation...</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error loading conversation</Text>
-              </View>
-            ) : comments.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No comments yet</Text>
-              </View>
-            ) : (
-              <View style={styles.repliesContainer}>
-                {renderNestedReplies(comments)}
+              {/* All Replies (Recursive) */}
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={theme.colors.green} />
+                  <Text style={styles.loadingText}>
+                    Loading conversation...
+                  </Text>
+                </View>
+              ) : error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>
+                    Error loading conversation
+                  </Text>
+                </View>
+              ) : comments.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No comments yet</Text>
+                </View>
+              ) : (
+                <View style={styles.repliesContainer}>
+                  {renderNestedReplies(comments)}
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Reply Box at Bottom */}
+            {username && username !== "SPECTATOR" && (
+              <View
+                style={[
+                  styles.replySection,
+                  { paddingBottom: insets.bottom || theme.spacing.md },
+                ]}
+              >
+                <ReplyComposer
+                  parentAuthor={author}
+                  parentPermlink={permlink}
+                  onReplySuccess={() => {}}
+                  placeholder="Write your reply..."
+                  buttonLabel="POST"
+                />
               </View>
             )}
-          </ScrollView>
-
-          {/* Reply Box at Bottom */}
-          {username && username !== 'SPECTATOR' && (
-            <View style={[styles.replySection, { paddingBottom: insets.bottom || theme.spacing.md }]}>
-              <ReplyComposer
-                parentAuthor={author}
-                parentPermlink={permlink}
-                onReplySuccess={() => {}}
-                placeholder="Write your reply..."
-                buttonLabel="POST"
-              />
-            </View>
-          )}
           </KeyboardAvoidingView>
         </Animated.View>
       </View>
@@ -208,13 +224,13 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   backdropPress: {
     flex: 1,
   },
   drawer: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -227,7 +243,7 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 0.8,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -240,13 +256,13 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: theme.colors.border,
     borderRadius: 2,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: theme.spacing.sm,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: theme.spacing.md,
     paddingBottom: theme.spacing.sm,
     borderBottomWidth: 1,
@@ -258,11 +274,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: theme.fontSizes.lg,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.text,
     fontFamily: theme.fonts.bold,
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerSpacer: {
     width: 40,
@@ -289,7 +305,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   loadingContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: theme.spacing.xl,
   },
   loadingText: {
@@ -298,7 +314,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
   },
   errorContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: theme.spacing.xl,
   },
   errorText: {
@@ -306,13 +322,13 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
   },
   emptyContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: theme.spacing.xl,
   },
   emptyText: {
     color: theme.colors.muted,
     fontSize: theme.fontSizes.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
   safeArea: {
     flex: 1,

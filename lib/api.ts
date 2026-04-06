@@ -1,6 +1,26 @@
 import { API_BASE_URL } from './constants';
 import type { Post } from './types';
 
+async function fetchWithRetry(url: string, retries = 2, timeoutMs = 10_000): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastError = err;
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -13,7 +33,7 @@ interface ApiResponse<T> {
 // Paginated feed fetcher
 export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/feed?page=${page}&limit=${limit}`);
+    const response = await fetchWithRetry(`${API_BASE_URL}/feed?page=${page}&limit=${limit}`);
     const data: ApiResponse<Post[]> = await response.json();
     if (data.success && Array.isArray(data.data)) {
       // Process each post to filter duplicate votes
@@ -44,7 +64,7 @@ export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
  */
 export async function getVideoFeed(page = 1, limit = 20) {
   try {
-    const response = await fetch(`${API_BASE_URL}/videos?page=${page}&limit=${limit}`);
+    const response = await fetchWithRetry(`${API_BASE_URL}/videos?page=${page}&limit=${limit}`);
     // Guard against non-JSON responses (404 HTML page if endpoint not deployed yet)
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
@@ -67,7 +87,7 @@ export async function getVideoFeed(page = 1, limit = 20) {
  */
 export async function getBalance(username: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/balance/${username}`);
+    const response = await fetchWithRetry(`${API_BASE_URL}/balance/${username}`);
     const data = await response.json();
     return data.success ? data.data : null;
   } catch (error) {
@@ -81,7 +101,7 @@ export async function getBalance(username: string) {
  */
 export async function getRewards(username: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/balance/${username}/rewards`);
+    const response = await fetchWithRetry(`${API_BASE_URL}/balance/${username}/rewards`);
     const data = await response.json();
     return data.success ? data.data : null;
   } catch (error) {

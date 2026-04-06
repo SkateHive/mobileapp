@@ -71,8 +71,8 @@ export function useVoteValue(username: string | null): VoteValueHookReturn {
           setRewardFund(fund);
           setFeedHistory(history);
         }
-      } catch {
-        // Silently fail - vote calculation will return 0
+      } catch (err) {
+        console.warn('[useVoteValue] Failed to fetch blockchain data for vote calc:', err);
       }
     };
 
@@ -119,6 +119,7 @@ export function useVoteValue(username: string | null): VoteValueHookReturn {
       
       return Math.max(0, estimate);
     } catch (err) {
+      console.warn('[useVoteValue] estimateVoteValue failed:', err);
       return 0;
     }
   }, [username, hivePower, rewardFund, feedHistory]);

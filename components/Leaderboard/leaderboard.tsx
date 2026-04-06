@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Crown } from "lucide-react-native";
 import { useLeaderboard } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { HIVE_AVATAR_URL } from "~/lib/constants";
 
 interface LeaderboardProps {
   currentUsername: string | null;
@@ -169,7 +170,7 @@ const LeaderboardItem = ({
       <View style={styles.avatarContainer}>
         <Image
           source={{
-            uri: `https://images.hive.blog/u/${skater.hive_author}/avatar/small`,
+            uri: `${HIVE_AVATAR_URL}/${skater.hive_author}/avatar/small`,
           }}
           style={styles.avatar}
         />

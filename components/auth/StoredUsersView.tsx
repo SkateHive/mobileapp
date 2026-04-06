@@ -4,6 +4,7 @@ import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '~/lib/theme';
+import { HIVE_AVATAR_URL } from '~/lib/constants';
 import type { StoredUser } from '../../lib/types';
 
 interface StoredUsersViewProps {
@@ -34,7 +35,7 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
               >
                 <View style={styles.userInfo}>
                   <Image
-                    source={{ uri: `https://images.hive.blog/u/${user.username}/avatar` }}
+                    source={{ uri: `${HIVE_AVATAR_URL}/${user.username}/avatar` }}
                     style={styles.avatar}
                   />
                   <Text style={styles.username}>

@@ -22,6 +22,7 @@ import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { FollowersModal } from "~/components/Profile/FollowersModal";
 import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 import { theme } from "~/lib/theme";
+import { HIVE_AVATAR_URL } from "~/lib/constants";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
 import { extractMediaFromBody } from "~/lib/utils";
@@ -223,6 +224,9 @@ export default function ProfileScreen() {
   const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
   const renderGridItem = useCallback(({ item }: { item: any }) => {
+    if (!item?.body) {
+      return <View style={[styles.gridTile, { width: tileSize, height: tileSize }]} />;
+    }
     const media = extractMediaFromBody(item.body);
     const videoMedia = media.find((m: any) => m.type === 'video');
 
@@ -301,7 +305,7 @@ export default function ProfileScreen() {
     }
 
     const profileImage = hiveAccount?.metadata?.profile?.profile_image;
-    const hiveAvatarUrl = `https://images.hive.blog/u/${profileUsername}/avatar/small`;
+    const hiveAvatarUrl = `${HIVE_AVATAR_URL}/${profileUsername}/avatar/small`;
 
     if (profileImage) {
       return (
