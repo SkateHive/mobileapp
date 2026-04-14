@@ -5,7 +5,6 @@ import {
   TextInput, 
   FlatList, 
   Pressable, 
-  ActivityIndicator,
   Dimensions,
   ScrollView,
   Keyboard
@@ -13,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { ThemedLoading } from "~/components/ui/ThemedLoading";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSearch, SearchType, TimeFilter } from "~/lib/hooks/useSearch";
 import { PostCard } from "~/components/Feed/PostCard";
@@ -231,7 +231,7 @@ export default function SearchScreen() {
     if (isSnapsFetchingNextPage) {
       return (
         <View style={styles.footerLoader}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <ThemedLoading size="small" />
         </View>
       );
     }
@@ -291,7 +291,7 @@ export default function SearchScreen() {
       <View style={styles.resultsContainer}>
         {isLoading && snaps.length === 0 && users.length === 0 ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <ThemedLoading size="large" />
           </View>
         ) : (
           searchType === 'users' ? (

@@ -18,10 +18,17 @@ interface NotificationProviderProps {
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const { username } = useAuth();
   const [badgeCount, setBadgeCount] = useState(0);
+  const [lastMarkedReadTimestamp, setLastMarkedReadTimestamp] = useState(0);
 
   const updateBadgeCount = useCallback(async () => {
     if (!username || username === 'SPECTATOR') {
       setBadgeCount(0);
+      return;
+    }
+
+    // Ignore API fetches for 20 seconds after marking as read to allow Hive indexers to catch up
+    // This prevents the badge from popping back up with old unread notifications before the blockchain clears them.
+    if (Date.now() - lastMarkedReadTimestamp < 20000) {
       return;
     }
 
@@ -32,20 +39,17 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       console.error('Error fetching notification badge count:', error);
       // Don't reset count on error to avoid flickering
     }
-  }, [username]);
+  }, [username, lastMarkedReadTimestamp]);
 
   const clearBadge = useCallback(() => {
     setBadgeCount(0);
   }, []);
 
   const onNotificationsMarkedAsRead = useCallback(() => {
-    // Immediately clear the badge
+    // Immediately clear the badge and block API updates for a few seconds
     setBadgeCount(0);
-    // Then refresh to make sure it's accurate
-    setTimeout(() => {
-      updateBadgeCount();
-    }, 1000); // Wait 1 second for the mark as read operation to complete on blockchain
-  }, [updateBadgeCount]);
+    setLastMarkedReadTimestamp(Date.now());
+  }, []);
 
   // Update badge count on mount and when username changes
   useEffect(() => {

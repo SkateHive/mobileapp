@@ -30,9 +30,9 @@ export function useSearch(query: string, type: SearchType = 'all', time: TimeFil
                     ( (type === 'all' || type === 'snaps') && snapsQuery.isLoading);
 
   return {
-    users: usersQuery.data?.success ? usersQuery.data.data.users : [],
+    users: (usersQuery.data?.success && usersQuery.data.data?.users) ? usersQuery.data.data.users : [],
     isUsersLoading: usersQuery.isLoading,
-    snaps: snapsQuery.data?.pages.flatMap(page => page.data?.snaps || []) || [],
+    snaps: snapsQuery.data?.pages.flatMap(page => page?.data?.snaps || []) || [],
     isSnapsLoading: snapsQuery.isLoading,
     isSnapsFetchingNextPage: snapsQuery.isFetchingNextPage,
     loadMoreSnaps: snapsQuery.fetchNextPage,

@@ -60,6 +60,50 @@ export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
   }
 }
 
+function normalizeFeedData(data: ApiResponse<any[]>): Post[] {
+  if (data.success && Array.isArray(data.data)) {
+    return data.data.map((post: any) => {
+      // Map soft post fields to standard display fields
+      if (post.is_soft_post) {
+        post.displayName = post.soft_post_display_name;
+        post.avatarUrl = post.soft_post_avatar;
+        post.author = post.soft_post_author || post.author;
+      } else {
+        post.avatarUrl = `https://images.hive.blog/u/${post.author}/avatar/small`;
+      }
+
+      // Map API 'votes' → dhive 'active_votes' for PostCard compatibility
+      if (post.votes && Array.isArray(post.votes)) {
+        const latestVotesMap = new Map();
+        post.votes.forEach((vote: any) => {
+          const existingVote = latestVotesMap.get(vote.voter);
+          if (!existingVote || new Date(vote.timestamp) > new Date(existingVote.timestamp)) {
+            latestVotesMap.set(vote.voter, vote);
+          }
+        });
+        post.active_votes = Array.from(latestVotesMap.values());
+      } else {
+        post.active_votes = [];
+      }
+
+      // Ensure children count is a number (for comment count display)
+      post.children = Number(post.children || 0);
+      
+      // Ensure json_metadata is parsed if it's a string from the API
+      if (typeof post.post_json_metadata === 'string') {
+        try {
+          post.json_metadata = post.post_json_metadata;
+        } catch (e) {}
+      } else if (post.post_json_metadata) {
+         post.json_metadata = JSON.stringify(post.post_json_metadata);
+      }
+
+      return post as Post;
+    });
+  }
+  return [];
+}
+
 /**
  * Fetches the snaps feed from the /feed endpoint (production-ready, cached, normalized)
  * Maps API field names to dhive-compatible names so PostCard can consume them.
@@ -67,48 +111,8 @@ export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
 export async function getSnapsFeed(page = 1, limit = 10): Promise<Post[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/feed?page=${page}&limit=${limit}`);
-    const data: ApiResponse<Post[]> = await response.json();
-    if (data.success && Array.isArray(data.data)) {
-      return data.data.map((post: any) => {
-        // Map soft post fields to standard display fields
-        if (post.is_soft_post) {
-          post.displayName = post.soft_post_display_name;
-          post.avatarUrl = post.soft_post_avatar;
-          post.author = post.soft_post_author || post.author;
-        } else {
-          post.avatarUrl = `https://images.hive.blog/u/${post.author}/avatar/small`;
-        }
-
-        // Map API 'votes' → dhive 'active_votes' for PostCard compatibility
-        if (post.votes && Array.isArray(post.votes)) {
-          const latestVotesMap = new Map();
-          post.votes.forEach((vote: any) => {
-            const existingVote = latestVotesMap.get(vote.voter);
-            if (!existingVote || new Date(vote.timestamp) > new Date(existingVote.timestamp)) {
-              latestVotesMap.set(vote.voter, vote);
-            }
-          });
-          post.active_votes = Array.from(latestVotesMap.values());
-        } else {
-          post.active_votes = [];
-        }
-
-        // Ensure children count is a number (for comment count display)
-        post.children = Number(post.children || 0);
-        
-        // Ensure json_metadata is parsed if it's a string from the API
-        if (typeof post.post_json_metadata === 'string') {
-          try {
-            post.json_metadata = post.post_json_metadata;
-          } catch (e) {}
-        } else if (post.post_json_metadata) {
-           post.json_metadata = JSON.stringify(post.post_json_metadata);
-        }
-
-        return post as Post;
-      });
-    }
-    return [];
+    const data = await response.json();
+    return normalizeFeedData(data);
   } catch (error) {
     console.error('Error fetching snaps feed from API:', error);
     throw error; // Throw to allow fallback in useSnaps
@@ -116,20 +120,36 @@ export async function getSnapsFeed(page = 1, limit = 10): Promise<Post[]> {
 }
 
 /**
- * Get balance
-
-
-/**
  * Fetches the Following feed
  */
-export async function getFollowing(username: string): Promise<Post[]> {
+export async function getFollowingFeedAPI(username: string, page = 1, limit = 10): Promise<Post[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/feed/${username}/following`);
-    const data: ApiResponse<Post[]> = await response.json();
-    return data.success && Array.isArray(data.data) ? data.data : [];
+    const response = await fetch(`${API_BASE_URL}/feed/${username}/following?page=${page}&limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return normalizeFeedData(data);
   } catch (error) {
-    console.error('Error fetching trending:', error);
-    return [];
+    console.warn('Error fetching following feed from API:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetches the Trending feed
+ */
+export async function getTrendingFeedAPI(page = 1, limit = 10): Promise<Post[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/feed/trending?page=${page}&limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return normalizeFeedData(data);
+  } catch (error) {
+    console.warn('Error fetching trending feed from API:', error);
+    throw error;
   }
 }
 

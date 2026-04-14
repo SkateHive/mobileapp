@@ -100,7 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [blacklistedList, setBlacklistedList] = useState<string[]>([]);
   const [blockedList, setBlockedList] = useState<string[]>([]);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { settings } = useAppSettings();
+  const { settings, setUserForSettings } = useAppSettings();
+
+  // Sync active user to AppSettings Context
+  useEffect(() => {
+    setUserForSettings(username);
+  }, [username, setUserForSettings]);
 
   // Delete a single stored user and update state
   const removeStoredUser = async (usernameToRemove: string) => {
@@ -309,29 +314,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Check if a user is already logged in (restore session)
   const checkCurrentUser = async () => {
     try {
-      // Robust check: Verify session duration from storage to avoid race conditions
-      // with AppSettingsContext loading.
-      const storedSettingsStr = await SecureStore.getItemAsync('app_settings');
-      let isAutoLock = false;
-      if (storedSettingsStr) {
-        const storedSettings = JSON.parse(storedSettingsStr);
-        if (storedSettings.sessionDuration === 0) {
-          isAutoLock = true;
-        }
-      }
-
-      if (isAutoLock) {
-        // If Auto-lock is enabled, we never restore from SecureStore
-        await SecureStore.deleteItemAsync(SESSION_KEY);
-        setUsername(null);
-        setIsAuthenticated(false);
-        setSession(null);
-        return;
-      }
-
       const storedSession = await SecureStore.getItemAsync(SESSION_KEY);
+      let isAutoLock = false;
+
       if (storedSession) {
         const parsed: Omit<AuthSession, 'decryptedKey'> & { expiryAt: number } = JSON.parse(storedSession);
+        
+        // Check user specifics settings to see if AutoLock was enabled for them
+        const userSettingsStr = await SecureStore.getItemAsync(`app_settings_${parsed.username}`);
+        if (userSettingsStr) {
+          const storedSettings = JSON.parse(userSettingsStr);
+          if (storedSettings.sessionDuration === 0) {
+            isAutoLock = true;
+          }
+        } else {
+          // fallback to global settings
+          const storedSettingsStr = await SecureStore.getItemAsync('app_settings');
+          if (storedSettingsStr) {
+            const storedSettings = JSON.parse(storedSettingsStr);
+            if (storedSettings.sessionDuration === 0) {
+              isAutoLock = true;
+            }
+          }
+        }
+
+        if (isAutoLock) {
+          await SecureStore.deleteItemAsync(SESSION_KEY);
+          setUsername(null);
+          setIsAuthenticated(false);
+          setSession(null);
+          return;
+        }
         
         // Check if session has expired
         if (parsed.expiryAt > Date.now()) {
