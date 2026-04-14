@@ -74,6 +74,10 @@ export function ConversationDrawer({
     }
   }, [isVisible, initialAuthor, initialPermlink, post]);
 
+  useEffect(() => {
+    setPost(initialPost);
+  }, [initialAuthor, initialPermlink, initialPost]);
+
   const [optimisticReplies, setOptimisticReplies] = useState<Discussion[]>([]);
 
   useEffect(() => {
