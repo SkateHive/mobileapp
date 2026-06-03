@@ -11,6 +11,8 @@ module.exports = function (api) {
         safe: false,
         allowUndefined: true,
       }],
+      // Powers reanimated v4 (used by @gorhom/bottom-sheet). MUST be the last plugin.
+      'react-native-worklets/plugin',
     ],
   };
 };

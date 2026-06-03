@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../ui/text";
 import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
@@ -123,29 +124,48 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     router.push("/(tabs)/notifications");
   }, [router]);
 
+  const handleMapPress = React.useCallback(() => {
+    router.push("/(tabs)/map");
+  }, [router]);
+
   const ListHeaderComponent = React.useCallback(
     () => (
       <View style={styles.header}>
         <Text style={styles.headerText}>Feed</Text>
-        <Pressable
-          onPress={handleNotificationsPress}
-          style={styles.notificationButton}
-          accessibilityRole="button"
-          accessibilityLabel={
-            badgeCount > 0
-              ? `Notifications, ${badgeCount} unread`
-              : "Notifications"
-          }
-        >
-          <BadgedIcon
-            name="notifications-outline"
-            color={theme.colors.text}
-            badgeCount={badgeCount}
-          />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={handleMapPress}
+            style={styles.headerButton}
+            accessibilityRole="button"
+            accessibilityLabel="Skate spot map"
+            hitSlop={8}
+          >
+            <Ionicons
+              name="map-outline"
+              size={24}
+              color={theme.colors.text}
+            />
+          </Pressable>
+          <Pressable
+            onPress={handleNotificationsPress}
+            style={styles.headerButton}
+            accessibilityRole="button"
+            accessibilityLabel={
+              badgeCount > 0
+                ? `Notifications, ${badgeCount} unread`
+                : "Notifications"
+            }
+          >
+            <BadgedIcon
+              name="notifications-outline"
+              color={theme.colors.text}
+              badgeCount={badgeCount}
+            />
+          </Pressable>
+        </View>
       </View>
     ),
-    [handleNotificationsPress, badgeCount],
+    [handleMapPress, handleNotificationsPress, badgeCount],
   );
 
   const ListFooterComponent = isLoading ? (
@@ -228,7 +248,12 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontFamily: theme.fonts.bold,
   },
-  notificationButton: {
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+  },
+  headerButton: {
     padding: theme.spacing.xs,
   },
   separator: {

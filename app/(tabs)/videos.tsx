@@ -177,6 +177,7 @@ function VideoItem({
 
 export default function VideosScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const router = useRouter();
   const { session, username } = useAuth();
   const { showToast } = useToast();
   const { data: videos = [], isLoading } = useVideoFeed();
@@ -278,6 +279,20 @@ export default function VideosScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Feed shortcut — top-right corner */}
+      <Pressable
+        style={styles.feedButton}
+        onPress={() => {
+          Haptics.selectionAsync();
+          router.push("/(tabs)/feed");
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Open feed"
+        hitSlop={8}
+      >
+        <Ionicons name="reader-outline" size={24} color="#fff" />
+      </Pressable>
+
       {videos.length > 0 ? (
         <FlatList
           data={videos}
@@ -324,6 +339,18 @@ export default function VideosScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
+  feedButton: {
+    position: "absolute",
+    top: 50,
+    right: 16,
+    zIndex: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   // videoContainer dimensions are set inline via useWindowDimensions in VideoItem
   videoContainer: { backgroundColor: "#000" },

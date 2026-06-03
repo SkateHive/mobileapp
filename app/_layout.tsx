@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, FiraCode_400Regular, FiraCode_700Bold } from '@expo-google-fonts/fira-code';
 import * as SplashScreen from 'expo-splash-screen';
@@ -82,6 +83,7 @@ export default function RootLayout() {
   }
 
   return (
+    <GestureHandlerRootView style={styles.container}>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NavigationGuard>
@@ -116,8 +118,14 @@ export default function RootLayout() {
                             contentStyle: { backgroundColor: theme.colors.background },
                           }}
                         />
-                        <Stack.Screen 
+                        <Stack.Screen
                           name="conversation"
+                          options={{
+                            contentStyle: { backgroundColor: theme.colors.background },
+                          }}
+                        />
+                        <Stack.Screen
+                          name="spot/[author]/[permlink]"
                           options={{
                             contentStyle: { backgroundColor: theme.colors.background },
                           }}
@@ -139,5 +147,6 @@ export default function RootLayout() {
         </NavigationGuard>
       </AuthProvider>
     </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

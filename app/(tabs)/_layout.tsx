@@ -22,9 +22,9 @@ const TAB_ITEMS: TabItem[] = [
     iconFamily: "Ionicons",
   },
   {
-    name: "feed",
-    title: "Feed",
-    icon: "reader-outline",
+    name: "map",
+    title: "Map",
+    icon: "map-outline",
     iconFamily: "Ionicons",
   },
   {
@@ -150,6 +150,15 @@ export default function TabLayout() {
                 }}
               />
             ))}
+
+            {/* Hidden feed tab - accessible from the videos/home top-right button */}
+            <Tabs.Screen
+              name="feed"
+              options={{
+                href: null,
+                title: "Feed",
+              }}
+            />
 
             {/* Hidden notifications tab - accessible from header */}
             <Tabs.Screen
