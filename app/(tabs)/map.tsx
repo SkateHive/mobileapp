@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { useToast } from "~/lib/toast-provider";
@@ -47,8 +48,26 @@ type AnyFeature =
   | ClusterFeature;
 
 export default function MapScreen() {
-  const { data: spots, isLoading, isError, refetch } = useAllSpots();
+  const {
+    data: spots,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+    dataUpdatedAt,
+  } = useAllSpots();
   const { showToast } = useToast();
+
+  // Refetch when returning to the map tab, but only if the cached set is
+  // stale (>5 min) — keeps it fresh without spamming the edge cache.
+  const FIVE_MIN = 5 * 60 * 1000;
+  useFocusEffect(
+    React.useCallback(() => {
+      if (dataUpdatedAt && Date.now() - dataUpdatedAt > FIVE_MIN) {
+        refetch();
+      }
+    }, [dataUpdatedAt, refetch, FIVE_MIN]),
+  );
 
   const mapRef = React.useRef<MapView>(null);
   const sheetRef = React.useRef<BottomSheet>(null);
@@ -292,6 +311,8 @@ export default function MapScreen() {
               />
             )}
             contentContainerStyle={styles.listContent}
+            refreshing={isRefetching}
+            onRefresh={refetch}
             ItemSeparatorComponent={() => <View style={styles.sep} />}
             ListEmptyComponent={
               <View style={styles.center}>
