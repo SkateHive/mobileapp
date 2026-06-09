@@ -21,6 +21,11 @@
       "bundleIdentifier": "com.bgrana.skatehive",
       "buildNumber": "17",
       "icon": "./assets/images/icon-ios.png",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.bgrana.skatehive"
+        ]
+      },
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": []
       },
@@ -74,7 +79,8 @@
         {
           "locationWhenInUsePermission": "SkateHive uses your location to show skate spots near you on the map."
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true
