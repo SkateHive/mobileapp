@@ -71,6 +71,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@bacons/apple-targets": "^4.0.7",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "~19.1.10",
     "@types/supercluster": "^7.1.3",

@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
 import { NotificationProvider } from '~/lib/notifications-context';
+import { useSpotWidgetSync } from '~/lib/hooks/useSpotWidgetSync';
 import { theme } from '~/lib/theme';
 
 const styles = StyleSheet.create({
@@ -45,6 +46,9 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
   const isRedirectingRef = useRef(false);
+
+  // Refresh the iOS "Nearby Spots" widget on app open / foreground (no-op elsewhere).
+  useSpotWidgetSync();
 
   useEffect(() => {
     // Don't redirect while loading

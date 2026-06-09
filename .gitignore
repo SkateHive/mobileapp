@@ -18,6 +18,9 @@ web-build/
 
 # iOS
 ios/
+# ...but keep native code for local Expo modules (e.g. modules/widget-bridge/ios)
+!modules/**/ios/
+!modules/**/ios/**
 *.pbxuser
 *.mode1v3
 *.mode2v3

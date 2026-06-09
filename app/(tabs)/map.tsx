@@ -31,6 +31,8 @@ import {
   type Region,
 } from "~/lib/spotmap/geo";
 import { spotHref, type SpotmapRow } from "~/lib/spotmap/types";
+import { syncSpotWidget } from "~/lib/widgets/spotWidget";
+import { persistUserLoc } from "~/lib/hooks/useSpotWidgetSync";
 
 // A broad opening view — clustering keeps it readable until the user zooms in.
 const INITIAL_REGION: Region = {
@@ -197,7 +199,11 @@ export default function MapScreen() {
         accuracy: Location.Accuracy.Balanced,
       });
       const { latitude, longitude } = pos.coords;
-      setUserLoc({ lat: latitude, lng: longitude });
+      const loc = { lat: latitude, lng: longitude };
+      setUserLoc(loc);
+      // Remember the location and refresh the iOS Home Screen widget.
+      persistUserLoc(loc);
+      if (spots?.length) syncSpotWidget(loc, spots);
       mapRef.current?.animateToRegion(
         {
           latitude,
@@ -210,7 +216,12 @@ export default function MapScreen() {
     } catch {
       showToast("Couldn't get your location", "error");
     }
-  }, [showToast]);
+  }, [showToast, spots]);
+
+  // Keep the iOS widget in sync once we have both a location and the spot set.
+  React.useEffect(() => {
+    if (userLoc && spots?.length) syncSpotWidget(userLoc, spots);
+  }, [userLoc, spots]);
 
   React.useEffect(
     () => () => {
