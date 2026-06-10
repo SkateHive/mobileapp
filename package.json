@@ -2,6 +2,7 @@
   "name": "mycommunity-app",
   "main": "index.js",
   "version": "1.0.2",
+  "packageManager": "pnpm@9.7.1",
   "scripts": {
     "dev": "expo start -c",
     "dev:web": "expo start -c --web",
@@ -11,6 +12,7 @@
     "web": "expo start -c --web",
     "clean": "rm -rf .expo node_modules",
     "build": "expo build",
+    "prebuild:ios": "expo prebuild --clean -p ios && node scripts/sync-widget-version.js",
     "start": "expo start --dev-client",
     "logs:ios": "xcrun simctl spawn booted log stream --level error --predicate 'process == \"SkateHive\"'"
   },

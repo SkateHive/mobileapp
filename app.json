@@ -19,7 +19,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
-      "buildNumber": "17",
+      "appleTeamId": "JBJ68VAF83",
+      "buildNumber": "18",
       "icon": "./assets/images/icon-ios.png",
       "entitlements": {
         "com.apple.security.application-groups": [

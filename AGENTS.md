@@ -78,6 +78,8 @@ This file provides context for AI agents working on this codebase.
 - All colors come from `lib/theme.ts` (primary=#32CD32, bg=#000000)
 - Use `StyleSheet.create()` — no inline styles, no NativeWind in practice
 - Font: FiraCode (monospace) for all text
+- For bold text with FiraCode, set `fontFamily: theme.fonts.bold` explicitly —
+  `fontWeight: 'bold'` does not render the bold variant for custom fonts
 
 ### State Management
 - **Server state:** React Query (`@tanstack/react-query`)
@@ -115,7 +117,12 @@ QueryClientProvider
 
 3. **newArchEnabled mismatch:** `app.json` says `false`, `ios/Podfile.properties.json` says `true`. Pick one and sync.
 
-4. **Test account in auth-provider:** Hardcoded credentials for Apple App Store review — should be removed after approval.
+4. **Test account in auth-provider:** Hardcoded credentials in `lib/auth-provider.tsx`
+   let Apple reviewers log in with a simple password instead of a HIVE posting key.
+   Remove immediately after Apple approves the app:
+   - Delete the "APPLE REVIEW TEST ACCOUNT CONFIGURATION" block (`TEST_USERNAME`,
+     `TEST_POSTING_KEY`, `TEST_SIMPLE_PASSWORD` constants).
+   - Delete the "APPLE REVIEW TEST ACCOUNT LOGIC" block inside the login function.
 
 5. **HIVE RPC nodes:** Multiple fallback nodes configured in `hive-utils.ts`. If one fails, the client retries on the next. Don't hardcode a single node.
 
