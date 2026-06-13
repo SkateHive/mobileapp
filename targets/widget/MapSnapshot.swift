@@ -1,9 +1,9 @@
 import MapKit
 import UIKit
 
-/// Renders a static dark-mode map image with 🛹 pins for iOS 15–16, where
-/// WidgetKit can't host a live SwiftUI `Map`. iOS 17+ uses the live Map instead
-/// and never calls this.
+/// Renders a static dark-mode map image with spot + user-location pins. The
+/// Spot Map widget shows this image in its left panel (WidgetKit can't host a
+/// live SwiftUI `Map` inside a widget), filled and clipped by the panel.
 func renderMapSnapshot(
   center: CLLocationCoordinate2D,
   spots: [NearbySpot],
