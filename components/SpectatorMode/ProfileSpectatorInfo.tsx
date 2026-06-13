@@ -1,207 +1,119 @@
-import { FontAwesome } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { View, TouchableOpacity, Linking, StyleSheet, Image } from "react-native";
+import { View, Pressable, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Text } from "~/components/ui/text";
-import { VideoPlayer } from '~/components/Feed/VideoPlayer';
-import { IconName, SpectatorInfoBase } from "./SpectatorInfoBase";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import { useAuth } from "~/lib/auth-provider";
 import { theme } from "~/lib/theme";
 
-interface SocialLink {
-  name: string;
-  icon?: string;
-  imageUrl?: string;
-  color: string;
-  url: string;
-}
-
+/**
+ * Spectator (logged-out, read-only) profile body. Kept deliberately simple:
+ * log in, or go back to browsing the feed.
+ */
 export function ProfileSpectatorInfo() {
-  const socialLinks: SocialLink[] = [
-    { 
-      name: 'X', 
-      imageUrl: 'local://logo-white.png',
-      color: '#FFFFFF', 
-      url: 'https://x.com/skatehive' 
-    },
-    { 
-      name: 'Instagram', 
-      icon: 'instagram', 
-      color: '#E4405F', 
-      url: 'https://instagram.com/skatehive' 
-    },
-    { 
-      name: 'Discord', 
-      imageUrl: 'local://Discord-Symbol-Blurple.png',
-      color: '#5865F2', 
-      url: 'https://discord.gg/caUtgq3XPC' 
-    },
-    { 
-      name: 'GitHub', 
-      icon: 'github', 
-      color: '#FFFFFF', 
-      url: 'https://github.com/skatehive' 
+  const { logout } = useAuth();
+
+  const goToLogin = async () => {
+    Haptics.selectionAsync();
+    // Leave spectator mode so the welcome screen shows the login form instead
+    // of bouncing an "authenticated" spectator back into the tabs.
+    try {
+      await logout();
+    } catch {
+      // ignore — navigation below still lands on the login screen
     }
-  ];
-  
-  const openSocialLink = (url: string) => {
-    Linking.openURL(url).catch(err => 
-      console.error('Error opening URL:', err)
-    );
+    router.replace("/");
   };
 
-  const infoItems = [
-    {
-      icon: "videocam-outline" as IconName,
-      title: "Watch",
-      text: "Watch this. Get hyped. Understand.",
-    },
-    {
-      icon: "key-outline" as IconName,
-      title: "Invitation Only",
-      text: "You need an invite. No invite? No ride.",
-    },
-    {
-      icon: "search-outline" as IconName,
-      title: "Find Us",
-      text: "Find us. We lurk where skaters roll.",
-    },
-    {
-      icon: "logo-discord" as IconName,
-      title: "Connect",
-      text: "Instagram or Discord? If you know, you know.",
-    },
-  ];
+  const backToFeed = () => {
+    Haptics.selectionAsync();
+    router.replace("/(tabs)/videos");
+  };
 
   return (
-    <Card style={styles.card}>
-      <CardContent style={styles.cardContent}>
-        <SpectatorInfoBase
-          iconColor={theme.colors.primary}
-          title="No Pass? No Session."
-          description="You gotta earn your way in. No brands, no corporations, just raw skate energy. Ready?"
-          infoItems={infoItems}
-        />
-        
-        {/* Video Player Section */}
-        <View style={styles.videoContainer}>
-          <VideoPlayer
-            url={'https://ipfs.skatehive.app/ipfs/QmYuM1h51bddDuC44FoAQYp9FRF2CghCncULeS4T3bp727'}
-            playing={false}
-          />
-        </View>
-      </CardContent>
-        
-      <CardFooter style={styles.cardFooter}>
-        <CardTitle style={styles.cardTitle}>
-          Find Us
-        </CardTitle>
-        
-        <View style={styles.socialLinksContainer}>
-          {socialLinks.map((link) => (
-            <TouchableOpacity 
-              key={link.name} 
-              onPress={() => openSocialLink(link.url)}
-              accessibilityLabel={`${link.name} social media link`}
-              accessibilityRole="link"
-              style={styles.socialLink}
-            >
-              <View style={link.name === 'X' ? [styles.socialLinkContent, styles.xIconContent] : styles.socialLinkContent}>
-                {link.imageUrl ? (
-                  <Image 
-                    source={
-                      link.imageUrl.startsWith('local://') 
-                        ? link.imageUrl === 'local://logo-white.png'
-                          ? require('../../assets/images/logo-white.png')
-                          : require('../../assets/images/Discord-Symbol-Blurple.png')
-                        : { uri: link.imageUrl }
-                    }
-                    style={link.name === 'X' ? styles.xLogoImage : styles.socialIconImage}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <FontAwesome name={link.icon as any} size={32} color={link.color} />
-                )}
-                <Text style={link.name === 'X' ? [styles.socialLinkText, styles.xTextAlignment] : styles.socialLinkText}>{link.name}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </CardFooter>
-    </Card>
+    <View style={styles.container}>
+      <Text style={styles.title}>SPECTATOR MODE</Text>
+      <Text style={styles.subtitle}>
+        You're browsing read-only. Log in to vote, post and earn — or keep
+        cruising the feed.
+      </Text>
+
+      <Pressable
+        style={styles.primaryBtn}
+        onPress={goToLogin}
+        accessibilityRole="button"
+        accessibilityLabel="Log in"
+      >
+        <Ionicons name="log-in-outline" size={18} color={theme.colors.black} />
+        <Text style={styles.primaryText}>LOG IN</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.secondaryBtn}
+        onPress={backToFeed}
+        accessibilityRole="button"
+        accessibilityLabel="Back to feed"
+      >
+        <Ionicons name="arrow-back" size={18} color={theme.colors.primary} />
+        <Text style={styles.secondaryText}>BACK TO FEED</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    width: '100%',
-    marginTop: theme.spacing.md,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
+  container: {
+    width: "100%",
+    marginTop: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: "center",
+    gap: theme.spacing.md,
   },
-  cardContent: {
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.background,
-  },
-  videoContainer: {
-    width: '100%',
-    aspectRatio: 16/9,
-    borderRadius: theme.borderRadius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    overflow: 'hidden',
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  cardFooter: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.md,
-  },
-  cardTitle: {
-    marginBottom: theme.spacing.md,
-    fontSize: theme.fontSizes.xl,
+  title: {
     fontFamily: theme.fonts.bold,
-    color: theme.colors.text,
-    lineHeight: theme.fontSizes.xl + theme.spacing.xs,
+    fontSize: theme.fontSizes.lg,
+    color: theme.colors.primary,
+    letterSpacing: 1,
   },
-  socialLinksContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: theme.spacing.xl,
-  },
-  socialLink: {
-    // No specific styling needed for TouchableOpacity
-  },
-  socialLinkContent: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.sm,
-    minHeight: 64,
-  },
-  socialLinkText: {
-    fontSize: theme.fontSizes.sm,
-    textAlign: 'center',
-    color: theme.colors.muted,
+  subtitle: {
     fontFamily: theme.fonts.regular,
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.muted,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: theme.spacing.sm,
   },
-  socialIconImage: {
-    width: 32,
-    height: 32,
+  primaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.sm,
+    width: "100%",
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary,
   },
-  xLogoImage: {
-    width: 24,
-    height: 24,
-    marginTop: 4,
+  primaryText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.black,
+    letterSpacing: 1,
   },
-  xTextAlignment: {
-    marginTop: 0,
+  secondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.sm,
+    width: "100%",
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
   },
-  xIconContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  secondaryText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.primary,
+    letterSpacing: 1,
   },
 });

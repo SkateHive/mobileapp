@@ -15,6 +15,16 @@ export async function persistUserLoc(loc: UserLoc): Promise<void> {
   }
 }
 
+/** Last location we saved — lets the map center instantly before a fresh GPS fix. */
+export async function loadPersistedUserLoc(): Promise<UserLoc | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(LOC_KEY);
+    return raw ? (JSON.parse(raw) as UserLoc) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Keeps the iOS widget fresh: on app open and every time it returns to the
  * foreground, recomputes nearby spots from the last-known location and pushes

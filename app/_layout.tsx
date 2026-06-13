@@ -42,10 +42,11 @@ const queryClient = new QueryClient({
 
 // Navigation Guard Component
 function NavigationGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, enterSpectatorMode } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const isRedirectingRef = useRef(false);
+  const enteringSpectatorRef = useRef(false);
 
   // Refresh the iOS "Nearby Spots" widget on app open / foreground (no-op elsewhere).
   useSpotWidgetSync();
@@ -56,7 +57,22 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = segments[0] === '(tabs)';
     const inConversation = segments.some(segment => segment === 'conversation');
-    const inProtectedRoutes = inAuthGroup || inConversation;
+    // The skate-spot map is public data — when a deep link (e.g. the iOS widget)
+    // opens it logged-out, drop into read-only spectator mode instead of bouncing
+    // through the login wall. The user can log in later to interact.
+    const isPublicMap = inAuthGroup && segments[1] === 'map';
+    const inProtectedRoutes = (inAuthGroup && !isPublicMap) || inConversation;
+
+    if (!isAuthenticated && isPublicMap) {
+      if (enteringSpectatorRef.current) return;
+      enteringSpectatorRef.current = true;
+      enterSpectatorMode()
+        .catch(() => {})
+        .finally(() => {
+          enteringSpectatorRef.current = false;
+        });
+      return;
+    }
 
     if (!isAuthenticated && inProtectedRoutes) {
       if (isRedirectingRef.current) return;
@@ -65,7 +81,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     } else {
       isRedirectingRef.current = false;
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, segments, router, enterSpectatorMode]);
 
   return <>{children}</>;
 }
@@ -131,6 +147,13 @@ export default function RootLayout() {
                         <Stack.Screen
                           name="spot/[author]/[permlink]"
                           options={{
+                            contentStyle: { backgroundColor: theme.colors.background },
+                          }}
+                        />
+                        <Stack.Screen
+                          name="spot-create"
+                          options={{
+                            presentation: 'modal',
                             contentStyle: { backgroundColor: theme.colors.background },
                           }}
                         />

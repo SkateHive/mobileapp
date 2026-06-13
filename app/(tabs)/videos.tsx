@@ -9,6 +9,8 @@ import {
   Share,
   useWindowDimensions,
   ViewToken,
+  Animated,
+  type GestureResponderEvent,
 } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -89,6 +91,52 @@ function VideoItem({
     return value > 0 ? `$${value.toFixed(2)}` : "";
   };
 
+  // ── Double-tap to vote (TikTok/IG-style heart burst) ──────────────────────
+  const canVote = !!username && username !== "SPECTATOR";
+  const lastTap = useRef(0);
+  const [burst, setBurst] = useState<{ x: number; y: number; tilt: number } | null>(null);
+  const burstScale = useRef(new Animated.Value(0)).current;
+  const burstOpacity = useRef(new Animated.Value(0)).current;
+  const burstLift = useRef(new Animated.Value(0)).current;
+
+  const playBurst = useCallback((x: number, y: number) => {
+    setBurst({ x, y, tilt: Math.random() * 24 - 12 });
+    burstScale.setValue(0);
+    burstOpacity.setValue(1);
+    burstLift.setValue(0);
+    Animated.parallel([
+      Animated.spring(burstScale, { toValue: 1, friction: 4, tension: 130, useNativeDriver: true }),
+      Animated.sequence([
+        Animated.delay(420),
+        Animated.parallel([
+          Animated.timing(burstOpacity, { toValue: 0, duration: 320, useNativeDriver: true }),
+          Animated.timing(burstLift, { toValue: -70, duration: 320, useNativeDriver: true }),
+        ]),
+      ]),
+    ]).start(({ finished }) => {
+      if (finished) setBurst(null);
+    });
+  }, [burstScale, burstOpacity, burstLift]);
+
+  const handleVideoTap = useCallback((e: GestureResponderEvent) => {
+    const now = Date.now();
+    const { locationX, locationY } = e.nativeEvent;
+    if (now - lastTap.current < 280) {
+      lastTap.current = 0;
+      if (!canVote) {
+        // Not logged in — let onVote surface the login prompt, skip the burst.
+        onVote(item);
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      playBurst(locationX, locationY);
+      // IG-style: double-tap only ever likes; never removes an existing vote.
+      if (!isLiked) onVote(item);
+    } else {
+      lastTap.current = now;
+    }
+  }, [canVote, isLiked, onVote, item, playBurst]);
+
   return (
     <View style={[styles.videoContainer, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }]}>
       {/* Native video — renders underneath thumbnail */}
@@ -114,6 +162,32 @@ function VideoItem({
         <View style={styles.spinnerOverlay}>
           <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
         </View>
+      )}
+
+      {/* Double-tap-to-vote layer — sits over the video, under the action
+          buttons/overlays (which are later siblings, so they keep their taps). */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleVideoTap} />
+
+      {/* Heart burst at the tap point */}
+      {burst && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.burst,
+            {
+              left: burst.x - 60,
+              top: burst.y - 60,
+              opacity: burstOpacity,
+              transform: [
+                { translateY: burstLift },
+                { scale: burstScale },
+                { rotate: `${burst.tilt}deg` },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="heart" size={120} color={theme.colors.primary} />
+        </Animated.View>
       )}
 
       {/* Top: user info */}
@@ -355,6 +429,18 @@ const styles = StyleSheet.create({
   // videoContainer dimensions are set inline via useWindowDimensions in VideoItem
   videoContainer: { backgroundColor: "#000" },
   nativeVideo: { ...StyleSheet.absoluteFillObject },
+  burst: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 16,
+  },
   thumbnail: { ...StyleSheet.absoluteFillObject, zIndex: 2 },
   spinnerOverlay: {
     ...StyleSheet.absoluteFillObject,

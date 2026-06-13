@@ -113,6 +113,8 @@ export default function ProfileScreen() {
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
   const [visibleGridItems, setVisibleGridItems] = useState<Set<string>>(new Set());
+  // Budget for automatic page fetches that fill the grid (see auto-fill effect)
+  const autoFillPagesRef = useRef(0);
 
   // Event-driven visibility tracking for grid video tiles (no polling)
   const onViewableGridItemsChanged = useRef(
@@ -136,6 +138,7 @@ export default function ProfileScreen() {
     setEditProfileVisible(false);
     setSettingsMenuVisible(false);
     setProfileTab('grid');
+    autoFillPagesRef.current = 0;
   }, [profileUsername]);
 
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
@@ -216,9 +219,29 @@ export default function ProfileScreen() {
     [userPosts, postHasMedia]
   );
 
-  // Removed auto-load loop: it caused infinite fetching and OOM on profiles
-  // with many text-only posts (no media = no grid items = keeps fetching).
-  // Users can scroll to load more via onEndReached instead.
+  // Auto-fill the grid until it has enough items to be scrollable (~5 rows).
+  // Without this, short first pages leave the list unscrollable and onEndReached
+  // never fires again (its first call lands while isLoading is true and is
+  // swallowed by loadNextPage's guard), so the grid stays stuck until a
+  // pull-to-refresh gesture re-triggers it.
+  // Capped at MAX_AUTO_FILL_PAGES so profiles with mostly text-only posts
+  // (no media = no grid items) can't fetch forever — the unbounded version
+  // of this loop previously caused OOM and RPC hammering.
+  const MIN_GRID_ITEMS = 15;
+  const MAX_AUTO_FILL_PAGES = 4;
+  useEffect(() => {
+    if (
+      profileTab === 'grid' &&
+      !isLoadingPosts &&
+      hasMore &&
+      userPosts.length > 0 &&
+      gridPosts.length < MIN_GRID_ITEMS &&
+      autoFillPagesRef.current < MAX_AUTO_FILL_PAGES
+    ) {
+      autoFillPagesRef.current += 1;
+      loadNextPage();
+    }
+  }, [profileTab, isLoadingPosts, hasMore, gridPosts.length, userPosts.length, loadNextPage]);
 
   // Render grid item
   const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
@@ -294,13 +317,10 @@ export default function ProfileScreen() {
   const renderProfileImage = () => {
     if (profileUsername === "SPECTATOR") {
       return (
-        <View style={styles.spectatorAvatar}>
-          <Ionicons
-            name="eye-outline"
-            size={48}
-            color={theme.colors.primary}
-          />
-        </View>
+        <Image
+          source={require("../../assets/images/icon-android.png")}
+          style={styles.spectatorLogo}
+        />
       );
     }
 
@@ -500,6 +520,7 @@ export default function ProfileScreen() {
 
   // Handle refresh
   const handleRefresh = () => {
+    autoFillPagesRef.current = 0;
     refreshPosts();
   };
 
@@ -742,6 +763,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  spectatorLogo: {
+    width: 96,
+    height: 96,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
   },
   profileImage: {
     width: 96,

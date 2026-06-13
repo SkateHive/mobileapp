@@ -64,6 +64,28 @@ export async function fetchSpotById(
 }
 
 /**
+ * Targeted ingestion: ask the server to pull one freshly-posted spot from Hive
+ * into the spotmap cache so it appears on the map within seconds instead of
+ * waiting for the daily reconciliation. Best-effort — returns true if the row
+ * was upserted, false otherwise (e.g. the RPC node hasn't propagated the write
+ * yet, in which case the optimistic local pin carries the UX and the daily sync
+ * backfills it).
+ */
+export async function syncOneSpot(author: string, permlink: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${SPOTMAP_BASE}/sync-one`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ author, permlink }),
+    });
+    const data = (await res.json().catch(() => null)) as { success?: boolean } | null;
+    return res.ok && !!data?.success;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Server picks one spot at random from the 10 nearest (within 80 km of
  * lat/lng) or the 30 newest. `exclude` is a comma-joined list of seen ids.
  */

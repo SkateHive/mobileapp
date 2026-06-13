@@ -11,7 +11,10 @@ public class WidgetBridgeModule: Module {
     Name("WidgetBridge")
 
     Function("setNearbySpots") { (json: String) in
-      UserDefaults(suiteName: self.appGroupId)?.set(json, forKey: self.payloadKey)
+      let defaults = UserDefaults(suiteName: self.appGroupId)
+      defaults?.set(json, forKey: self.payloadKey)
+      // New data → reset the Nearest Spot widget's cycle back to the closest spot.
+      defaults?.set(0, forKey: "selectedSpotIndexV1")
       self.reloadWidgets()
     }
 

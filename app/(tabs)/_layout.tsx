@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
-import { StyleSheet, View, PanResponder } from "react-native";
+import { StyleSheet, View, PanResponder, Modal, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import * as Haptics from "expo-haptics";
 import { theme } from "~/lib/theme";
+import { Text } from "~/components/ui/text";
 import { ErrorBoundary } from "~/components/ui/ErrorBoundary";
 
 interface TabItem {
@@ -72,10 +74,68 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  // Drop-up anchored above the center "+" button
+  createMenuOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingBottom: 96, // clears the 60px tab bar + the button's upward float
+  },
+  createMenuCard: {
+    backgroundColor: theme.colors.secondaryCard,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    minWidth: 180,
+    overflow: "hidden",
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  createMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  createMenuText: {
+    color: theme.colors.text,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
+  },
+  createMenuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.border,
+  },
+  createMenuPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: theme.colors.secondaryCard,
+    marginTop: -1,
+  },
 });
 
 export default function TabLayout() {
   const router = useRouter();
+  const [createMenuVisible, setCreateMenuVisible] = useState(false);
+
+  const openCreateMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCreateMenuVisible(true);
+  };
+
+  const handleMenuChoice = (target: "/(tabs)/create" | "/spot-create") => {
+    setCreateMenuVisible(false);
+    router.push(target);
+  };
 
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
@@ -119,6 +179,16 @@ export default function TabLayout() {
               <Tabs.Screen
                 key={tab.name}
                 name={tab.name}
+                listeners={
+                  tab.isCenter
+                    ? {
+                        tabPress: (e) => {
+                          e.preventDefault();
+                          openCreateMenu();
+                        },
+                      }
+                    : undefined
+                }
                 options={{
                   title: tab.title,
                   tabBarIcon: ({ color, focused }) =>
@@ -170,6 +240,39 @@ export default function TabLayout() {
             />
           </Tabs>
         </View>
+
+        {/* Drop-up shown when the center "+" is tapped */}
+        <Modal
+          visible={createMenuVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCreateMenuVisible(false)}
+        >
+          <Pressable
+            style={styles.createMenuOverlay}
+            onPress={() => setCreateMenuVisible(false)}
+          >
+            <View style={styles.createMenuCard}>
+              <Pressable
+                style={styles.createMenuItem}
+                onPress={() => handleMenuChoice("/(tabs)/create")}
+              >
+                <Ionicons name="create-outline" size={22} color={theme.colors.primary} />
+                <Text style={styles.createMenuText}>Post</Text>
+              </Pressable>
+              <View style={styles.createMenuDivider} />
+              <Pressable
+                style={styles.createMenuItem}
+                onPress={() => handleMenuChoice("/spot-create")}
+              >
+                <Ionicons name="location-outline" size={22} color={theme.colors.primary} />
+                <Text style={styles.createMenuText}>Spot</Text>
+              </Pressable>
+            </View>
+            {/* Pointer triangle aimed at the center button */}
+            <View style={styles.createMenuPointer} />
+          </Pressable>
+        </Modal>
       </SafeAreaView>
     </ErrorBoundary>
   );

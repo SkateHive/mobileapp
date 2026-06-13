@@ -6,7 +6,7 @@ module.exports = {
   // Match the main app so the static-map (MKMapSnapshotter) fallback can serve
   // iOS 15–16, while iOS 17+ uses the live SwiftUI Map.
   deploymentTarget: "15.1",
-  frameworks: ["SwiftUI", "WidgetKit", "MapKit"],
+  frameworks: ["SwiftUI", "WidgetKit", "MapKit", "AppIntents"],
   // App Group is also auto-mirrored from app.json's ios.entitlements, but we
   // declare it explicitly so the target's generated.entitlements is unambiguous.
   entitlements: {

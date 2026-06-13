@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
+import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import React from "react";
@@ -65,6 +66,7 @@ export default function Index() {
     deleteStoredUser,
   } = useAuth();
   const queryClient = useQueryClient();
+  const isFocused = useIsFocused();
 
   const [deletingUser, setDeletingUser] = React.useState<string | null>(null);
   const [username, setUsername] = React.useState("");
@@ -79,10 +81,13 @@ export default function Index() {
   }, [queryClient]);
 
   React.useEffect(() => {
-    if (isAuthenticated) {
+    // Only auto-advance to the feed when the welcome screen itself is focused.
+    // Otherwise a deep link (e.g. the map widget entering read-only spectator
+    // mode) would flip `isAuthenticated` and yank the user off the map.
+    if (isAuthenticated && isFocused) {
       router.push("/(tabs)/videos");
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isFocused]);
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {

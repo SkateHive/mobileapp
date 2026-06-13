@@ -32,7 +32,7 @@ import {
 } from "~/lib/spotmap/geo";
 import { spotHref, type SpotmapRow } from "~/lib/spotmap/types";
 import { syncSpotWidget } from "~/lib/widgets/spotWidget";
-import { persistUserLoc } from "~/lib/hooks/useSpotWidgetSync";
+import { persistUserLoc, loadPersistedUserLoc } from "~/lib/hooks/useSpotWidgetSync";
 
 // A broad opening view — clustering keeps it readable until the user zooms in.
 const INITIAL_REGION: Region = {
@@ -75,6 +75,11 @@ export default function MapScreen() {
   const sheetRef = React.useRef<BottomSheet>(null);
   const listRef = React.useRef<BottomSheetFlatListMethods>(null);
   const regionDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  // Latest location we want centered; re-applied in onMapReady if the map
+  // wasn't laid out yet when we first tried to center.
+  const pendingCenterRef = React.useRef<{ lat: number; lng: number } | null>(
     null,
   );
 
@@ -129,6 +134,22 @@ export default function MapScreen() {
     if (regionDebounce.current) clearTimeout(regionDebounce.current);
     regionDebounce.current = setTimeout(() => setRegion(r), 150);
   }, []);
+
+  const centerOnLoc = React.useCallback(
+    (loc: { lat: number; lng: number }, ms: number) => {
+      pendingCenterRef.current = loc;
+      mapRef.current?.animateToRegion(
+        {
+          latitude: loc.lat,
+          longitude: loc.lng,
+          latitudeDelta: 0.4,
+          longitudeDelta: 0.4,
+        },
+        ms,
+      );
+    },
+    [],
+  );
 
   // Marker tap → highlight, surface its card, lift the sheet to mid detent.
   const handleMarkerPress = React.useCallback(
@@ -204,24 +225,50 @@ export default function MapScreen() {
       // Remember the location and refresh the iOS Home Screen widget.
       persistUserLoc(loc);
       if (spots?.length) syncSpotWidget(loc, spots);
-      mapRef.current?.animateToRegion(
-        {
-          latitude,
-          longitude,
-          latitudeDelta: 0.4,
-          longitudeDelta: 0.4,
-        },
-        500,
-      );
+      centerOnLoc(loc, 500);
     } catch {
       showToast("Couldn't get your location", "error");
     }
-  }, [showToast, spots]);
+  }, [showToast, spots, centerOnLoc]);
 
   // Keep the iOS widget in sync once we have both a location and the spot set.
   React.useEffect(() => {
     if (userLoc && spots?.length) syncSpotWidget(userLoc, spots);
   }, [userLoc, spots]);
+
+  // On first open, jump straight to the user's location: instantly from the
+  // last saved spot, then refine with a fresh GPS fix (silent if permission
+  // is denied — the manual "Near Me" button still works).
+  const didAutoLocate = React.useRef(false);
+  React.useEffect(() => {
+    if (didAutoLocate.current) return;
+    didAutoLocate.current = true;
+
+    (async () => {
+      const saved = await loadPersistedUserLoc();
+      if (saved) {
+        setUserLoc(saved);
+        centerOnLoc(saved, 0);
+      }
+
+      try {
+        let { status } = await Location.getForegroundPermissionsAsync();
+        if (status === Location.PermissionStatus.UNDETERMINED) {
+          status = (await Location.requestForegroundPermissionsAsync()).status;
+        }
+        if (status !== Location.PermissionStatus.GRANTED) return;
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLoc(loc);
+        persistUserLoc(loc);
+        centerOnLoc(loc, saved ? 500 : 0);
+      } catch {
+        // Ignore — manual "Near Me" remains available.
+      }
+    })();
+  }, [centerOnLoc]);
 
   React.useEffect(
     () => () => {
@@ -239,6 +286,9 @@ export default function MapScreen() {
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
         initialRegion={INITIAL_REGION}
+        onMapReady={() => {
+          if (pendingCenterRef.current) centerOnLoc(pendingCenterRef.current, 0);
+        }}
         onRegionChangeComplete={handleRegionChange}
         showsUserLocation={!!userLoc}
         showsMyLocationButton={false}

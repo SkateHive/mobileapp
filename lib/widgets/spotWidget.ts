@@ -12,10 +12,14 @@ export interface UserLoc {
   lng: number;
 }
 
+// Last payload signature pushed this session. Skipping identical pushes keeps the
+// widget "comfortable" — no redundant reloads, which protects the iOS refresh budget.
+let lastSignature: string | null = null;
+
 /**
  * Computes the nearest spots to `userLoc` and pushes them to the iOS widget via
- * the App Group. No-op off iOS, with no spots, or when the native module is
- * absent (Expo Go / web). Mirrors the web's `/spot/<author>/<permlink>` paths.
+ * the App Group — but only when the result actually changed. No-op off iOS, with
+ * no spots, or when the native module is absent (Expo Go / web).
  */
 export function syncSpotWidget(userLoc: UserLoc, spots: SpotmapRow[]): void {
   if (Platform.OS !== "ios" || !spots?.length) return;
@@ -24,6 +28,16 @@ export function syncSpotWidget(userLoc: UserLoc, spots: SpotmapRow[]): void {
     .map((s) => ({ s, d: distanceKm(userLoc.lat, userLoc.lng, s.lat, s.lng) }))
     .sort((a, b) => a.d - b.d)
     .slice(0, MAX_SPOTS);
+
+  // Signature = coarse location (~100m) + the ordered nearest ids. If unchanged,
+  // the widget would render identically, so don't reload it.
+  const signature = JSON.stringify([
+    userLoc.lat.toFixed(3),
+    userLoc.lng.toFixed(3),
+    nearest.map(({ s }) => s.id),
+  ]);
+  if (signature === lastSignature) return;
+  lastSignature = signature;
 
   const payload = {
     updatedAt: Date.now() / 1000,
