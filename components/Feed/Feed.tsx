@@ -14,6 +14,7 @@ import { PostCard } from "./PostCard";
 import { ActivityIndicator } from "react-native";
 import { useAuth } from "~/lib/auth-provider";
 import { useSnaps } from "~/lib/hooks/useSnaps";
+import { isHiddenByModeration } from "~/lib/moderation";
 import { theme } from "~/lib/theme";
 import {
   ViewportTrackerProvider,
@@ -87,6 +88,10 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
     if (!comments || comments.length === 0) return [];
 
     return comments.filter((post) => {
+      // Admin/community moderation hides posts for everyone — even the author's
+      // own — to match the web feed (skatehive3.0 filterAutoComments).
+      if (isHiddenByModeration(post)) return false;
+
       // Don't filter out the user's own posts
       if (post.author === username) return true;
 

@@ -6,6 +6,7 @@ import {
   getVideoFeed } from '../api';
 import { API_BASE_URL, LEADERBOARD_API_URL, HIVE_AVATAR_URL } from '../constants';
 import { extractMediaFromBody } from '../utils';
+import { filterModeratedPosts } from '../moderation';
 import type { Post } from '../types';
 
 // ============================================================================
@@ -24,7 +25,8 @@ export interface VideoPost {
   replies: number;
   thumbnailUrl?: string;
   tags: string[];
-  active_votes: { voter: string; weight: number }[];
+  // `rshares` is the signed field (negative = downvote); `weight` is unsigned.
+  active_votes: { voter: string; weight: number; rshares?: number; percent?: number }[];
 }
 
 const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
@@ -76,15 +78,17 @@ async function fetchVideoFeed(): Promise<VideoPost[]> {
   // Try the dedicated /videos endpoint first
   const result = await getVideoFeed(1, 30);
   if (result) {
-    return result.data.map((entry: any) => ({
+    const mapped = result.data.map((entry: any) => ({
       ...entry,
       username: entry.author,
     }));
+    // Hide posts moderated on the web (admin downvotes, etc.).
+    return filterModeratedPosts(mapped);
   }
 
   // Fallback: use general feed + client-side extraction
   const posts = await getFeed(1, 50);
-  return extractVideosFromFeed(posts);
+  return filterModeratedPosts(extractVideosFromFeed(posts));
 }
 
 export function useVideoFeed() {
