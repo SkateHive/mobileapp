@@ -525,6 +525,16 @@ export const PostCard = React.memo(
                     ]}
                     disabled={isVoting}
                     hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    // The count is hidden at 0, so the label carries it — an
+                    // icon-only control would otherwise announce nothing.
+                    accessibilityLabel={
+                      isLiked
+                        ? `Voted, ${voteCount} votes`
+                        : `Upvote, ${voteCount} votes`
+                    }
+                    accessibilityState={{ selected: isLiked, disabled: isVoting }}
+                    accessibilityHint="Double tap to choose a vote weight"
                   >
                     <View style={styles.iconBox}>
                       {isLiked ? (
@@ -540,7 +550,14 @@ export const PostCard = React.memo(
                     )}
                   </Pressable>
 
-                  <Text style={styles.actionSeparator} selectable={false}>
+                  {/* Purely decorative — never announce a stray "|" between
+                      the two controls. */}
+                  <Text
+                    style={styles.actionSeparator}
+                    selectable={false}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  >
                     |
                   </Text>
 
@@ -553,6 +570,9 @@ export const PostCard = React.memo(
                       { opacity: pressed ? 0.7 : 0.9 },
                     ]}
                     hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${post.children} replies`}
+                    accessibilityHint="Double tap to open the conversation"
                   >
                     <View style={styles.iconBox}>
                       <FontAwesome
@@ -567,7 +587,13 @@ export const PostCard = React.memo(
                   </Pressable>
                 </View>
 
-                <View style={styles.payoutContainer}>
+                {/* "$" and the amount are separate Texts for spacing, so group
+                    them for screen readers instead of announcing two fragments. */}
+                <View
+                  style={styles.payoutContainer}
+                  accessible
+                  accessibilityLabel={`Payout ${calculateTotalValue()} dollars`}
+                >
                   <Text style={[styles.payoutText, { color: rowColor }]}>$</Text>
                   <Text style={[styles.payoutText, { color: rowColor }]}>
                     {calculateTotalValue()}
