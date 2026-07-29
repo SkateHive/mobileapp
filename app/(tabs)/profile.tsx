@@ -181,9 +181,12 @@ export default function ProfileScreen() {
         : (post.json_metadata || {});
     } catch {}
 
-    // 1. Try json_metadata.image (most reliable, set by posting apps)
-    if (metadata?.image) {
-      const imgs = Array.isArray(metadata.image) ? metadata.image : [metadata.image];
+    // 1. Try json_metadata.images/.image (most reliable, set by posting apps).
+    // Both spellings exist in the wild: the web app and this app write `images`,
+    // older/other Hive clients write `image`.
+    const rawImages = metadata?.images ?? metadata?.image;
+    if (rawImages) {
+      const imgs = Array.isArray(rawImages) ? rawImages : [rawImages];
       if (imgs[0]) return imgs[0];
     }
 

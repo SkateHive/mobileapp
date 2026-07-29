@@ -144,7 +144,11 @@ export const PostCard = React.memo(
         const raw =
           (post as any).post_json_metadata || (post as any).json_metadata;
         const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (metadata?.image?.[0]) return metadata.image[0];
+        // Both spellings exist in the wild — see getPostThumbnail in profile.tsx.
+        const imgs = metadata?.images ?? metadata?.image;
+        if (Array.isArray(imgs) ? imgs[0] : imgs) {
+          return Array.isArray(imgs) ? imgs[0] : imgs;
+        }
       } catch {}
       // Fallback: first image in the body
       const firstImage = media.find((m) => m.type === "image");

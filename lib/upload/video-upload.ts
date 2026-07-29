@@ -5,6 +5,12 @@ interface VideoUploadResult {
   gatewayUrl: string;
   requestId?: string;
   sourceApp?: string;
+  /**
+   * Poster frame the transcoder extracted (or the one we supplied). Optional:
+   * the secondary worker never produces one, and the primary only started
+   * returning it in SkateHive/video-transcoder#2.
+   */
+  thumbnailUrl?: string;
 }
 
 export interface VideoUploadOptions {
@@ -193,6 +199,7 @@ export async function uploadVideoToWorker(
           gatewayUrl: result.gatewayUrl,
           requestId: result.requestId,
           sourceApp: result.sourceApp,
+          thumbnailUrl: result.thumbnailUrl,
         };
       } catch (error) {
         errors.push(error instanceof Error ? error.message : `${service.name} failed`);
