@@ -26,7 +26,7 @@ import { castVote, canPost } from "~/lib/posting";
 import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
-import { extractMediaFromBody } from "~/lib/utils";
+import { extractMediaFromBody, metadataImageUrl } from "~/lib/utils";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 
@@ -37,17 +37,22 @@ function usePostMedia(post: any) {
   return useMemo(() => {
     const media = extractMediaFromBody(post?.body || "");
     const video = media.find((m) => m.type === "video");
-    let metaImages: string[] = [];
+    let metaImage: string | null = null;
     try {
       const meta =
         typeof post?.json_metadata === "string"
           ? JSON.parse(post.json_metadata)
           : post?.json_metadata || {};
-      if (Array.isArray(meta?.image)) metaImages = meta.image;
+      metaImage = metadataImageUrl(meta);
     } catch {}
     const bodyImages = media.filter((m) => m.type === "image").map((m) => m.url);
-    const images = Array.from(new Set([...bodyImages, ...metaImages]));
-    return { videoUrl: video?.url, images, poster: images[0] };
+    const images = Array.from(
+      new Set([...bodyImages, ...(metaImage ? [metaImage] : [])])
+    );
+    // A video snap has no markdown image, so its poster only ever comes from
+    // json_metadata — the frame the transcoder extracted.
+    const poster = video ? metaImage ?? bodyImages[0] : images[0];
+    return { videoUrl: video?.url, images, poster };
   }, [post?.body, post?.json_metadata]);
 }
 
@@ -131,6 +136,14 @@ function ImmersivePostItem({
     else player.pause();
   }, [isActive, videoUrl, player]);
 
+  // The poster stays up until the surface actually renders a frame — the gateway
+  // needs a second or two, and hiding it earlier just shows black. Playback state
+  // isn't the same signal: the player reports playing before anything is drawn.
+  const [hasFrames, setHasFrames] = useState(false);
+  useEffect(() => {
+    setHasFrames(false);
+  }, [videoUrl]);
+
   // Collapse the caption when this post scrolls away, so it re-opens clean and
   // its expanded scroll-view never fights the vertical paging gesture.
   useEffect(() => {
@@ -196,8 +209,14 @@ function ImmersivePostItem({
       {videoUrl ? (
         <>
           {/* Profile viewer respects aspect ratio (contain), unlike the cropped home feed. */}
-          <VideoView style={StyleSheet.absoluteFill} player={player} contentFit="contain" nativeControls={false} />
-          {poster && !isActive && (
+          <VideoView
+            style={StyleSheet.absoluteFill}
+            player={player}
+            contentFit="contain"
+            nativeControls={false}
+            onFirstFrameRender={() => setHasFrames(true)}
+          />
+          {poster && (!isActive || !hasFrames) && (
             <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="contain" transition={0} />
           )}
           <Pressable style={StyleSheet.absoluteFill} onPress={handleTap} />
