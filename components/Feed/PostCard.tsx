@@ -36,7 +36,7 @@ import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
 import type { Media, NestedDiscussion } from "../../lib/types";
 import type { Discussion } from "@hiveio/dhive";
-import { extractMediaFromBody, removeVideoLinksFromBody } from "~/lib/utils";
+import { extractMediaFromBody, removeVideoLinksFromBody, metadataImageUrl } from "~/lib/utils";
 
 // Action-bar icons (upvote / comment) — sized to match the web footer.
 const ACTION_ICON_SIZE = 18;
@@ -148,7 +148,8 @@ export const PostCard = React.memo(
         const raw =
           (post as any).post_json_metadata || (post as any).json_metadata;
         const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (metadata?.image?.[0]) return metadata.image[0];
+        const metaImage = metadataImageUrl(metadata);
+        if (metaImage) return metaImage;
       } catch {}
       // Fallback: first image in the body
       const firstImage = media.find((m) => m.type === "image");

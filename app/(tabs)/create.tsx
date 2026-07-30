@@ -293,8 +293,8 @@ export default function CreatePost() {
 
     try {
       let postBody = content;
+      // Uploaded photos plus any video poster frame — becomes json_metadata.images.
       let imageUrls: string[] = [];
-      let videoUrls: string[] = [];
       // Public media URLs for an optional Instagram cross-post.
       let igImageUrl: string | undefined;
       let igVideoUrl: string | undefined;
@@ -364,8 +364,15 @@ export default function CreatePost() {
               }
             );
 
-            videoUrls.push(videoResult.cid);
             igVideoUrl = videoResult.gatewayUrl;
+
+            // The transcoder extracts a poster frame; carrying it in
+            // json_metadata.images is what lets clients show something before
+            // the ~5MB clip downloads. Absent until the worker is redeployed
+            // (and the secondary never produces one), so treat it as optional.
+            if (videoResult.thumbnailUrl) {
+              imageUrls.push(videoResult.thumbnailUrl);
+            }
 
             // Add video iframe to post body
             const videoIframe = createVideoIframe(
@@ -419,7 +426,11 @@ export default function CreatePost() {
         parentPermlink,
         body: postBody,
         permlink,
-        jsonMetadata: { app: "mycommunity-mobile", tags },
+        jsonMetadata: {
+          app: "mycommunity-mobile",
+          tags,
+          ...(imageUrls.length > 0 && { images: imageUrls }),
+        },
       });
 
       // Success

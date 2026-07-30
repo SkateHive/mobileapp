@@ -27,7 +27,7 @@ import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
-import { extractMediaFromBody, filterDeletedPosts } from "~/lib/utils";
+import { extractMediaFromBody, filterDeletedPosts, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 import { ImmersivePostViewer } from "~/components/Feed/ImmersivePostViewer";
@@ -181,11 +181,9 @@ export default function ProfileScreen() {
         : (post.json_metadata || {});
     } catch {}
 
-    // 1. Try json_metadata.image (most reliable, set by posting apps)
-    if (metadata?.image) {
-      const imgs = Array.isArray(metadata.image) ? metadata.image : [metadata.image];
-      if (imgs[0]) return imgs[0];
-    }
+    // 1. Try json_metadata images (most reliable, set by posting apps)
+    const metaImage = metadataImageUrl(metadata);
+    if (metaImage) return metaImage;
 
     // 2. Try 3speak / video app thumbnail from json_metadata.video
     if (metadata?.video?.info?.snaphash) {
