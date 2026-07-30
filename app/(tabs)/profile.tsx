@@ -134,11 +134,12 @@ export default function ProfileScreen() {
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
   // Index (within gridPosts) of the post open in the immersive viewer; null = closed.
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // Only needed by poster-less video tiles, which fall back to a real player —
+  // gating on visibility keeps offscreen clips from decoding.
   const [visibleGridItems, setVisibleGridItems] = useState<Set<string>>(new Set());
   // Budget for automatic page fetches that fill the grid (see auto-fill effect)
   const autoFillPagesRef = useRef(0);
 
-  // Event-driven visibility tracking for grid video tiles (no polling)
   const onViewableGridItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const permlinks = viewableItems
@@ -279,11 +280,13 @@ export default function ProfileScreen() {
     // Tapping any tile opens the immersive post viewer at that post.
     const openViewer = () => setViewerIndex(index);
 
-    // Video posts autoplay muted when in view (event-driven via onViewableItemsChanged)
+    // Video posts show their poster frame; the clip plays in the viewer. Clips
+    // without a poster keep the old inline player (see GridVideoTile).
     if (videoMedia) {
       return (
         <GridVideoTile
           videoUrl={videoMedia.url}
+          thumbnailUrl={getPostThumbnail(item)}
           size={tileSize}
           isVisible={visibleGridItems.has(item.permlink)}
           onPress={openViewer}
