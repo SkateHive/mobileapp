@@ -35,7 +35,7 @@ import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
 import type { Media, NestedDiscussion } from "../../lib/types";
 import type { Discussion } from "@hiveio/dhive";
-import { extractMediaFromBody, removeVideoLinksFromBody } from "~/lib/utils";
+import { extractMediaFromBody, removeVideoLinksFromBody, metadataImageUrl } from "~/lib/utils";
 
 // Helper function to format time in abbreviated format (2 characters max)
 const formatTimeAbbreviated = (date: Date): string => {
@@ -144,11 +144,8 @@ export const PostCard = React.memo(
         const raw =
           (post as any).post_json_metadata || (post as any).json_metadata;
         const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-        // Both spellings exist in the wild — see getPostThumbnail in profile.tsx.
-        const imgs = metadata?.images ?? metadata?.image;
-        if (Array.isArray(imgs) ? imgs[0] : imgs) {
-          return Array.isArray(imgs) ? imgs[0] : imgs;
-        }
+        const metaImage = metadataImageUrl(metadata);
+        if (metaImage) return metaImage;
       } catch {}
       // Fallback: first image in the body
       const firstImage = media.find((m) => m.type === "image");

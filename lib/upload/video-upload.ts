@@ -199,7 +199,12 @@ export async function uploadVideoToWorker(
           gatewayUrl: result.gatewayUrl,
           requestId: result.requestId,
           sourceApp: result.sourceApp,
-          thumbnailUrl: result.thumbnailUrl,
+          // Narrow at the boundary: the response is untyped, and this value ends
+          // up in json_metadata on the blockchain.
+          thumbnailUrl:
+            typeof result.thumbnailUrl === 'string' && result.thumbnailUrl
+              ? result.thumbnailUrl
+              : undefined,
         };
       } catch (error) {
         errors.push(error instanceof Error ? error.message : `${service.name} failed`);

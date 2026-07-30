@@ -143,3 +143,20 @@ export function removeVideoLinksFromBody(body: string): string {
   
   return cleanedBody;
 }
+/**
+ * First usable image URL recorded in a post's `json_metadata`.
+ *
+ * Both spellings are in the wild — this app and the web write `images`, other
+ * Hive clients write `image` — and either may be an array or a bare string. An
+ * empty `images` must not mask a usable `image`, which is why this isn't a plain
+ * `??`: the web writes `images: []` on video snaps.
+ */
+export function metadataImageUrl(metadata: any): string | null {
+  for (const raw of [metadata?.images, metadata?.image]) {
+    const first = Array.isArray(raw)
+      ? raw.find((url) => typeof url === 'string' && url.length > 0)
+      : raw;
+    if (typeof first === 'string' && first.length > 0) return first;
+  }
+  return null;
+}
