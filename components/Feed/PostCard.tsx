@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect, useMemo } from "react";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { useSoftPostOverlay } from "~/lib/userbase/soft-post-context";
 import { FontAwesome } from "@expo/vector-icons";
+import { ArrowUp, Check } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import {
   Pressable,
@@ -36,6 +37,9 @@ import { theme } from "~/lib/theme";
 import type { Media, NestedDiscussion } from "../../lib/types";
 import type { Discussion } from "@hiveio/dhive";
 import { extractMediaFromBody, removeVideoLinksFromBody } from "~/lib/utils";
+
+// Action-bar icons (upvote / comment) — sized to match the web footer.
+const ACTION_ICON_SIZE = 18;
 
 // Helper function to format time in abbreviated format (2 characters max)
 const formatTimeAbbreviated = (date: Date): string => {
@@ -266,8 +270,12 @@ export const PostCard = React.memo(
     };
 
     const calculateTotalValue = () => {
-      return payoutValue.toFixed(3);
+      return payoutValue.toFixed(2);
     };
+
+    // The whole action row (icons, counters and payout) shifts to the accent
+    // colour once the viewer has voted — the row reads as one unit.
+    const rowColor = isLiked ? theme.colors.primary : theme.colors.text;
 
     const handleProfilePress = () => {
       router.push({
@@ -506,74 +514,90 @@ export const PostCard = React.memo(
             ) : (
               /* Normal bottom bar mode */
               <>
-                <Text
-                  style={[
-                    styles.payoutText,
-                    {
-                      color:
-                        parseFloat(calculateTotalValue()) > 0
-                          ? theme.colors.green
-                          : theme.colors.gray,
-                    },
-                  ]}
-                >
-                  ${calculateTotalValue()}
-                </Text>
-
                 <View style={styles.actionsContainer}>
-                  {/* Replies section - clickable to open conversation */}
-                  <Pressable
-                    onPress={handleConversationPress}
-                    style={styles.actionItem}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                  >
-                    <FontAwesome
-                      name="comment-o"
-                      size={22}
-                      color={theme.colors.gray}
-                    />
-                    <Text style={styles.actionText}>{post.children}</Text>
-                  </Pressable>
-
                   {/* Voting section */}
                   <Pressable
                     onPress={() => setShowSlider(true)}
-                    style={[
+                    style={({ pressed }) => [
                       styles.actionItem,
-                      isVoting && styles.disabledButton,
+                      styles.voteItem,
+                      { opacity: isVoting ? 0.5 : pressed ? 0.7 : 0.9 },
                     ]}
                     disabled={isVoting}
                     hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    // The count is hidden at 0, so the label carries it — an
+                    // icon-only control would otherwise announce nothing.
+                    accessibilityLabel={
+                      isLiked
+                        ? `Voted, ${voteCount} votes`
+                        : `Upvote, ${voteCount} votes`
+                    }
+                    accessibilityState={{ selected: isLiked, disabled: isVoting }}
+                    accessibilityHint="Double tap to choose a vote weight"
                   >
-                    {isVoting ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={isLiked ? theme.colors.green : theme.colors.gray}
-                      />
-                    ) : (
-                      <>
-                        <Text
-                          style={[
-                            styles.voteCount,
-                            {
-                              color: isLiked
-                                ? theme.colors.green
-                                : theme.colors.gray,
-                            },
-                          ]}
-                        >
-                          {voteCount}
-                        </Text>
-                        <FontAwesome
-                          name="arrow-up"
-                          size={22}
-                          color={
-                            isLiked ? theme.colors.green : theme.colors.gray
-                          }
-                        />
-                      </>
+                    <View style={styles.iconBox}>
+                      {isLiked ? (
+                        <Check size={ACTION_ICON_SIZE} color={rowColor} />
+                      ) : (
+                        <ArrowUp size={ACTION_ICON_SIZE} color={rowColor} />
+                      )}
+                    </View>
+                    {voteCount > 0 && (
+                      <Text style={[styles.actionText, { color: rowColor }]}>
+                        {voteCount}
+                      </Text>
                     )}
                   </Pressable>
+
+                  {/* Purely decorative — never announce a stray "|" between
+                      the two controls. */}
+                  <Text
+                    style={styles.actionSeparator}
+                    selectable={false}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  >
+                    |
+                  </Text>
+
+                  {/* Replies section - clickable to open conversation */}
+                  <Pressable
+                    onPress={handleConversationPress}
+                    style={({ pressed }) => [
+                      styles.actionItem,
+                      styles.commentItem,
+                      { opacity: pressed ? 0.7 : 0.9 },
+                    ]}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${post.children} replies`}
+                    accessibilityHint="Double tap to open the conversation"
+                  >
+                    <View style={styles.iconBox}>
+                      <FontAwesome
+                        name="comment-o"
+                        size={ACTION_ICON_SIZE}
+                        color={rowColor}
+                      />
+                    </View>
+                    <Text style={[styles.actionText, { color: rowColor }]}>
+                      {post.children}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* "$" and the amount are separate Texts for spacing, so group
+                    them for screen readers instead of announcing two fragments. */}
+                <View
+                  style={styles.payoutContainer}
+                  accessible
+                  accessibilityLabel={`Payout ${calculateTotalValue()} dollars`}
+                >
+                  <Text style={[styles.payoutText, { color: rowColor }]}>$</Text>
+                  <Text style={[styles.payoutText, { color: rowColor }]}>
+                    {calculateTotalValue()}
+                  </Text>
                 </View>
               </>
             )}
@@ -806,30 +830,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.colors.lightGray,
+  },
+  payoutContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xxs,
   },
   payoutText: {
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.sm,
     fontFamily: theme.fonts.regular,
   },
   actionsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing.sm,
   },
   actionItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: "rgba(50, 205, 50, 0.06)",
+    paddingVertical: theme.spacing.xs,
+  },
+  voteItem: {
+    gap: theme.spacing.xs,
+  },
+  commentItem: {
+    gap: 6,
+  },
+  // Fixed box so the counter doesn't shift when the icon swaps (↑ ↔ ✓).
+  iconBox: {
+    width: ACTION_ICON_SIZE,
+    height: ACTION_ICON_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionSeparator: {
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.regular,
+    color: theme.colors.gray,
   },
   actionText: {
-    fontSize: theme.fontSizes.md,
-    color: theme.colors.gray,
+    fontSize: theme.fontSizes.sm,
+    fontFamily: theme.fonts.regular,
   },
   voteButton: {
     flexDirection: "row",
@@ -838,10 +879,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xs,
     paddingVertical: theme.spacing.xxs,
     borderRadius: theme.borderRadius.xs,
-  },
-  voteCount: {
-    fontSize: theme.fontSizes.md, // Force consistent font size
-    fontFamily: theme.fonts.regular,
   },
   disabledButton: {
     opacity: 0.7,
