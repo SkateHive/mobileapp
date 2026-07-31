@@ -81,6 +81,8 @@ function handleAuth(session: AuthSession): { headers: Record<string, string>; si
 export interface CrossPostArgs {
   permlink: string;
   body: string;
+  /** Author-edited Instagram caption. When absent the server builds one from the body. */
+  caption?: string;
   tags?: string[];
   imageUrl?: string;
   videoUrl?: string;
@@ -97,6 +99,7 @@ export async function crossPostToInstagram(
     hive_author: session.username,
     hive_permlink: args.permlink,
     body: args.body,
+    ...(args.caption ? { caption: args.caption } : {}),
     tags: args.tags ?? [],
     image_url: args.imageUrl,
     video_url: args.videoUrl,
