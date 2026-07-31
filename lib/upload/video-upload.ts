@@ -152,6 +152,10 @@ export async function uploadVideoToWorker(
       }
 
       let pollInterval: ReturnType<typeof setInterval> | null = null;
+      // clearInterval stops future ticks but can't cancel a poll already in
+      // flight. Without this guard a late response lands after the caller has
+      // reset its UI and re-writes a stale stage — leaving "Done!" on screen.
+      let settled = false;
       if (options.onProgress) {
         options.onProgress(5, 'receiving');
         pollInterval = setInterval(async () => {
@@ -159,7 +163,7 @@ export async function uploadVideoToWorker(
             const resp = await fetch(`${baseUrl}/progress/${correlationId}`, {
               headers: { 'Accept': 'text/event-stream' },
             });
-            if (!resp.ok) return;
+            if (!resp.ok || settled) return;
             const text = await resp.text();
             const lines = text.split('\n').filter(l => l.startsWith('data:'));
             if (lines.length > 0) {
@@ -209,6 +213,7 @@ export async function uploadVideoToWorker(
       } catch (error) {
         errors.push(error instanceof Error ? error.message : `${service.name} failed`);
       } finally {
+        settled = true;
         if (pollInterval) clearInterval(pollInterval);
       }
     }
