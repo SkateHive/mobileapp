@@ -92,6 +92,14 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
         if (status === "readyToPlay") {
           sub?.remove();
           extract();
+        } else if (status === "error") {
+          // Unreadable file: stop showing a spinner that will never resolve. The
+          // post still goes through, with the transcoder picking the frame.
+          sub?.remove();
+          if (!cancelled) {
+            setIsWorking(false);
+            onSelect(null);
+          }
         }
       });
       return () => {
