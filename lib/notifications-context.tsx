@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchNewNotifications } from './hive-utils';
 import { useAuth } from './auth-provider';
 
@@ -18,8 +18,14 @@ interface NotificationProviderProps {
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const { username, session } = useAuth();
   const [badgeCount, setBadgeCount] = useState(0);
+  // Bumped whenever the count is set locally, so a fetch that was already in
+  // flight can't land afterwards with the pre-clear result. Same guard as
+  // useHiveAccount's requestIdRef.
+  const requestIdRef = useRef(0);
 
   const updateBadgeCount = useCallback(async () => {
+    const currentRequestId = ++requestIdRef.current;
+
     // Email (userbase) accounts may have no on-chain Hive account yet → skip.
     if (!username || username === 'SPECTATOR' || session?.kind === 'userbase') {
       setBadgeCount(0);
@@ -28,6 +34,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
     try {
       const newNotifications = await fetchNewNotifications(username);
+      if (currentRequestId !== requestIdRef.current) return;
       setBadgeCount(newNotifications.length);
     } catch (error) {
       console.error('Error fetching notification badge count:', error);
@@ -36,6 +43,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   }, [username, session?.kind]);
 
   const clearBadge = useCallback(() => {
+    requestIdRef.current += 1;
     setBadgeCount(0);
   }, []);
 
@@ -44,6 +52,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   // count straight back. Clear locally and let the periodic refresh below
   // reconcile once the chain has caught up.
   const onNotificationsMarkedAsRead = useCallback(() => {
+    requestIdRef.current += 1;
     setBadgeCount(0);
   }, []);
 
