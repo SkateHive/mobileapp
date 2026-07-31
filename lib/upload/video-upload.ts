@@ -169,7 +169,9 @@ export async function uploadVideoToWorker(
             if (lines.length > 0) {
               const lastLine = lines[lines.length - 1];
               const data = JSON.parse(lastLine.replace('data: ', ''));
-              if (data.progress !== undefined) {
+              // Re-checked here and not only above: reading the body is a second
+              // await, and the upload can settle while it's pending.
+              if (!settled && data.progress !== undefined) {
                 options.onProgress?.(data.progress, data.stage || 'processing');
               }
             }
