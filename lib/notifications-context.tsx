@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { fetchNewNotifications } from './hive-utils';
 import { useAuth } from './auth-provider';
 
@@ -18,7 +18,6 @@ interface NotificationProviderProps {
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const { username, session } = useAuth();
   const [badgeCount, setBadgeCount] = useState(0);
-  const markedAsReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateBadgeCount = useCallback(async () => {
     // Email (userbase) accounts may have no on-chain Hive account yet → skip.
@@ -40,19 +39,13 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     setBadgeCount(0);
   }, []);
 
+  // Marking as read broadcasts a transaction, and Hive only produces a block every
+  // ~3s — so re-querying right after would read the pre-mark state and put the
+  // count straight back. Clear locally and let the periodic refresh below
+  // reconcile once the chain has caught up.
   const onNotificationsMarkedAsRead = useCallback(() => {
-    // Immediately clear the badge
     setBadgeCount(0);
-    // Clear any pending timer before setting a new one
-    if (markedAsReadTimerRef.current) {
-      clearTimeout(markedAsReadTimerRef.current);
-    }
-    // Then refresh to make sure it's accurate
-    markedAsReadTimerRef.current = setTimeout(() => {
-      markedAsReadTimerRef.current = null;
-      updateBadgeCount();
-    }, 1000); // Wait 1 second for the mark as read operation to complete on blockchain
-  }, [updateBadgeCount]);
+  }, []);
 
   // Update badge count on mount and when username changes
   useEffect(() => {
@@ -69,15 +62,6 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
     return () => clearInterval(interval);
   }, [updateBadgeCount, username]);
-
-  // Cleanup pending timers on unmount
-  useEffect(() => {
-    return () => {
-      if (markedAsReadTimerRef.current) {
-        clearTimeout(markedAsReadTimerRef.current);
-      }
-    };
-  }, []);
 
   const value = useMemo(() => ({
     badgeCount,
