@@ -1,6 +1,6 @@
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Image,
   Keyboard,
@@ -45,9 +45,11 @@ import {
   setIgHandle,
   getHivePower,
   eligibleForCrosspost,
+  hasEligibleHiveAccount,
   MIN_HP_TO_CROSSPOST,
 } from "~/lib/instagram";
 import { InstagramHandleModal } from "~/components/Instagram/InstagramHandleModal";
+import { VideoCoverPicker } from "~/components/create/VideoCoverPicker";
 import { WEB_BASE_URL } from "~/lib/constants";
 
 export default function CreatePost() {
@@ -66,6 +68,13 @@ export default function CreatePost() {
   const [uploadProgress, setUploadProgress] = useState<string>("");
   const [videoProgress, setVideoProgress] = useState<number>(0);
   const [videoStage, setVideoStage] = useState<string>("");
+  // Local file of the frame the author picked as the video's cover.
+  const [coverUri, setCoverUri] = useState<string | null>(null);
+  // Instagram caption, editable and separate from the Hive body. Only offered to
+  // accounts that will actually cross-post, so the field never lies about where
+  // the text ends up.
+  const [igCaption, setIgCaption] = useState("");
+  const [igCanCrossPost, setIgCanCrossPost] = useState(false);
 
   // Instagram first-time handle prompt (eligible classic-key accounts only)
   const [igModalVisible, setIgModalVisible] = useState(false);
@@ -113,6 +122,7 @@ export default function CreatePost() {
     tags: string[];
     imageUrl?: string;
     videoUrl?: string;
+    caption?: string;
   }) => {
     try {
       if (!session || !eligibleForCrosspost(session)) return; // classic-key only
@@ -141,6 +151,7 @@ export default function CreatePost() {
         tags: args.tags,
         imageUrl: args.imageUrl,
         videoUrl: args.videoUrl,
+        caption: args.caption,
         permalinkUrl: `${WEB_BASE_URL}/post/${args.author}/${args.permlink}`,
       })
         .then(() => showToast("Shared to Instagram", "success"))
@@ -170,6 +181,7 @@ export default function CreatePost() {
         const asset = result.assets[0];
         setMedia(asset.uri);
         setMediaType(asset.type === "video" ? "video" : "image");
+        setCoverUri(null);
 
         // Get the actual MIME type from the asset
         if (asset.mimeType) {
@@ -218,6 +230,7 @@ export default function CreatePost() {
     try {
       setMedia(mediaAsset.uri);
       setMediaType(mediaAsset.mediaType === "video" ? "video" : "image");
+      setCoverUri(null);
 
       // Get the actual MIME type based on the asset type
       const fileExtension = mediaAsset.uri.split(".").pop()?.toLowerCase();
@@ -259,7 +272,29 @@ export default function CreatePost() {
     setMediaMimeType(null);
     setIsVideoPlaying(false);
     setHasVideoInteraction(false);
+    setCoverUri(null);
   };
+
+  // Resolve cross-post eligibility as soon as there's media, so the caption field
+  // only appears for accounts whose text will actually reach Instagram. The server
+  // re-checks authoritatively; this only drives the UI.
+  useEffect(() => {
+    let cancelled = false;
+    if (!media || !session || !eligibleForCrosspost(session)) {
+      setIgCanCrossPost(false);
+      return;
+    }
+    hasEligibleHiveAccount(session)
+      .then((ok) => {
+        if (!cancelled) setIgCanCrossPost(ok);
+      })
+      .catch(() => {
+        if (!cancelled) setIgCanCrossPost(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [media, session]);
 
   const handleVideoPress = () => {
     if (!hasVideoInteraction) {
@@ -342,12 +377,39 @@ export default function CreatePost() {
           setVideoStage('receiving');
 
           try {
+            // Upload the author's chosen frame first: the worker prefers a
+            // supplied cover over extracting its own, so the choice sticks and
+            // the server skips an ffmpeg pass. Best-effort — if it fails we fall
+            // back to the frame the worker picks.
+            let coverUrl: string | undefined;
+            if (coverUri) {
+              setUploadProgress("Uploading cover...");
+              try {
+                const cover = isUserbaseSession(session)
+                  ? await uploadImageViaUserbase(
+                      coverUri,
+                      "cover.jpg",
+                      "image/jpeg",
+                      session.userbaseToken!
+                    )
+                  : await uploadImageToHive(coverUri, "cover.jpg", "image/jpeg", {
+                      username,
+                      privateKey: session.decryptedKey,
+                    });
+                coverUrl = cover.url;
+              } catch (coverError) {
+                console.warn("Cover upload failed, using the worker's frame:", coverError);
+              }
+              setUploadProgress("Uploading video...");
+            }
+
             const videoResult = await uploadVideoToWorker(
               media,
               fileName,
               mediaMimeType,
               {
                 creator: username,
+                thumbnailUrl: coverUrl,
                 onProgress: (progress, stage) => {
                   setVideoProgress(progress);
                   setVideoStage(stage);
@@ -366,12 +428,13 @@ export default function CreatePost() {
 
             igVideoUrl = videoResult.gatewayUrl;
 
-            // The transcoder extracts a poster frame; carrying it in
-            // json_metadata.images is what lets clients show something before
-            // the ~5MB clip downloads. Absent until the worker is redeployed
-            // (and the secondary never produces one), so treat it as optional.
-            if (videoResult.thumbnailUrl) {
-              imageUrls.push(videoResult.thumbnailUrl);
+            // The poster is what the profile grid renders before the ~5MB clip
+            // downloads, and what Instagram uses as the Reel cover. The author's
+            // frame wins; the worker's own extraction is the fallback.
+            const poster = coverUrl ?? videoResult.thumbnailUrl;
+            if (poster) {
+              imageUrls.push(poster);
+              igImageUrl = poster;
             }
 
             // Add video iframe to post body
@@ -447,11 +510,14 @@ export default function CreatePost() {
         tags,
         imageUrl: igImageUrl,
         videoUrl: igVideoUrl,
+        caption: igCaption.trim() || undefined,
       });
 
       // Clear form
       setContent("");
       setMedia(null);
+      setCoverUri(null);
+      setIgCaption("");
       setMediaType(null);
       setMediaMimeType(null);
 
@@ -542,14 +608,6 @@ export default function CreatePost() {
                 )}
               </Pressable>
 
-              <Button
-                onPress={handlePost}
-                disabled={(!content.trim() && !media) || isUploading}
-              >
-                <Text style={styles.shareButtonText}>
-                  {isUploading ? "Publishing..." : "Share"}
-                </Text>
-              </Button>
             </View>
 
             {/* Media Preview */}
@@ -585,8 +643,43 @@ export default function CreatePost() {
                     <Ionicons name="close" size={20} color="white" />
                   </Pressable>
                 </View>
+
+                {mediaType === "video" && (
+                  <VideoCoverPicker
+                    videoUri={media}
+                    onSelect={setCoverUri}
+                    disabled={isUploading}
+                  />
+                )}
+
+                {igCanCrossPost && (
+                  <View style={styles.captionBlock}>
+                    <Text style={styles.captionLabel}>INSTAGRAM CAPTION</Text>
+                    <TextInput
+                      style={styles.captionInput}
+                      value={igCaption}
+                      onChangeText={setIgCaption}
+                      placeholder={content.trim() || "Same as your post"}
+                      placeholderTextColor={theme.colors.muted}
+                      multiline
+                      maxLength={2200}
+                      editable={!isUploading}
+                    />
+                  </View>
+                )}
               </View>
             )}
+
+            {/* Publishing last, after the cover and caption the author may still
+                be adjusting. */}
+            <Button
+              onPress={handlePost}
+              disabled={(!content.trim() && !media) || isUploading}
+            >
+              <Text style={styles.shareButtonText}>
+                {isUploading ? "Publishing..." : "Share"}
+              </Text>
+            </Button>
 
             {/* Error Message */}
             {errorMessage && (
@@ -639,7 +732,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: theme.fontSizes.lg,
     fontFamily: theme.fonts.default,
-    minHeight: 150,
+    // Snaps are short, and the cover strip plus caption now share the screen —
+    // the box grows with the text anyway.
+    minHeight: 96,
     textAlignVertical: "top",
   },
   progressCard: {
@@ -703,6 +798,25 @@ const styles = StyleSheet.create({
   shareButtonText: {
     fontFamily: theme.fonts.bold,
     color: theme.colors.black,
+  },
+  captionBlock: {
+    marginTop: theme.spacing.md,
+  },
+  captionLabel: {
+    fontSize: theme.fontSizes.xs,
+    fontFamily: theme.fonts.bold,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.xxs,
+  },
+  captionInput: {
+    minHeight: 64,
+    color: theme.colors.text,
+    fontFamily: theme.fonts.regular,
+    fontSize: theme.fontSizes.sm,
+    backgroundColor: theme.colors.secondaryCard,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    textAlignVertical: 'top',
   },
   mediaPreviewContainer: {
     marginHorizontal: theme.spacing.md,
