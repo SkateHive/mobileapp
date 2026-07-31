@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchNewNotifications } from './hive-utils';
 import { useAuth } from './auth-provider';
 
@@ -18,9 +18,16 @@ interface NotificationProviderProps {
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const { username, session } = useAuth();
   const [badgeCount, setBadgeCount] = useState(0);
-  const markedAsReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bumped whenever the count is set locally, so a fetch that was already in
+  // flight can't land afterwards with the pre-clear result. Same guard as
+  // useHiveAccount's requestIdRef.
+  const requestIdRef = useRef(0);
+  // Changing this restarts the periodic refresh below.
+  const [refreshCycle, setRefreshCycle] = useState(0);
 
   const updateBadgeCount = useCallback(async () => {
+    const currentRequestId = ++requestIdRef.current;
+
     // Email (userbase) accounts may have no on-chain Hive account yet → skip.
     if (!username || username === 'SPECTATOR' || session?.kind === 'userbase') {
       setBadgeCount(0);
@@ -29,6 +36,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
     try {
       const newNotifications = await fetchNewNotifications(username);
+      if (currentRequestId !== requestIdRef.current) return;
       setBadgeCount(newNotifications.length);
     } catch (error) {
       console.error('Error fetching notification badge count:', error);
@@ -37,22 +45,23 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   }, [username, session?.kind]);
 
   const clearBadge = useCallback(() => {
+    requestIdRef.current += 1;
     setBadgeCount(0);
   }, []);
 
+  // Marking as read broadcasts a transaction, and Hive only produces a block every
+  // ~3s — so re-querying right after would read the pre-mark state and put the
+  // count straight back. Clear locally and let the periodic refresh below
+  // reconcile once the chain has caught up.
   const onNotificationsMarkedAsRead = useCallback(() => {
-    // Immediately clear the badge
+    requestIdRef.current += 1;
     setBadgeCount(0);
-    // Clear any pending timer before setting a new one
-    if (markedAsReadTimerRef.current) {
-      clearTimeout(markedAsReadTimerRef.current);
-    }
-    // Then refresh to make sure it's accurate
-    markedAsReadTimerRef.current = setTimeout(() => {
-      markedAsReadTimerRef.current = null;
-      updateBadgeCount();
-    }, 1000); // Wait 1 second for the mark as read operation to complete on blockchain
-  }, [updateBadgeCount]);
+    // Restart the refresh cycle too. The generation guard only discards requests
+    // that were already in flight; a periodic refresh firing in the seconds right
+    // after would be a new request, and would read the chain before the block
+    // carrying the read is produced. Restarting puts the next one two minutes out.
+    setRefreshCycle((c) => c + 1);
+  }, []);
 
   // Update badge count on mount and when username changes
   useEffect(() => {
@@ -68,16 +77,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }, 120000); // 2 minutes
 
     return () => clearInterval(interval);
-  }, [updateBadgeCount, username]);
-
-  // Cleanup pending timers on unmount
-  useEffect(() => {
-    return () => {
-      if (markedAsReadTimerRef.current) {
-        clearTimeout(markedAsReadTimerRef.current);
-      }
-    };
-  }, []);
+  }, [updateBadgeCount, username, refreshCycle]);
 
   const value = useMemo(() => ({
     badgeCount,
