@@ -22,6 +22,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   // flight can't land afterwards with the pre-clear result. Same guard as
   // useHiveAccount's requestIdRef.
   const requestIdRef = useRef(0);
+  // Changing this restarts the periodic refresh below.
+  const [refreshCycle, setRefreshCycle] = useState(0);
 
   const updateBadgeCount = useCallback(async () => {
     const currentRequestId = ++requestIdRef.current;
@@ -54,6 +56,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const onNotificationsMarkedAsRead = useCallback(() => {
     requestIdRef.current += 1;
     setBadgeCount(0);
+    // Restart the refresh cycle too. The generation guard only discards requests
+    // that were already in flight; a periodic refresh firing in the seconds right
+    // after would be a new request, and would read the chain before the block
+    // carrying the read is produced. Restarting puts the next one two minutes out.
+    setRefreshCycle((c) => c + 1);
   }, []);
 
   // Update badge count on mount and when username changes
@@ -70,7 +77,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }, 120000); // 2 minutes
 
     return () => clearInterval(interval);
-  }, [updateBadgeCount, username]);
+  }, [updateBadgeCount, username, refreshCycle]);
 
   const value = useMemo(() => ({
     badgeCount,
