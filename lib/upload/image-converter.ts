@@ -1,9 +1,24 @@
+import { Image } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
+
+/** Longest side an uploaded image is scaled down to. */
+const MAX_UPLOAD_DIMENSION = 1600;
 
 export interface ConvertedImage {
   uri: string;
   width: number;
   height: number;
+}
+
+/** Dimensions without decoding the whole file. Null when they can't be read. */
+function getImageSize(uri: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      () => resolve(null)
+    );
+  });
 }
 
 /**
@@ -40,12 +55,29 @@ export async function convertToJPEG(
   quality: number = 0.8
 ): Promise<ConvertedImage> {
   try {
-    // Convert to JPEG using ImageManipulator
-    // ImageManipulator will handle reading the file internally
+    // Scale the longest side down before uploading. A phone camera produces
+    // ~3000x4000, while nothing here renders above ~1080px and a profile grid
+    // tile is ~390px — those pixels are uploaded, stored and downloaded only to
+    // be discarded at draw time. A smaller body is also far less exposed to
+    // whatever truncated two spot photos mid-upload (#39).
+    const size = await getImageSize(uri);
+    const longestSide = size ? Math.max(size.width, size.height) : 0;
+    const actions: ImageManipulator.Action[] =
+      size && longestSide > MAX_UPLOAD_DIMENSION
+        ? [
+            {
+              resize:
+                size.width >= size.height
+                  ? { width: MAX_UPLOAD_DIMENSION }
+                  : { height: MAX_UPLOAD_DIMENSION },
+            },
+          ]
+        : []; // already small enough — never upscale
+
     // Even for non-HEIC images, this ensures consistent JPEG output
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [], // No transformations, just format conversion
+      actions,
       {
         compress: quality,
         format: ImageManipulator.SaveFormat.JPEG,

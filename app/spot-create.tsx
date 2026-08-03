@@ -285,13 +285,19 @@ export default function SpotCreateScreen() {
       if (synced) {
         queryClient.invalidateQueries({ queryKey: ["spotmap", "all"] });
       }
+      // The post is on-chain either way; the map is a separate service that has
+      // to be told. Saying "added" when it wasn't told is how two spots sat
+      // invisible for weeks with their authors believing otherwise (#39).
+      const doneMessage = synced
+        ? "Spot added!"
+        : "Spot published — it can take a day to show on the map";
 
       // Keep the widget fresh with the new spot included.
       persistUserLoc({ lat: coords.lat, lng: coords.lng });
       const spots = queryClient.getQueryData<SpotmapRow[]>(["spotmap", "all"]) ?? [optimistic];
       syncSpotWidget({ lat: coords.lat, lng: coords.lng }, spots);
 
-      showToast("Spot added!", "success");
+      showToast(doneMessage, synced ? "success" : "info");
       router.replace("/(tabs)/map");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to add spot.";
