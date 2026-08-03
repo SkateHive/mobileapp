@@ -23,6 +23,7 @@ import { useSoftPostOverlay } from "~/lib/userbase/soft-post-context";
 import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
@@ -175,34 +176,16 @@ function VideoItem({
         </View>
       ) : null}
 
-      {/* Left: action buttons */}
-      <View style={styles.leftActions}>
-        <Pressable style={styles.actionButton} onPress={() => onVote(item)} disabled={isVoting}>
-          {isVoting ? (
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-          ) : (
-            <Ionicons
-              name={isLiked ? "heart" : "heart-outline"}
-              size={28}
-              color={isLiked ? theme.colors.primary : "#fff"}
-            />
-          )}
-          {voteCount > 0 && (
-            <Text style={[styles.actionText, isLiked && { color: theme.colors.primary }]}>
-              {voteCount}
-            </Text>
-          )}
-        </Pressable>
-
-        <Pressable style={styles.actionButton} onPress={() => onComment(item)}>
-          <Ionicons name="chatbubble-outline" size={26} color="#fff" />
-          {item.replies > 0 && <Text style={styles.actionText}>{item.replies}</Text>}
-        </Pressable>
-
-        <Pressable style={styles.actionButton} onPress={() => onShare(item)}>
-          <Ionicons name="share-outline" size={26} color="#fff" />
-        </Pressable>
-      </View>
+      <VideoActionRail
+        isLiked={isLiked}
+        voteCount={voteCount}
+        isVoting={isVoting}
+        commentCount={item.replies ?? 0}
+        onVote={() => onVote(item)}
+        onComment={() => onComment(item)}
+        onShare={() => onShare(item)}
+        bottom={200}
+      />
     </View>
   );
 }
@@ -456,24 +439,6 @@ const styles = StyleSheet.create({
   tagsText: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 12,
-    textShadowColor: "rgba(0,0,0,0.8)",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  leftActions: {
-    position: "absolute",
-    left: 16,
-    bottom: 200,
-    alignItems: "center",
-    gap: 20,
-    zIndex: 10,
-  },
-  actionButton: { alignItems: "center", justifyContent: "center" },
-  actionText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 2,
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
