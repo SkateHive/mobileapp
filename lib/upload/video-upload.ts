@@ -6,9 +6,9 @@ interface VideoUploadResult {
   requestId?: string;
   sourceApp?: string;
   /**
-   * Poster frame the transcoder extracted (or the one we supplied). Optional:
-   * the secondary worker never produces one, and the primary only started
-   * returning it in SkateHive/video-transcoder#2.
+   * Poster frame the transcoder extracted (or the one we supplied). Optional
+   * because it only exists from SkateHive/video-transcoder#2 onwards — both
+   * workers run that code now, so either can return it.
    */
   thumbnailUrl?: string;
 }
