@@ -116,6 +116,10 @@ export function ActionSheet({
                   <Pressable
                     style={styles.row}
                     onPress={() => {
+                      // Rows stay pressable through the exit animation; a second
+                      // tap would replace the queued action and run something the
+                      // user didn't choose last.
+                      if (pendingAction.current) return;
                       Haptics.selectionAsync();
                       pendingAction.current = item.onPress;
                       onClose();
