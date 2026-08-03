@@ -1,221 +1,103 @@
-# MyCommunity App 🚀
+<p align="center">
+  <img src="docs/banner.png" alt="SkateHive" width="100%">
+</p>
 
-A powerful React Native mobile application that empowers communities through the HIVE blockchain. MyCommunity App combines social networking features with decentralized rewards, secure authentication, and a modern user interface to create a seamless community experience.
+# SkateHive Mobile
 
-## 📱 Overview
+The SkateHive mobile app — a skateboarding community running on the [HIVE](https://hive.io) blockchain. Skaters post clips and photos, vote on each other's tricks, map spots, and earn crypto rewards for it.
 
-MyCommunity App is built using the latest React Native and Expo technologies, offering a cross-platform solution with native performance. The application connects to the HIVE blockchain, allowing users to interact with decentralized content, manage their HIVE wallets, and participate in community governance.
+Built with React Native and Expo. Posts, votes and payouts live on-chain; media lives on IPFS.
 
-## 🌟 Key Features
+## What's in it
 
-### Content Creation & Sharing
+**Feed** — short posts ("snaps") with photo and video, voting with an adjustable weight, threaded replies, and live payout values.
 
-- 📝 Long-form articles with Markdown support
-- 📱 Short posts for quick updates
-- 🖼️ Rich media support (images & videos)
-- 🎬 IPFS video integration
-- 📊 Post analytics and earnings tracking
+**Videos** — a full-screen vertical feed. Double-tap to vote.
 
-### Secure Wallet Integration
+**Profiles** — a media grid backed by poster frames, opening into a full-screen viewer.
 
-- 🔒 Encrypted credential storage
-- 💰 HIVE wallet integration
-- 🎁 Easy community rewards distribution
-- 📈 Real-time payout tracking
-- 🔐 Secure voting mechanism
+**Spot map** — skate spots on a map, plus a camera flow for adding new ones from where you're standing.
 
-### Community Features
+**iOS home screen widgets** — nearest spot, a spot map, top spots, and a shortcut straight into the camera. Built with WidgetKit; iOS only.
 
-- 👥 Community building tools
-- 🏷️ Custom tags and categories
-- 💬 Interactive discussions
-- ⭐ Reputation system
-- 📊 Community analytics
+**Instagram cross-post** — eligible accounts can mirror a snap to Instagram, choosing the cover frame and editing the caption before it goes out.
 
-### UI/UX
+**Two ways to sign in** — a HIVE posting key, encrypted on-device and unlocked with Face ID or a PIN, or an email account with server-side custody for people who don't have a HIVE account yet.
 
-- 🌓 Dark/Light theme toggle
-- 📱 Native mobile experience
-- ⚡ Fast and responsive interface
-- 🎨 Modern design language
+## Stack
 
-## 🛠️ Project Structure
+| | |
+|---|---|
+| Runtime | Expo 54, React Native 0.81, New Architecture enabled |
+| Routing | Expo Router (file-based) |
+| Server state | TanStack Query |
+| Blockchain | `@hiveio/dhive` against several HIVE RPC nodes with failover |
+| Video | `expo-video`, transcoded through SkateHive's own worker and pinned to IPFS |
+| Storage | `expo-secure-store` for keys, App Group `UserDefaults` for the widget |
 
-The project follows a clean, modular architecture:
+Dark theme only. FiraCode throughout. Styling is plain `StyleSheet`, with every colour and spacing value coming from `lib/theme.ts`.
 
-```
-mycommunity-app/
-├── app/                 # Expo Router screens and navigation
-│   ├── (tabs)/          # Main tab screens
-│   ├── (onboarding)/    # Onboarding flows
-│   └── _layout.tsx      # Root navigation layout
-├── assets/              # Static assets (images, videos)
-├── components/          # Reusable UI components
-│   ├── auth/            # Authentication components
-│   ├── Feed/            # Feed-related components
-│   ├── ui/              # Base UI components
-│   └── Leaderboard/     # Leaderboard components
-├── lib/                 # Core utilities and business logic
-│   ├── hooks/           # Custom React hooks
-│   ├── icons/           # Icon components
-│   ├── api.ts           # API integration
-│   ├── auth-provider.tsx # Authentication context
-│   ├── hive-utils.ts    # HIVE blockchain utilities
-│   └── types.ts         # TypeScript type definitions
-└── ...configuration files
-```
+## Getting started
 
-### Key Files
-
-- `app/_layout.tsx`: Root navigation and providers setup
-- `lib/auth-provider.tsx`: Authentication logic and secure storage
-- `lib/api.ts`: API integration functions
-- `components/ui/`: Reusable UI components built with NativeWind
-
-## 📋 Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18 or newer)
-- [pnpm](https://pnpm.io/) package manager
-- [Expo CLI](https://docs.expo.dev/workflow/expo-cli/) (optional, but recommended)
-- For iOS development: macOS with Xcode
-- For Android development: Android Studio and SDK
-
-## 🚀 Getting Started
-
-### Installation
-
-1. Clone the repository:
-
-```bash
-git clone https://github.com/SkateHive/mobileapp.git
-cd mobileapp
-```
-
-2. Install dependencies with pnpm:
+Requires Node 18+ and **pnpm 9** — not `corepack pnpm`, which ignores this repo's `node-linker=hoisted` setting and leaves the bundler unable to resolve `babel-preset-expo`.
 
 ```bash
 pnpm install
+cp .env.example .env
 ```
 
-3. Set up environment variables (if needed):
-
-Create a `.env` file in the project root with your configuration:
-
-```
-API_BASE_URL=your_api_url
-HIVE_NODE=your_preferred_node
-```
-
-### Running the App
-
-#### Development Mode
-
-Run the app in development mode with hot reloading:
+Most of the native surface here — the widget bridge, video, secure store — doesn't exist inside Expo Go, so day-to-day work uses a development build:
 
 ```bash
-# Start the development server with Metro bundler
-pnpm dev
+pnpm start             # expo start --dev-client, then scan the QR
+```
 
-# Run on iOS simulator
-pnpm ios
+Expo Go still works for screens that don't touch those modules: run `npx expo start` and press `s` to switch to it. The widget is invisible there, and pushing spot data to it silently does nothing.
 
-# Run on Android emulator
+```bash
+pnpm ios               # build and run on a connected device or simulator
 pnpm android
-
-# Run on web browser
-pnpm web
 ```
 
-#### Using a Physical Device
+## Releasing
 
-To run on a physical device:
+**iOS ships from a local Xcode archive, not EAS.** `ios/` is gitignored and regenerated by prebuild, so `app.json` is the only place a version number lives.
 
-1. Install the Expo Go app on your device
-2. Make sure your device is on the same network as your development machine
-3. Scan the QR code displayed in the terminal with your camera app (iOS) or Expo Go app (Android)
+1. Bump `expo.ios.buildNumber` in `app.json`.
+2. `pnpm prebuild:ios` — clean-prebuilds iOS, adds the widget target, and syncs the widget's build number to the app's. App Store Connect rejects an extension whose build number differs from the app's.
+3. Open `ios/SkateHive.xcworkspace`, set the destination to **Any iOS Device**, then **Product → Archive → Distribute App**.
 
-## 📦 Building for Production
+## Project layout
 
-This project uses [EAS Build](https://docs.expo.dev/build/introduction/) for creating production-ready builds:
-
-```bash
-# Install EAS CLI if not already installed
-npm install -g eas-cli
-
-# Log in to your Expo account
-eas login
-
-# Configure your build profiles (if needed)
-eas build:configure
-
-# Build for internal testing (preview)
-eas build --platform ios --profile preview
-eas build --platform android --profile preview
-
-# Build for production
-eas build --platform ios --profile production
-eas build --platform android --profile production
+```
+app/              Expo Router screens — (tabs)/ holds feed, videos, map,
+                  notifications and profile
+components/       UI grouped by area (Feed/, Profile/, ui/, spotmap/)
+lib/              Everything that isn't a screen: auth, HIVE operations,
+                  uploads, hooks, theme
+modules/          Local native modules — widget-bridge writes spot data into
+                  the shared App Group
+targets/widget/   The SkateSpots WidgetKit target (Swift)
+scripts/          Build helpers
 ```
 
-## 📱 HIVE Blockchain Integration
+Worth reading first: `lib/auth-provider.tsx` for sessions and key handling, `lib/hive-utils.ts` for every blockchain operation, and `lib/theme.ts` for the design system.
 
-MyCommunity App integrates with the HIVE blockchain for:
+## Contributing
 
-- User authentication using HIVE account credentials
-- Content storage and retrieval
-- Rewards distribution and tracking
-- Voting and social interactions
+**[AGENTS.md](AGENTS.md) is the guide** — architecture, conventions, security rules, and the gotchas that would otherwise cost you an afternoon. Read it before your first change. [CLAUDE.md](CLAUDE.md) covers the build and release specifics.
 
-The integration is handled through the `@hiveio/dhive` library with secure storage of user credentials using Expo SecureStore.
+Three rules that aren't negotiable:
 
-## 🔧 Troubleshooting
+- Private keys are never stored in plaintext and never logged.
+- Dark theme only.
+- Blockchain calls can fail on any node — wrap them.
 
-### Common Issues
+There is no automated test suite. Changes are verified by running the app on a device.
 
-#### Metro Bundler Issues
+## Links
 
-If you encounter issues with the Metro bundler:
-
-```bash
-# Clear Metro cache
-pnpm clean
-pnpm dev -c
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add some amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-## 🔐 Security
-
-- Encrypted local storage
-- Secure key management
-- Private key never leaves the device
-- Regular security audits
-
-## 💎 Powered by HIVE
-
-Built on the HIVE blockchain, enabling:
-
-- Decentralized content storage
-- Community rewards
-- Transparent monetization
-- Censorship resistance
-
-## 🔗 Links
-
-- [HIVE Blockchain](https://hive.io/)
-- [Expo Documentation](https://docs.expo.dev/)
-- [React Native Documentation](https://reactnative.dev/docs/getting-started)
-
----
-
-<p align="center">
-  Made with ❤️ for the HIVE community
-</p>
+- [skatehive.app](https://skatehive.app) — the web app
+- [skatehive-api](https://github.com/SkateHive/skatehive-api) — the backend
+- [video-transcoder](https://github.com/SkateHive/video-transcoder) — video processing
+- [HIVE](https://hive.io) · [Expo](https://docs.expo.dev/)
