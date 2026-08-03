@@ -51,7 +51,7 @@ export function VideoActionRail({
         <Ionicons
           name={isLiked ? "heart" : "heart-outline"}
           size={VOTE_ICON}
-          color={isLiked ? theme.colors.primary : "#fff"}
+          color={isLiked ? theme.colors.primary : theme.colors.white}
         />
       )}
       {voteCount > 0 && (
@@ -75,7 +75,7 @@ export function VideoActionRail({
           {isDownloading ? (
             <ActivityIndicator size="small" color={theme.colors.primary} />
           ) : (
-            <Ionicons name="download-outline" size={ACTION_ICON} color="#fff" />
+            <Ionicons name="download-outline" size={ACTION_ICON} color={theme.colors.white} />
           )}
         </Pressable>
       )}
@@ -104,7 +104,7 @@ export function VideoActionRail({
         accessibilityRole="button"
         accessibilityLabel={`${commentCount} replies`}
       >
-        <Ionicons name="chatbubble-outline" size={ACTION_ICON} color="#fff" />
+        <Ionicons name="chatbubble-outline" size={ACTION_ICON} color={theme.colors.white} />
         {commentCount > 0 && <Text style={styles.count}>{commentCount}</Text>}
       </Pressable>
 
@@ -114,7 +114,7 @@ export function VideoActionRail({
         accessibilityRole="button"
         accessibilityLabel="Share"
       >
-        <Ionicons name="share-outline" size={ACTION_ICON} color="#fff" />
+        <Ionicons name="share-outline" size={ACTION_ICON} color={theme.colors.white} />
       </Pressable>
     </View>
   );
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   count: {
-    color: "#fff",
+    color: theme.colors.white,
     fontSize: 12,
     fontFamily: theme.fonts.bold,
     textShadowColor: "rgba(0,0,0,0.8)",
