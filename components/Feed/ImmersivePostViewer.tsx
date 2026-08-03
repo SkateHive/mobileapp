@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   Share,
   useWindowDimensions,
   type GestureResponderEvent,
@@ -28,6 +27,7 @@ import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { extractMediaFromBody, metadataImageUrl } from "~/lib/utils";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
+import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 
 const postKey = (p: any) => `${p.author}/${p.permlink}`;
@@ -208,16 +208,19 @@ function ImmersivePostItem({
       {/* Media */}
       {videoUrl ? (
         <>
-          {/* Profile viewer respects aspect ratio (contain), unlike the cropped home feed. */}
+          {/* Fills the screen like the Videos tab — one full-screen behaviour
+              across both players (#33). Crops non-vertical clips at the edges. */}
           <VideoView
             style={StyleSheet.absoluteFill}
             player={player}
-            contentFit="contain"
+            contentFit="cover"
             nativeControls={false}
             onFirstFrameRender={() => setHasFrames(true)}
           />
+          {/* Matches the video's fit, so there's no jump from a letterboxed
+              poster to full-bleed video. */}
           {poster && (!isActive || !hasFrames) && (
-            <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="contain" transition={0} />
+            <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} />
           )}
           <Pressable style={StyleSheet.absoluteFill} onPress={handleTap} />
         </>
@@ -257,6 +260,7 @@ function ImmersivePostItem({
         <Pressable style={styles.author} onPress={() => onOpenProfile(post.author)} hitSlop={8}>
           <Image source={{ uri: avatarUrl }} style={styles.avatar} transition={0} />
           <Text style={styles.username}>@{post.author}</Text>
+          {payout ? <Text style={styles.balance}> +{payout}</Text> : null}
         </Pressable>
         <Pressable style={styles.closeButton} onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={26} color="#fff" />
@@ -300,52 +304,17 @@ function ImmersivePostItem({
         </Pressable>
       ) : null}
 
-      {/* Action rail */}
-      <View style={styles.actions}>
-        {isOwn ? (
-          <Pressable style={styles.actionButton} onPress={handleDownload} disabled={downloading}>
-            {downloading ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            ) : (
-              <Ionicons name="download-outline" size={30} color="#fff" />
-            )}
-            <Text style={styles.actionText}>Save</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={styles.actionButton} onPress={() => onVote(post)} disabled={isVoting}>
-            {isVoting ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            ) : (
-              <Ionicons
-                name={isLiked ? "heart" : "heart-outline"}
-                size={30}
-                color={isLiked ? theme.colors.primary : "#fff"}
-              />
-            )}
-            {voteCount > 0 && (
-              <Text style={[styles.actionText, isLiked && { color: theme.colors.primary }]}>
-                {voteCount}
-              </Text>
-            )}
-          </Pressable>
-        )}
-
-        <Pressable style={styles.actionButton} onPress={() => onComment(post)}>
-          <Ionicons name="chatbubble-outline" size={27} color="#fff" />
-          {(post.children ?? 0) > 0 && <Text style={styles.actionText}>{post.children}</Text>}
-        </Pressable>
-
-        <Pressable style={styles.actionButton} onPress={() => onShare(post)}>
-          <Ionicons name="share-outline" size={27} color="#fff" />
-        </Pressable>
-
-        {payout ? (
-          <View style={styles.actionButton}>
-            <Ionicons name="cash-outline" size={22} color={theme.colors.primary} />
-            <Text style={[styles.actionText, { color: theme.colors.primary }]}>{payout}</Text>
-          </View>
-        ) : null}
-      </View>
+      <VideoActionRail
+        isLiked={isLiked}
+        voteCount={voteCount}
+        isVoting={isVoting}
+        commentCount={post.children ?? 0}
+        onVote={isOwn ? undefined : () => onVote(post)}
+        onComment={() => onComment(post)}
+        onShare={() => onShare(post)}
+        onDownload={isOwn ? handleDownload : undefined}
+        isDownloading={downloading}
+      />
     </View>
   );
 }
@@ -555,6 +524,14 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 3,
   },
+  balance: {
+    color: theme.colors.primary,
+    fontSize: 15,
+    fontFamily: theme.fonts.bold,
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
   closeButton: {
     width: 38,
     height: 38,
@@ -597,20 +574,5 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.bold,
     fontSize: 13,
     marginTop: 4,
-  },
-  actions: {
-    position: "absolute",
-    right: theme.spacing.md,
-    bottom: 96,
-    alignItems: "center",
-    gap: 22,
-  },
-  actionButton: { alignItems: "center", gap: 3 },
-  actionText: {
-    color: "#fff",
-    fontSize: 12,
-    fontFamily: theme.fonts.bold,
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowRadius: 3,
   },
 });
