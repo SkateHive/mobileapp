@@ -753,7 +753,6 @@ export default function ProfileScreen() {
             subtitle: "Name, bio & avatar",
             variant: "primary",
             onPress: () => {
-              setSettingsMenuVisible(false);
               setEditProfileVisible(true);
             },
           },
@@ -766,7 +765,6 @@ export default function ProfileScreen() {
                   subtitle: "Cross-post your clips",
                   variant: "secondary",
                   onPress: () => {
-                    setSettingsMenuVisible(false);
                     openInstagramSettings();
                   },
                 } as ActionSheetItem,
@@ -779,7 +777,6 @@ export default function ProfileScreen() {
             subtitle: currentUsername ? `Sign out @${currentUsername}` : "Sign out",
             variant: "danger",
             onPress: () => {
-              setSettingsMenuVisible(false);
               handleLogout();
             },
           },

@@ -44,6 +44,11 @@ export function ActionSheet({
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
+  // An item's action runs only once this sheet's Modal is gone. iOS silently
+  // drops a presentation that starts while another modal is still dismissing,
+  // so opening a screen straight from onPress left nothing on screen — and the
+  // caller's visibility flag stuck at true, wedging every later modal.
+  const pendingAction = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -64,6 +69,16 @@ export function ActionSheet({
       });
     }
   }, [visible, progress]);
+
+  // Runs after React has committed the unmount, so the Modal is out of the tree
+  // before whatever the item wants to open tries to present.
+  useEffect(() => {
+    if (mounted) return;
+    const action = pendingAction.current;
+    if (!action) return;
+    pendingAction.current = null;
+    action();
+  }, [mounted]);
 
   if (!mounted) return null;
 
@@ -102,7 +117,8 @@ export function ActionSheet({
                     style={styles.row}
                     onPress={() => {
                       Haptics.selectionAsync();
-                      item.onPress();
+                      pendingAction.current = item.onPress;
+                      onClose();
                     }}
                   >
                     <View style={[styles.iconTile, styles[`tile_${variant}`]]}>
