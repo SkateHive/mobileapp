@@ -10,13 +10,35 @@ export interface ConvertedImage {
   height: number;
 }
 
-/** Dimensions without decoding the whole file. Null when they can't be read. */
+/**
+ * Image dimensions, or null when they can't be read.
+ *
+ * Bounded on purpose: Image.getSize takes success and error callbacks and there's
+ * no guarantee either fires — an unreadable URI can leave the promise pending, and
+ * this sits directly in the upload path. Falling through to null just skips the
+ * resize, which is the pre-existing behaviour.
+ */
 function getImageSize(uri: string): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: { width: number; height: number } | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const timer = setTimeout(() => finish(null), 3000);
+
     Image.getSize(
       uri,
-      (width, height) => resolve({ width, height }),
-      () => resolve(null)
+      (width, height) => {
+        clearTimeout(timer);
+        finish({ width, height });
+      },
+      () => {
+        clearTimeout(timer);
+        finish(null);
+      }
     );
   });
 }
