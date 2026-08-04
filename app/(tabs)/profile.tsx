@@ -140,8 +140,9 @@ export default function ProfileScreen() {
   // Index (within gridPosts) of the post open in the immersive viewer; null = closed.
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
-  // Shown in the header chip. Same definition the Instagram gate uses
-  // (own vesting_shares), so the two never disagree.
+  // Hive Power of the account being viewed — not necessarily the signed-in one.
+  // Uses the same definition as the Instagram gate (the account's own
+  // vesting_shares), so the two never disagree for your own profile.
   const [hivePower, setHivePower] = useState<number | null>(null);
   // Only needed by poster-less video tiles, which fall back to a real player —
   // gating on visibility keeps offscreen clips from decoding.
@@ -387,15 +388,24 @@ export default function ProfileScreen() {
   }, [hiveAccount?.vesting_shares]);
 
   // "232 HP" means nothing to someone arriving from outside Hive, so the chip
-  // explains itself on tap.
+  // explains itself on tap. The chip shows the *viewed* account's power, so the
+  // copy can't talk about "your votes" on someone else's profile.
   const explainHivePower = () => {
+    const isOwnProfile = profileUsername === currentUsername;
     Alert.alert(
       "Hive Power",
-      "Hive Power is how much influence your account has on Hive.\n\n" +
-        "The more you hold, the more your votes are worth — so the posts you " +
-        "vote on earn more, and so do you when others vote on yours.\n\n" +
-        "You build it by earning rewards on your clips and keeping them as Hive " +
-        "Power instead of cashing out.",
+      isOwnProfile
+        ? "Hive Power is how much influence your account has on Hive.\n\n" +
+            "The more you hold, the more your votes are worth — so the posts you " +
+            "vote on earn more, and so do you when others vote on yours.\n\n" +
+            "You build it by earning rewards on your clips and keeping them as " +
+            "Hive Power instead of cashing out."
+        : "Hive Power is how much influence an account has on Hive.\n\n" +
+            "The more someone holds, the more their votes are worth — so the " +
+            "posts they vote on earn more, and they earn more when others vote " +
+            "on theirs.\n\n" +
+            "It grows by earning rewards on clips and keeping them as Hive Power " +
+            "instead of cashing out.",
       [{ text: "Got it" }]
     );
   };
@@ -574,8 +584,10 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Handle, with country inline */}
-            <Text style={styles.username} numberOfLines={1}>
+            {/* Handle, with country inline. Two lines because a long handle plus
+                a long country ("UNITED KINGDOM") would otherwise clip the country
+                away entirely — the column is already narrowed by the avatar. */}
+            <Text style={styles.username} numberOfLines={2}>
               @{profileUsername}
               {!!hiveAccount?.metadata?.profile?.location && (
                 <Text style={styles.username}>
