@@ -9,6 +9,7 @@ import {
   FlatList,
   Dimensions,
   Animated,
+  Alert,
   ViewToken,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
@@ -27,6 +28,9 @@ import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
+import { convertVestToHive } from "~/lib/hive-utils";
+import { canPost } from "~/lib/posting";
+import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
@@ -109,7 +113,8 @@ function countryToFlag(location: string): string {
 }
 
 export default function ProfileScreen() {
-  const { username: currentUsername, logout, session } = useAuth();
+  const { username: currentUsername, logout, session, followingList, updateUserRelationship } =
+    useAuth();
   const { showToast } = useToast();
   const params = useLocalSearchParams();
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
@@ -134,6 +139,11 @@ export default function ProfileScreen() {
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
   // Index (within gridPosts) of the post open in the immersive viewer; null = closed.
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  // Hive Power of the account being viewed — not necessarily the signed-in one.
+  // Uses the same definition as the Instagram gate (the account's own
+  // vesting_shares), so the two never disagree for your own profile.
+  const [hivePower, setHivePower] = useState<number | null>(null);
   // Only needed by poster-less video tiles, which fall back to a real player —
   // gating on visibility keeps offscreen clips from decoding.
   const [visibleGridItems, setVisibleGridItems] = useState<Set<string>>(new Set());
@@ -361,6 +371,74 @@ export default function ProfileScreen() {
     }
   };
 
+  // Own vesting converted to HP. The account is already loaded, so this only
+  // costs the global-properties lookup convertVestToHive needs.
+  useEffect(() => {
+    const raw = hiveAccount?.vesting_shares;
+    const vests = raw ? parseFloat(String(raw).split(' ')[0]) : 0;
+    if (!vests) {
+      setHivePower(null);
+      return;
+    }
+    let cancelled = false;
+    convertVestToHive(vests)
+      .then((hp) => { if (!cancelled) setHivePower(hp); })
+      .catch(() => { if (!cancelled) setHivePower(null); });
+    return () => { cancelled = true; };
+  }, [hiveAccount?.vesting_shares]);
+
+  // "232 HP" means nothing to someone arriving from outside Hive, so the chip
+  // explains itself on tap. The chip shows the *viewed* account's power, so the
+  // copy can't talk about "your votes" on someone else's profile.
+  const explainHivePower = () => {
+    const isOwnProfile = profileUsername === currentUsername;
+    Alert.alert(
+      "Hive Power",
+      isOwnProfile
+        ? "Hive Power is how much influence your account has on Hive.\n\n" +
+            "The more you hold, the more your votes are worth — so the posts you " +
+            "vote on earn more, and so do you when others vote on yours.\n\n" +
+            "You build it by earning rewards on your clips and keeping them as " +
+            "Hive Power instead of cashing out."
+        : "Hive Power is how much influence an account has on Hive.\n\n" +
+            "The more someone holds, the more their votes are worth — so the " +
+            "posts they vote on earn more, and they earn more when others vote " +
+            "on theirs.\n\n" +
+            "It grows by earning rewards on clips and keeping them as Hive Power " +
+            "instead of cashing out.",
+      [{ text: "Got it" }]
+    );
+  };
+
+  const isFollowingProfile = followingList.includes(profileUsername ?? '');
+
+  const handleFollowToggle = async () => {
+    if (!session || !canPost(session)) {
+      router.push('/login');
+      return;
+    }
+    if (!profileUsername || isFollowLoading) return;
+
+    const wasFollowing = isFollowingProfile;
+    setIsFollowLoading(true);
+    try {
+      Haptics.impactAsync(
+        wasFollowing ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium
+      );
+      // updateUserRelationship keeps followingList in sync, which is what the
+      // button reads — calling setRelationship directly would leave the rest of
+      // the app thinking otherwise.
+      await updateUserRelationship(profileUsername, wasFollowing ? '' : 'blog');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Could not update follow',
+        'error'
+      );
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
   const handleFollowersPress = () => {
     if (profileUsername === "SPECTATOR") return;
     setModalType('followers');
@@ -479,29 +557,6 @@ export default function ProfileScreen() {
     );
   }
 
-  // Calculate stats from hiveAccount (only for non-SPECTATOR users)
-  let reputation = 25; // Default reputation
-  let hivepower = 0; // Default hive power
-  let vp = 100; // Default voting power
-  let rc = 100; // Default RC
-  
-  if (profileUsername !== "SPECTATOR" && hiveAccount) {
-    // Use reputation from profile data if available, otherwise calculate it
-    reputation = hiveAccount.profile?.reputation || 
-      (hiveAccount.reputation ? 
-        Math.log10(Math.abs(Number(hiveAccount.reputation))) * 9 + 25 : 25);
-    
-    const vestingShares = parseFloat(typeof hiveAccount.vesting_shares === 'string' ? hiveAccount.vesting_shares.split(' ')[0] : hiveAccount.vesting_shares.amount.toString());
-    const receivedVestingShares = parseFloat(typeof hiveAccount.received_vesting_shares === 'string' ? hiveAccount.received_vesting_shares.split(' ')[0] : hiveAccount.received_vesting_shares.amount.toString());
-    const delegatedVestingShares = parseFloat(typeof hiveAccount.delegated_vesting_shares === 'string' ? hiveAccount.delegated_vesting_shares.split(' ')[0] : hiveAccount.delegated_vesting_shares.amount.toString());
-    const totalVests = vestingShares + receivedVestingShares - delegatedVestingShares;
-    
-    // Simple HP calculation (actual conversion requires global props)
-    hivepower = totalVests / 1000; // Simplified calculation
-
-    vp = hiveAccount.voting_power ? hiveAccount.voting_power / 100 : 100;
-  }
-
   // Render the profile header section
   const renderProfileHeader = () => (
     <View>
@@ -529,46 +584,101 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Username */}
-            <Text style={styles.username}>@{profileUsername}</Text>
+            {/* Handle, with country inline. Two lines because a long handle plus
+                a long country ("UNITED KINGDOM") would otherwise clip the country
+                away entirely — the column is already narrowed by the avatar. */}
+            <Text style={styles.username} numberOfLines={2}>
+              @{profileUsername}
+              {!!hiveAccount?.metadata?.profile?.location && (
+                <Text style={styles.username}>
+                  {"  ·  "}
+                  {countryToFlag(hiveAccount.metadata.profile.location)}{" "}
+                  {hiveAccount.metadata.profile.location}
+                </Text>
+              )}
+            </Text>
 
-            {/* Stats + flag inline */}
-            <View style={styles.statsRow}>
-              {profileUsername === "SPECTATOR" ? (
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
-                </View>
-              ) : (
-                <Pressable style={styles.statItem} onPress={handleFollowingPress}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
-                </Pressable>
-              )}
-              {profileUsername === "SPECTATOR" ? (
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </View>
-              ) : (
-                <Pressable style={styles.statItem} onPress={handleFollowersPress}>
-                  <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </Pressable>
-              )}
-              {hiveAccount?.metadata?.profile?.location && (
-                <View style={styles.statItem}>
-                  <Text style={styles.locationFlag}>
-                    {countryToFlag(hiveAccount.metadata.profile.location)}
-                  </Text>
-                  <Text style={styles.statLabel}>
-                    {hiveAccount.metadata.profile.location}
-                  </Text>
-                </View>
-              )}
-            </View>
+            {/* Trimmed: bios routinely carry a trailing newline, which renders
+                as an empty second line. */}
+            {!!hiveAccount?.metadata?.profile?.about?.trim() && (
+              <Text style={styles.bio} numberOfLines={2}>
+                {hiveAccount.metadata.profile.about.trim()}
+              </Text>
+            )}
+
+            {/* Hive Power. Hidden until it resolves — the design asked for an
+                "earned" figure, which nothing exposes; HP is a real number the
+                app already trusts elsewhere. */}
+            {hivePower !== null && hivePower > 0 && (
+              <Pressable
+                style={styles.hpChip}
+                onPress={explainHivePower}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`${Math.round(hivePower)} Hive Power. What is this?`}
+              >
+                <Text style={styles.hpChipText}>{Math.round(hivePower)} HP</Text>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={12}
+                  color={theme.colors.muted}
+                />
+              </Pressable>
+            )}
           </View>
         </View>
+
+        {/* Stats card */}
+        <View style={styles.statsCard}>
+          <View style={styles.statCell}>
+            <Text style={styles.statValue}>{gridPosts.length}</Text>
+            <Text style={styles.statLabel}>Clips</Text>
+          </View>
+
+          <Pressable
+            style={[styles.statCell, styles.statCellMiddle]}
+            onPress={handleFollowingPress}
+            disabled={profileUsername === "SPECTATOR"}
+          >
+            <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.statCell}
+            onPress={handleFollowersPress}
+            disabled={profileUsername === "SPECTATOR"}
+          >
+            <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </Pressable>
+        </View>
+
+        {/* Follow lives only on someone else's profile — your own keeps Edit
+            Profile behind the gear, as before. */}
+        {!!params.username && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
+          <Pressable
+            onPress={handleFollowToggle}
+            disabled={isFollowLoading}
+            style={({ pressed }) => [
+              styles.followButton,
+              isFollowingProfile ? styles.followButtonActive : styles.followButtonIdle,
+              { opacity: isFollowLoading ? 0.5 : pressed ? 0.85 : 1 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={isFollowingProfile ? `Unfollow ${profileUsername}` : `Follow ${profileUsername}`}
+            accessibilityState={{ selected: isFollowingProfile, disabled: isFollowLoading }}
+          >
+            <Text
+              style={[
+                styles.followButtonText,
+                isFollowingProfile ? styles.followButtonTextActive : styles.followButtonTextIdle,
+              ]}
+            >
+              {isFollowingProfile ? "Following" : "Follow"}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Show Create Account CTA only for SPECTATOR */}
@@ -808,6 +918,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
+    gap: 12,
   },
   profileHeaderRow: {
     flexDirection: 'row',
@@ -826,9 +937,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  locationFlag: {
-    fontSize: 18,
-  },
   gearIcon: {
     padding: theme.spacing.xs,
   },
@@ -843,14 +951,71 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
   },
-  statsRow: {
+  bio: {
+    color: theme.colors.white,
+    fontFamily: theme.fonts.regular,
+    fontSize: theme.fontSizes.xs,
+    lineHeight: 18,
+    opacity: 0.8,
+  },
+  hpChip: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.lg,
-    marginTop: theme.spacing.xs,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.full,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    marginTop: theme.spacing.xxs,
   },
-  statItem: {
-    alignItems: 'flex-start',
+  hpChipText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.xxs,
+    color: theme.colors.primary,
+  },
+  statsCard: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: 10,
+  },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  statCellMiddle: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  followButton: {
+    minHeight: 36,
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  followButtonIdle: {
+    backgroundColor: theme.colors.primary,
+  },
+  followButtonActive: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+  },
+  followButtonText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.sm,
+  },
+  followButtonTextIdle: {
+    color: theme.colors.black,
+  },
+  followButtonTextActive: {
+    color: theme.colors.muted,
   },
   statValue: {
     fontFamily: theme.fonts.bold,
@@ -860,8 +1025,7 @@ const styles = StyleSheet.create({
   statLabel: {
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
-    fontSize: theme.fontSizes.xs,
-    marginTop: theme.spacing.xxs,
+    fontSize: theme.fontSizes.xxs,
   },
   spectatorAvatar: {
     width: 96,
