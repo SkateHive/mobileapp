@@ -77,8 +77,11 @@ export default function CreatePost() {
   // the text ends up.
   const [igCaption, setIgCaption] = useState("");
   const [igCanCrossPost, setIgCanCrossPost] = useState(false);
-  // Per-post override of the account-wide setting (Profile → gear → Instagram).
-  // Starts from that setting and resets to it after each post.
+  // Account-wide setting (Profile → gear → Instagram). Off means the composer
+  // says nothing about Instagram at all: turning it off is a decision about
+  // every post, so re-asking on each one would be nagging.
+  const [igGlobalOn, setIgGlobalOn] = useState(true);
+  // Per-post opt-out, only meaningful while the global setting is on.
   const [igCrossPost, setIgCrossPost] = useState(true);
 
   // Instagram first-time handle prompt (eligible classic-key accounts only)
@@ -293,7 +296,9 @@ export default function CreatePost() {
     // Re-read here rather than on mount: the composer stays mounted while the
     // user flips the account-wide setting over on the profile tab.
     isCrossPostEnabled().then((on) => {
-      if (!cancelled) setIgCrossPost(on);
+      if (cancelled) return;
+      setIgGlobalOn(on);
+      setIgCrossPost(on);
     });
     hasEligibleHiveAccount(session)
       .then((ok) => {
@@ -663,7 +668,7 @@ export default function CreatePost() {
                   />
                 )}
 
-                {igCanCrossPost && (
+                {igCanCrossPost && igGlobalOn && (
                   <View style={styles.captionBlock}>
                     <View style={styles.captionHeader}>
                       <Text style={styles.captionLabel}>
@@ -677,7 +682,7 @@ export default function CreatePost() {
                           false: theme.colors.border,
                           true: theme.colors.primary,
                         }}
-                        thumbColor={theme.colors.text}
+                        thumbColor={theme.colors.white}
                       />
                     </View>
                     {igCrossPost && (

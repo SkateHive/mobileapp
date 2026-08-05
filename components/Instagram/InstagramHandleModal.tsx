@@ -74,25 +74,6 @@ export function InstagramHandleModal({
             />
           </View>
 
-          {showCrossPostToggle ? (
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleLabel}>
-                <Text style={styles.toggleTitle}>Cross-post to Instagram</Text>
-                <Text style={styles.toggleHint}>
-                  {crossPostEnabled
-                    ? "New snaps with media are offered to @skatehive."
-                    : "Snaps stay on Hive only."}
-                </Text>
-              </View>
-              <Switch
-                value={crossPostEnabled}
-                onValueChange={onCrossPostChange}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={theme.colors.text}
-              />
-            </View>
-          ) : null}
-
           <Pressable
             style={[styles.primaryBtn, (!valid || saving) && styles.disabled]}
             disabled={!valid || saving}
@@ -114,6 +95,27 @@ export function InstagramHandleModal({
               <Text style={styles.skipText}>Not now</Text>
             </Pressable>
           )}
+
+          {/* Below the buttons and behind a divider on purpose: this saves on
+              its own, and next to Save it read as something Save owned. */}
+          {showCrossPostToggle ? (
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleLabel}>
+                <Text style={styles.toggleTitle}>Cross-post to Instagram</Text>
+                <Text style={styles.toggleHint}>
+                  {crossPostEnabled
+                    ? "New snaps with media are offered to @skatehive."
+                    : "Snaps stay on Hive only."}
+                </Text>
+              </View>
+              <Switch
+                value={crossPostEnabled}
+                onValueChange={onCrossPostChange}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                thumbColor={theme.colors.white}
+              />
+            </View>
+          ) : null}
         </Pressable>
       </Pressable>
     </Modal>
@@ -181,7 +183,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: theme.spacing.md,
+    marginTop: theme.spacing.xs,
   },
   toggleLabel: { flex: 1 },
   toggleTitle: {
