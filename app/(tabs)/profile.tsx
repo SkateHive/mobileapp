@@ -22,7 +22,14 @@ import { LoadingScreen } from "~/components/ui/LoadingScreen";
 import { FollowersModal } from "~/components/Profile/FollowersModal";
 import { EditProfileModal } from "~/components/Profile/EditProfileModal";
 import { InstagramHandleModal } from "~/components/Instagram/InstagramHandleModal";
-import { getIgHandle, setIgHandle as setIgHandleApi, deleteIgHandle, hasEligibleHiveAccount } from "~/lib/instagram";
+import {
+  getIgHandle,
+  setIgHandle as setIgHandleApi,
+  deleteIgHandle,
+  hasEligibleHiveAccount,
+  isCrossPostEnabled,
+  setCrossPostEnabled,
+} from "~/lib/instagram";
 import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
@@ -126,6 +133,7 @@ export default function ProfileScreen() {
   const [igModalVisible, setIgModalVisible] = useState(false);
   const [igHandle, setIgHandleState] = useState("");
   const [igSaving, setIgSaving] = useState(false);
+  const [igCrossPost, setIgCrossPost] = useState(true);
   useEffect(() => {
     let cancelled = false;
     hasEligibleHiveAccount(session).then((ok) => {
@@ -338,6 +346,7 @@ export default function ProfileScreen() {
   const openInstagramSettings = async () => {
     setSettingsMenuVisible(false);
     setIgModalVisible(true);
+    setIgCrossPost(await isCrossPostEnabled());
     if (session) {
       const { handle } = await getIgHandle(session);
       setIgHandleState(handle || "");
@@ -900,6 +909,12 @@ export default function ProfileScreen() {
         onSave={saveInstagram}
         onRemove={removeInstagram}
         onClose={() => setIgModalVisible(false)}
+        showCrossPostToggle
+        crossPostEnabled={igCrossPost}
+        onCrossPostChange={(enabled) => {
+          setIgCrossPost(enabled);
+          setCrossPostEnabled(enabled);
+        }}
       />
     </View>
   );

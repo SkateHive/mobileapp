@@ -1,6 +1,7 @@
 import { sha256 } from "js-sha256";
 import { PrivateKey } from "@hiveio/dhive";
 import { Buffer } from "buffer";
+import * as SecureStore from "expo-secure-store";
 import { API_ORIGIN } from "./constants";
 import { HiveClient, convertVestToHive } from "./hive-utils";
 import { isUserbaseSession } from "./posting";
@@ -15,6 +16,28 @@ import type { AuthSession } from "./types";
 //     below + the server. Never log keys here.
 
 export const MIN_HP_TO_CROSSPOST = 100;
+
+// Whether cross-posting is on by default for this device. Stored locally rather
+// than on the server: signing in elsewhere starts from the default again, which
+// is the trade-off for not needing an API change.
+const CROSSPOST_PREF_KEY = "ig_crosspost_enabled";
+
+/** Defaults to on — that's the behaviour every existing user already has. */
+export async function isCrossPostEnabled(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(CROSSPOST_PREF_KEY)) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export async function setCrossPostEnabled(enabled: boolean): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(CROSSPOST_PREF_KEY, enabled ? "1" : "0");
+  } catch {
+    // A preference that won't persist isn't worth failing a save over.
+  }
+}
 
 /**
  * Account TYPE can attempt a cross-post: a classic key account (can sign) OR a

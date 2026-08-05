@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Modal, View, Pressable, TextInput, ActivityIndicator, StyleSheet } from "react-native";
+import { Modal, View, Pressable, TextInput, ActivityIndicator, StyleSheet, Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
@@ -13,6 +13,14 @@ interface Props {
   onSave: (handle: string) => void;
   onRemove?: () => void;
   onClose: () => void;
+  /**
+   * Shows the cross-posting switch. Off by default: this modal is also the
+   * first-time handle prompt shown mid-post, where an account-wide setting
+   * would be the wrong thing to put in front of someone.
+   */
+  showCrossPostToggle?: boolean;
+  crossPostEnabled?: boolean;
+  onCrossPostChange?: (enabled: boolean) => void;
 }
 
 /**
@@ -28,6 +36,9 @@ export function InstagramHandleModal({
   onSave,
   onRemove,
   onClose,
+  showCrossPostToggle = false,
+  crossPostEnabled = true,
+  onCrossPostChange,
 }: Props) {
   const [handle, setHandle] = useState(initialHandle);
 
@@ -62,6 +73,25 @@ export function InstagramHandleModal({
               editable={!saving}
             />
           </View>
+
+          {showCrossPostToggle ? (
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleLabel}>
+                <Text style={styles.toggleTitle}>Cross-post to Instagram</Text>
+                <Text style={styles.toggleHint}>
+                  {crossPostEnabled
+                    ? "New snaps with media are offered to @skatehive."
+                    : "Snaps stay on Hive only."}
+                </Text>
+              </View>
+              <Switch
+                value={crossPostEnabled}
+                onValueChange={onCrossPostChange}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                thumbColor={theme.colors.text}
+              />
+            </View>
+          ) : null}
 
           <Pressable
             style={[styles.primaryBtn, (!valid || saving) && styles.disabled]}
@@ -146,6 +176,24 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.default,
     fontSize: theme.fontSizes.lg,
     paddingVertical: theme.spacing.md,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  toggleLabel: { flex: 1 },
+  toggleTitle: {
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.text,
+  },
+  toggleHint: {
+    fontFamily: theme.fonts.default,
+    fontSize: theme.fontSizes.xs,
+    color: theme.colors.muted,
+    marginTop: theme.spacing.xxs,
   },
   primaryBtn: {
     backgroundColor: theme.colors.primary,

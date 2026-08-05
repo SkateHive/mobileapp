@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
+  Switch,
 } from "react-native";
 import { router } from "expo-router";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
@@ -47,6 +48,7 @@ import {
   eligibleForCrosspost,
   hasEligibleHiveAccount,
   MIN_HP_TO_CROSSPOST,
+  isCrossPostEnabled,
 } from "~/lib/instagram";
 import { InstagramHandleModal } from "~/components/Instagram/InstagramHandleModal";
 import { VideoCoverPicker } from "~/components/create/VideoCoverPicker";
@@ -75,6 +77,9 @@ export default function CreatePost() {
   // the text ends up.
   const [igCaption, setIgCaption] = useState("");
   const [igCanCrossPost, setIgCanCrossPost] = useState(false);
+  // Per-post override of the account-wide setting (Profile → gear → Instagram).
+  // Starts from that setting and resets to it after each post.
+  const [igCrossPost, setIgCrossPost] = useState(true);
 
   // Instagram first-time handle prompt (eligible classic-key accounts only)
   const [igModalVisible, setIgModalVisible] = useState(false);
@@ -125,6 +130,7 @@ export default function CreatePost() {
     caption?: string;
   }) => {
     try {
+      if (!igCrossPost) return; // author turned it off (globally or for this post)
       if (!session || !eligibleForCrosspost(session)) return; // classic-key only
       if (args.parentAuthor !== SNAPS_CONTAINER_AUTHOR) return; // main feed only
       if (!args.imageUrl && !args.videoUrl) return; // needs media
@@ -284,6 +290,11 @@ export default function CreatePost() {
       setIgCanCrossPost(false);
       return;
     }
+    // Re-read here rather than on mount: the composer stays mounted while the
+    // user flips the account-wide setting over on the profile tab.
+    isCrossPostEnabled().then((on) => {
+      if (!cancelled) setIgCrossPost(on);
+    });
     hasEligibleHiveAccount(session)
       .then((ok) => {
         if (!cancelled) setIgCanCrossPost(ok);
@@ -654,17 +665,33 @@ export default function CreatePost() {
 
                 {igCanCrossPost && (
                   <View style={styles.captionBlock}>
-                    <Text style={styles.captionLabel}>INSTAGRAM CAPTION</Text>
-                    <TextInput
-                      style={styles.captionInput}
-                      value={igCaption}
-                      onChangeText={setIgCaption}
-                      placeholder={content.trim() || "Same as your post"}
-                      placeholderTextColor={theme.colors.muted}
-                      multiline
-                      maxLength={2200}
-                      editable={!isUploading}
-                    />
+                    <View style={styles.captionHeader}>
+                      <Text style={styles.captionLabel}>
+                        {igCrossPost ? "INSTAGRAM CAPTION" : "INSTAGRAM: OFF FOR THIS POST"}
+                      </Text>
+                      <Switch
+                        value={igCrossPost}
+                        onValueChange={setIgCrossPost}
+                        disabled={isUploading}
+                        trackColor={{
+                          false: theme.colors.border,
+                          true: theme.colors.primary,
+                        }}
+                        thumbColor={theme.colors.text}
+                      />
+                    </View>
+                    {igCrossPost && (
+                      <TextInput
+                        style={styles.captionInput}
+                        value={igCaption}
+                        onChangeText={setIgCaption}
+                        placeholder={content.trim() || "Same as your post"}
+                        placeholderTextColor={theme.colors.muted}
+                        multiline
+                        maxLength={2200}
+                        editable={!isUploading}
+                      />
+                    )}
                   </View>
                 )}
               </View>
@@ -801,6 +828,11 @@ const styles = StyleSheet.create({
   },
   captionBlock: {
     marginTop: theme.spacing.md,
+  },
+  captionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   captionLabel: {
     fontSize: theme.fontSizes.xs,
