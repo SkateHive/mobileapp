@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet, ViewStyle, ActivityIndicator } from 'react
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { useVideoMuted } from '~/lib/video-mute';
 
 interface VideoWithAutoplayProps {
@@ -23,7 +24,10 @@ export function VideoWithAutoplay({
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const shouldPlay = isVisible && (!requireInteraction || hasInteracted);
+  // Tab screens stay mounted when you leave them, so visibility alone would let
+  // a clip keep playing (and, once unmuted, keep talking) from another tab.
+  const isFocused = useIsFocused();
+  const shouldPlay = isFocused && isVisible && (!requireInteraction || hasInteracted);
 
   // A timeline that autoplays with sound is bad behaviour, so the feed defaults
   // to muted — but the choice is shared, so unmuting here carries over.
