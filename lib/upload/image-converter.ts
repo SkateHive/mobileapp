@@ -1,9 +1,46 @@
+import { Image } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
+
+/** Longest side an uploaded image is scaled down to. */
+const MAX_UPLOAD_DIMENSION = 1600;
 
 export interface ConvertedImage {
   uri: string;
   width: number;
   height: number;
+}
+
+/**
+ * Image dimensions, or null when they can't be read.
+ *
+ * Bounded on purpose: Image.getSize takes success and error callbacks and there's
+ * no guarantee either fires — an unreadable URI can leave the promise pending, and
+ * this sits directly in the upload path. Falling through to null just skips the
+ * resize, which is the pre-existing behaviour.
+ */
+function getImageSize(uri: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: { width: number; height: number } | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const timer = setTimeout(() => finish(null), 3000);
+
+    Image.getSize(
+      uri,
+      (width, height) => {
+        clearTimeout(timer);
+        finish({ width, height });
+      },
+      () => {
+        clearTimeout(timer);
+        finish(null);
+      }
+    );
+  });
 }
 
 /**
@@ -40,12 +77,29 @@ export async function convertToJPEG(
   quality: number = 0.8
 ): Promise<ConvertedImage> {
   try {
-    // Convert to JPEG using ImageManipulator
-    // ImageManipulator will handle reading the file internally
+    // Scale the longest side down before uploading. A phone camera produces
+    // ~3000x4000, while nothing here renders above ~1080px and a profile grid
+    // tile is ~390px — those pixels are uploaded, stored and downloaded only to
+    // be discarded at draw time. A smaller body is also far less exposed to
+    // whatever truncated two spot photos mid-upload (#39).
+    const size = await getImageSize(uri);
+    const longestSide = size ? Math.max(size.width, size.height) : 0;
+    const actions: ImageManipulator.Action[] =
+      size && longestSide > MAX_UPLOAD_DIMENSION
+        ? [
+            {
+              resize:
+                size.width >= size.height
+                  ? { width: MAX_UPLOAD_DIMENSION }
+                  : { height: MAX_UPLOAD_DIMENSION },
+            },
+          ]
+        : []; // already small enough — never upscale
+
     // Even for non-HEIC images, this ensures consistent JPEG output
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [], // No transformations, just format conversion
+      actions,
       {
         compress: quality,
         format: ImageManipulator.SaveFormat.JPEG,
