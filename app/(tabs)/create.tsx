@@ -15,6 +15,7 @@ import {
   Switch,
 } from "react-native";
 import { router } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { Button } from "~/components/ui/button";
 import { Text } from "~/components/ui/text";
@@ -133,7 +134,11 @@ export default function CreatePost() {
     caption?: string;
   }) => {
     try {
-      if (!igCrossPost) return; // author turned it off (globally or for this post)
+      // Read the account-wide setting again at the last moment. The state below
+      // can be one screen out of date — the user may have turned it off in
+      // Profile after this composer already had its media — and publishing to
+      // Instagram against an explicit "no" is not a mistake worth risking.
+      if (!igCrossPost || !(await isCrossPostEnabled())) return;
       if (!session || !eligibleForCrosspost(session)) return; // classic-key only
       if (args.parentAuthor !== SNAPS_CONTAINER_AUTHOR) return; // main feed only
       if (!args.imageUrl && !args.videoUrl) return; // needs media
@@ -293,8 +298,8 @@ export default function CreatePost() {
       setIgCanCrossPost(false);
       return;
     }
-    // Re-read here rather than on mount: the composer stays mounted while the
-    // user flips the account-wide setting over on the profile tab.
+    // New media starts a new post, so the per-post switch goes back to the
+    // account-wide setting.
     isCrossPostEnabled().then((on) => {
       if (cancelled) return;
       setIgGlobalOn(on);
@@ -311,6 +316,24 @@ export default function CreatePost() {
       cancelled = true;
     };
   }, [media, session]);
+
+  // The composer stays mounted while you flip the setting over on the profile
+  // tab, and picking media isn't what brings you back — so re-read on focus.
+  // Only a global "off" overrides the per-post switch here: someone who turned
+  // it off for this post and stepped away shouldn't come back to it re-armed.
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    if (!isFocused) return;
+    let cancelled = false;
+    isCrossPostEnabled().then((on) => {
+      if (cancelled) return;
+      setIgGlobalOn(on);
+      if (!on) setIgCrossPost(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFocused]);
 
   const handleVideoPress = () => {
     if (!hasVideoInteraction) {
