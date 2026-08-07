@@ -98,18 +98,37 @@ export function RecentMediaGallery({
     }
   }, [hasPermission, maxItems]);
 
+  // Ask what we already have before prompting. This used to depend on
+  // loadRecentMedia, whose identity changes with hasPermission, so granting
+  // access re-ran the whole thing mid-flight and left the panel stuck on
+  // "Requesting permissions…" — and it re-prompted on every mount besides.
   useEffect(() => {
-    const initializeMedia = async () => {
-      const granted = await requestPermission();
-      if (granted) {
-        await loadRecentMedia();
-      } else {
+    (async () => {
+      try {
+        const current = await MediaLibrary.getPermissionsAsync();
+        setCanAskAgain(current.canAskAgain);
+        if (current.status === "granted") {
+          setHasPermission(true);
+          return;
+        }
+        if (current.canAskAgain) {
+          await requestPermission();
+          return;
+        }
+        setHasPermission(false);
+      } catch {
+        setHasPermission(false);
+      } finally {
         setIsLoading(false);
       }
-    };
+    })();
+  }, [requestPermission]);
 
-    initializeMedia();
-  }, [requestPermission, loadRecentMedia]);
+  // Load only once access is actually there — including when it arrives late,
+  // from Settings.
+  useEffect(() => {
+    if (hasPermission) loadRecentMedia();
+  }, [hasPermission, loadRecentMedia]);
 
   const handleMediaPress = useCallback(
     async (asset: MediaAsset) => {
