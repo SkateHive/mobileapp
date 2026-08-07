@@ -20,6 +20,7 @@ import { useToast } from '~/lib/toast-provider';
 import { castVote, canPost } from '~/lib/posting';
 import { theme } from '~/lib/theme';
 import { extractMediaFromBody } from '~/lib/utils';
+import { recordVote } from '~/lib/vote-store';
 import type { Discussion } from '@hiveio/dhive';
 import type { Media, NestedDiscussion } from '../../lib/types';
 
@@ -105,6 +106,7 @@ export function ConversationReply({
           post.permlink,
           previousLikedState ? 0 : 10000 // Full vote weight
         );
+        recordVote(post.author, post.permlink, previousLikedState ? 0 : 10000);
       } catch (err) {
         setIsLiked(previousLikedState);
         setVoteCount(prevCount => previousLikedState ? prevCount + 1 : prevCount - 1);
