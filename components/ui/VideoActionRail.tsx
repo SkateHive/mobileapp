@@ -19,6 +19,9 @@ interface VideoActionRailProps {
   /** "Save to camera roll", offered on your own posts in the profile viewer. */
   onDownload?: () => void;
   isDownloading?: boolean;
+  /** Sound control. Omitted on surfaces with no audio to speak of (images). */
+  isMuted?: boolean;
+  onToggleMute?: () => void;
   /** Screens clear different amounts of chrome below the rail. */
   bottom?: number;
 }
@@ -41,6 +44,8 @@ export function VideoActionRail({
   onShare,
   onDownload,
   isDownloading = false,
+  isMuted = false,
+  onToggleMute,
   bottom = 96,
 }: VideoActionRailProps) {
   const voteBody = (
@@ -64,6 +69,22 @@ export function VideoActionRail({
 
   return (
     <View style={[styles.rail, { bottom }]}>
+      {onToggleMute && (
+        <Pressable
+          style={styles.action}
+          onPress={onToggleMute}
+          accessibilityRole="button"
+          accessibilityLabel={isMuted ? "Unmute" : "Mute"}
+          accessibilityState={{ selected: !isMuted }}
+        >
+          <Ionicons
+            name={isMuted ? "volume-mute" : "volume-high"}
+            size={ACTION_ICON}
+            color={theme.colors.white}
+          />
+        </Pressable>
+      )}
+
       {onDownload && (
         <Pressable
           style={styles.action}

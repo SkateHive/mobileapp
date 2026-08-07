@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Pressable, StyleSheet, ViewStyle, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
+import { useVideoMuted } from '~/lib/video-mute';
 
 interface VideoWithAutoplayProps {
   url: string;
@@ -22,12 +24,23 @@ export function VideoWithAutoplay({
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const shouldPlay = isVisible && (!requireInteraction || hasInteracted);
+  // Tab screens stay mounted when you leave them, so visibility alone would let
+  // a clip keep playing (and, once unmuted, keep talking) from another tab.
+  const isFocused = useIsFocused();
+  const shouldPlay = isFocused && isVisible && (!requireInteraction || hasInteracted);
+
+  // A timeline that autoplays with sound is bad behaviour, so the feed defaults
+  // to muted — but the choice is shared, so unmuting here carries over.
+  const [isMuted, setMuted] = useVideoMuted(true);
 
   const player = useVideoPlayer(url, (p) => {
     p.loop = true;
-    p.muted = true;
+    p.muted = isMuted;
   });
+
+  useEffect(() => {
+    player.muted = isMuted;
+  }, [isMuted, player]);
 
   useEffect(() => {
     try {
@@ -97,6 +110,25 @@ export function VideoWithAutoplay({
           </View>
         )}
       </Pressable>
+
+      {/* Outside the Pressable above so a tap here never counts as the
+          "start playing" interaction. */}
+      {isPlaying && (
+        <Pressable
+          style={styles.muteButton}
+          onPress={() => setMuted(!isMuted)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={isMuted ? 'Unmute video' : 'Mute video'}
+          accessibilityState={{ selected: !isMuted }}
+        >
+          <Ionicons
+            name={isMuted ? 'volume-mute' : 'volume-high'}
+            size={16}
+            color="white"
+          />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -135,6 +167,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2,
+  },
+  muteButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 4,
   },
   interactionOverlay: {
     position: 'absolute',

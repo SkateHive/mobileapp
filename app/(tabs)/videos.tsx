@@ -24,6 +24,8 @@ import { useToast } from "~/lib/toast-provider";
 import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
+import { useIsFocused } from "@react-navigation/native";
+import { useVideoMuted } from "~/lib/video-mute";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
@@ -64,20 +66,32 @@ function VideoItem({
   const displayName = softOverlay?.handle || item.username;
   const avatarUrl = softOverlay?.avatar_url || `${HIVE_AVATAR_URL}/${displayName}/avatar`;
 
+  // Full-screen player the user opened on purpose — sound on until they say
+  // otherwise. expo-video sets the iOS session to .playback, so the ringer
+  // switch doesn't silence it.
+  const [isMuted, setMuted] = useVideoMuted(false);
+
   // Native video player — fast, no WebView
   const player = useVideoPlayer(item.videoUrl, (p) => {
     p.loop = true;
-    p.muted = true;
+    p.muted = isMuted;
   });
 
-  // Play/pause based on visibility
   useEffect(() => {
-    if (isActive) {
+    player.muted = isMuted;
+  }, [isMuted, player]);
+
+  // Play/pause based on visibility. Focus matters too: this tab stays mounted
+  // when you leave it, and a clip that keeps playing carries its sound into
+  // whatever screen you moved to.
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    if (isActive && isFocused) {
       player.play();
     } else {
       player.pause();
     }
-  }, [isActive, player]);
+  }, [isActive, isFocused, player]);
 
   // Track when video actually starts playing — depends only on player to avoid duplicate subscriptions
   useEffect(() => {
@@ -184,6 +198,8 @@ function VideoItem({
         onVote={() => onVote(item)}
         onComment={() => onComment(item)}
         onShare={() => onShare(item)}
+        isMuted={isMuted}
+        onToggleMute={() => setMuted(!isMuted)}
         bottom={200}
       />
     </View>

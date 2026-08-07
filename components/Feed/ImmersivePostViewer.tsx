@@ -28,6 +28,7 @@ import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { extractMediaFromBody, metadataImageUrl } from "~/lib/utils";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
+import { useVideoMuted } from "~/lib/video-mute";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 
 const postKey = (p: any) => `${p.author}/${p.permlink}`;
@@ -124,11 +125,18 @@ function ImmersivePostItem({
   const payout = formatPayout(post);
   const avatarUrl = `${HIVE_AVATAR_URL}/${post.author}/avatar`;
 
+  // Same deal as the Videos tab: a full-screen player starts with sound.
+  const [isMuted, setMuted] = useVideoMuted(false);
+
   // expo-video player is created unconditionally (hooks rule); idle when no video.
   const player = useVideoPlayer(videoUrl ?? null, (p) => {
     p.loop = true;
-    p.muted = true;
+    p.muted = isMuted;
   });
+
+  useEffect(() => {
+    player.muted = isMuted;
+  }, [isMuted, player]);
 
   useEffect(() => {
     if (!videoUrl) return;
@@ -314,6 +322,8 @@ function ImmersivePostItem({
         onShare={() => onShare(post)}
         onDownload={isOwn ? handleDownload : undefined}
         isDownloading={downloading}
+        isMuted={isMuted}
+        onToggleMute={videoUrl ? () => setMuted(!isMuted) : undefined}
       />
     </View>
   );

@@ -298,7 +298,9 @@ export default function ProfileScreen() {
           videoUrl={videoMedia.url}
           thumbnailUrl={getPostThumbnail(item)}
           size={tileSize}
-          isVisible={visibleGridItems.has(item.permlink)}
+          // Poster-less tiles fall back to a real player. Stop them while the
+          // viewer is open on top: nothing is visible, and they still decode.
+          isVisible={viewerIndex === null && visibleGridItems.has(item.permlink)}
           onPress={openViewer}
         />
       );
@@ -324,7 +326,7 @@ export default function ProfileScreen() {
         )}
       </Pressable>
     );
-  }, [tileSize, getPostThumbnail, visibleGridItems]);
+  }, [tileSize, getPostThumbnail, visibleGridItems, viewerIndex]);
 
   const handleLogout = async () => {
     try {
