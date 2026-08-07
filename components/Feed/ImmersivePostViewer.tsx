@@ -25,7 +25,7 @@ import { castVote, canPost } from "~/lib/posting";
 import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
-import { extractMediaFromBody, metadataImageUrl } from "~/lib/utils";
+import { extractMediaFromBody, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { useVideoMuted } from "~/lib/video-mute";
@@ -72,12 +72,6 @@ function captionFor(post: any): string {
     .replace(/[#>*_`~]/g, "")
     .trim();
   return body.slice(0, 1500);
-}
-
-function formatPayout(post: any): string {
-  const raw = post?.pending_payout_value || post?.total_payout_value || "0";
-  const value = parseFloat(raw) || 0;
-  return value > 0 ? `$${value.toFixed(2)}` : "";
 }
 
 // ─── One full-screen post ─────────────────────────────────────────────────────

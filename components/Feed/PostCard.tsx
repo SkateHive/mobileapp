@@ -36,7 +36,7 @@ import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
 import type { Media, NestedDiscussion } from "../../lib/types";
 import type { Discussion } from "@hiveio/dhive";
-import { extractMediaFromBody, removeVideoLinksFromBody, metadataImageUrl } from "~/lib/utils";
+import { extractMediaFromBody, removeVideoLinksFromBody, metadataImageUrl, postPayout } from "~/lib/utils";
 import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 
 // Action-bar icons (upvote / comment) — sized to match the web footer.
@@ -131,16 +131,7 @@ export const PostCard = React.memo(
     }, [post.active_votes, currentUsername, voteOverrides]);
 
     // Track the post's payout value for dynamic updates
-    const [payoutValue, setPayoutValue] = useState(() => {
-      const pending = parseFloat(
-        post.pending_payout_value?.toString?.() || "0",
-      );
-      const total = parseFloat(post.total_payout_value?.toString?.() || "0");
-      const curator = parseFloat(
-        post.curator_payout_value?.toString?.() || "0",
-      );
-      return pending + total + curator;
-    });
+    const [payoutValue, setPayoutValue] = useState(() => postPayout(post));
     const { showToast } = useToast();
 
     // Memoize media extraction
