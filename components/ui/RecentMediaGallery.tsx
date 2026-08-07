@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
-  Image,
   Pressable,
   StyleSheet,
   Alert,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as MediaLibrary from "expo-media-library";
+import { Image } from "expo-image";
 import { Text } from "./text";
 import { theme } from "~/lib/theme";
 
@@ -221,10 +221,13 @@ export function RecentMediaGallery({
             style={styles.mediaItem}
             onPress={() => handleMediaPress(item)}
           >
+            {/* expo-image, not RN's: these are ph:// references into the Photos
+                database, which RN's Image renders as blank. */}
             <Image
               source={{ uri: item.uri }}
               style={styles.thumbnail}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={0}
             />
             {item.mediaType === "video" && (
               <View style={styles.videoIndicator}>
