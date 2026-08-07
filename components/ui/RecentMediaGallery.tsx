@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
-  Image,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
+  AppState,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as MediaLibrary from "expo-media-library";
+import { Image } from "expo-image";
 import { Text } from "./text";
 import { theme } from "~/lib/theme";
 
@@ -32,22 +33,31 @@ export function RecentMediaGallery({
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  // iOS shows the permission dialog once. After a refusal, requesting again
+  // returns "denied" without presenting anything — which is why this button did
+  // nothing at all (#29). Past that point the only route is the Settings app.
+  const [canAskAgain, setCanAskAgain] = useState(true);
 
-  const requestPermission = useCallback(async () => {
+  // Read-only check. Never prompts, so it's safe to run at launch: changing
+  // Photos access in Settings makes iOS kill the app, and the *request* call
+  // issued while the relaunched app is still inactive never resolves — which is
+  // what left this panel stuck on "Requesting permissions…" forever.
+  const checkPermission = useCallback(async () => {
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      setHasPermission(status === "granted");
-      return status === "granted";
-    } catch (error) {
-      console.error("Error requesting media library permission:", error);
+      const perm = await MediaLibrary.getPermissionsAsync();
+      setHasPermission(perm.status === "granted");
+      setCanAskAgain(perm.canAskAgain);
+    } catch {
       setHasPermission(false);
-      return false;
     }
   }, []);
 
+  // Truth by attempt, not by asking. On device the permission API reported
+  // status "denied" while iOS itself showed Expo Go with full photo access and
+  // accessPrivileges came back as "all" — most likely because saving now asks
+  // for write-only access, after which the read status stops reflecting
+  // reality. Whether the library can be listed is answered by listing it.
   const loadRecentMedia = useCallback(async () => {
-    if (!hasPermission) return;
-
     setIsLoading(true);
     try {
       const result = await MediaLibrary.getAssetsAsync({
@@ -69,26 +79,49 @@ export function RecentMediaGallery({
         }));
 
       setMediaAssets(assets);
+      setHasPermission(true);
     } catch (error) {
+      // The only reason this throws in practice is missing access, so it drives
+      // the panel rather than an alert the user can do nothing about.
       console.error("Error loading media assets:", error);
-      Alert.alert("Error", "Failed to load recent media");
+      setHasPermission(false);
     } finally {
       setIsLoading(false);
     }
-  }, [hasPermission, maxItems]);
+  }, [maxItems]);
 
+  // Declared after loadRecentMedia so it can hand straight over to it.
+  const requestPermission = useCallback(async () => {
+    try {
+      const { status, canAskAgain: mayAsk } =
+        await MediaLibrary.requestPermissionsAsync();
+      setCanAskAgain(mayAsk);
+      if (status === "granted") await loadRecentMedia();
+      else setHasPermission(false);
+    } catch (error) {
+      console.error("Error requesting media library permission:", error);
+      setHasPermission(false);
+    }
+  }, [loadRecentMedia]);
+
+  // Mount does not prompt: it just tries to list, and the outcome decides what
+  // is shown. checkPermission runs alongside only to know whether the button
+  // should prompt or send the user to Settings.
   useEffect(() => {
-    const initializeMedia = async () => {
-      const granted = await requestPermission();
-      if (granted) {
-        await loadRecentMedia();
-      } else {
-        setIsLoading(false);
-      }
-    };
+    checkPermission();
+    loadRecentMedia();
+  }, [checkPermission, loadRecentMedia]);
 
-    initializeMedia();
-  }, [requestPermission, loadRecentMedia]);
+  // Granting happens in Settings, which means leaving the app — so try again on
+  // the way back, or the user returns to the same panel they just fixed.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active" || hasPermission) return;
+      checkPermission();
+      loadRecentMedia();
+    });
+    return () => sub.remove();
+  }, [checkPermission, loadRecentMedia, hasPermission]);
 
   const handleMediaPress = useCallback(
     async (asset: MediaAsset) => {
@@ -111,7 +144,7 @@ export function RecentMediaGallery({
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text style={styles.statusText}>Requesting permissions...</Text>
+          <Text style={styles.statusText}>Checking photo access...</Text>
         </View>
       </View>
     );
@@ -124,13 +157,17 @@ export function RecentMediaGallery({
           <Ionicons name="images-outline" size={32} color={theme.colors.gray} />
           <Text style={styles.statusText}>Media access required</Text>
           <Text style={styles.subText}>
-            Grant permission to view your recent photos and videos
+            {canAskAgain
+              ? "Grant permission to view your recent photos and videos"
+              : "Photo access is off. Turn it on in Settings to see your recent photos and videos here — or use Add media, which needs no permission."}
           </Text>
           <Pressable
             style={styles.permissionButton}
-            onPress={requestPermission}
+            onPress={canAskAgain ? requestPermission : Linking.openSettings}
           >
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            <Text style={styles.permissionButtonText}>
+              {canAskAgain ? "Grant Permission" : "Open Settings"}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -172,10 +209,13 @@ export function RecentMediaGallery({
             style={styles.mediaItem}
             onPress={() => handleMediaPress(item)}
           >
+            {/* expo-image, not RN's: these are ph:// references into the Photos
+                database, which RN's Image renders as blank. */}
             <Image
               source={{ uri: item.uri }}
               style={styles.thumbnail}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={0}
             />
             {item.mediaType === "video" && (
               <View style={styles.videoIndicator}>
