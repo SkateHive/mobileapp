@@ -694,9 +694,19 @@ export default function CreatePost() {
                 {igCanCrossPost && igGlobalOn && (
                   <View style={styles.captionBlock}>
                     <View style={styles.captionHeader}>
-                      <Text style={styles.captionLabel}>
-                        {igCrossPost ? "INSTAGRAM CAPTION" : "INSTAGRAM: OFF FOR THIS POST"}
-                      </Text>
+                      {/* The switch controls the cross-post, not the caption.
+                          Labelling this row "INSTAGRAM CAPTION" made it read as
+                          a switch for the text field sitting under it. */}
+                      <View style={styles.captionLabelGroup}>
+                        <Ionicons
+                          name="logo-instagram"
+                          size={14}
+                          color={theme.colors.primary}
+                        />
+                        <Text style={styles.captionLabel}>
+                          ALSO POST TO INSTAGRAM
+                        </Text>
+                      </View>
                       <Switch
                         value={igCrossPost}
                         onValueChange={setIgCrossPost}
@@ -709,16 +719,19 @@ export default function CreatePost() {
                       />
                     </View>
                     {igCrossPost && (
-                      <TextInput
-                        style={styles.captionInput}
-                        value={igCaption}
-                        onChangeText={setIgCaption}
-                        placeholder={content.trim() || "Same as your post"}
-                        placeholderTextColor={theme.colors.muted}
-                        multiline
-                        maxLength={2200}
-                        editable={!isUploading}
-                      />
+                      <>
+                        <Text style={styles.captionSubLabel}>Caption</Text>
+                        <TextInput
+                          style={styles.captionInput}
+                          value={igCaption}
+                          onChangeText={setIgCaption}
+                          placeholder={content.trim() || "Same as your post"}
+                          placeholderTextColor={theme.colors.muted}
+                          multiline
+                          maxLength={2200}
+                          editable={!isUploading}
+                        />
+                      </>
                     )}
                   </View>
                 )}
@@ -861,6 +874,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  captionLabelGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+  },
+  captionSubLabel: {
+    fontSize: theme.fontSizes.xs,
+    fontFamily: theme.fonts.default,
+    color: theme.colors.muted,
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.xxs,
   },
   captionLabel: {
     fontSize: theme.fontSizes.xs,
