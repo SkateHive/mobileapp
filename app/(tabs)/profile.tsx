@@ -299,13 +299,24 @@ export default function ProfileScreen() {
     const openViewer = () => setViewerIndex(index);
 
     // Earnings, bottom-left: the video badge already owns the other corner.
-    // Hidden at zero — a grid of $0.00 makes a profile look dead.
+    // Hidden at zero — a grid of $0.00 makes a profile look dead. Bare text,
+    // no chip: at three tiles per row the container was most of what you saw.
     const payout = formatPayout(item);
-    const earnings = payout ? (
-      <View style={styles.gridEarnings} pointerEvents="none">
-        <Text style={styles.gridEarningsText}>{payout}</Text>
-      </View>
-    ) : null;
+    const isVideo = !!videoMedia;
+    const earnings =
+      payout || isVideo ? (
+        <View style={styles.gridEarnings} pointerEvents="none">
+          {isVideo && (
+            <Ionicons
+              name="play-outline"
+              size={13}
+              color={theme.colors.primary}
+              style={styles.gridPlayIcon}
+            />
+          )}
+          {payout ? <Text style={styles.gridEarningsText}>{payout}</Text> : null}
+        </View>
+      ) : null;
 
     // Video posts show their poster frame; the clip plays in the viewer. Clips
     // without a poster keep the old inline player (see GridVideoTile).
@@ -1167,15 +1178,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 6,
     left: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  gridPlayIcon: {
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   gridEarningsText: {
     color: theme.colors.primary,
     fontFamily: theme.fonts.bold,
     fontSize: theme.fontSizes.xxs,
+    // No pill behind it, so the shadow is what keeps it readable over a light
+    // frame of the photo.
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   gridPlaceholder: {
     flex: 1,

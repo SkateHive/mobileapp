@@ -1,7 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
 import { theme } from '~/lib/theme';
 
@@ -49,11 +48,6 @@ export const GridVideoTile = React.memo(({ videoUrl, thumbnailUrl, size, onPress
           loop={false}
         />
       ) : null}
-      {/* Marks the tile as a video — a poster is otherwise indistinguishable
-          from a photo post. */}
-      <View style={styles.badge}>
-        <Ionicons name="play" size={12} color={theme.colors.white} />
-      </View>
     </Pressable>
   );
 });
@@ -66,16 +60,5 @@ const styles = StyleSheet.create({
   poster: {
     width: '100%',
     height: '100%',
-  },
-  badge: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
 });
