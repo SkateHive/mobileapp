@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   View,
   FlatList,
+  Alert,
   Modal,
   PanResponder,
   Pressable,
@@ -184,16 +185,20 @@ function ImmersivePostItem({
   // Save the post's media (video or current image) to the camera roll.
   const handleDownload = useCallback(async () => {
     if (downloading) return;
+    // Alert, not the toast: toasts render in the root tree, which is BEHIND
+    // this full-screen Modal. Every outcome here was invisible, so a failing
+    // download and a working one looked exactly the same — like a dead button.
+    const say = (msg: string) => Alert.alert("Save to camera roll", msg);
     const url = videoUrl || images[imageIndex] || images[0];
     if (!url) {
-      onToast("Nothing to download", "error");
+      say("There's no media on this post to save.");
       return;
     }
     try {
       setDownloading(true);
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
-        onToast("Allow photo access to save", "error");
+        say("Allow photo access in Settings to save this.");
         return;
       }
       const clean = url.split("?")[0];
@@ -205,9 +210,11 @@ function ImmersivePostItem({
       const file = await File.downloadFileAsync(url, dest);
       await MediaLibrary.saveToLibraryAsync(file.uri);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onToast("Saved to camera roll", "success");
-    } catch {
-      onToast("Download failed", "error");
+      say("Saved.");
+    } catch (e) {
+      // The message matters: this failed silently for a while, and "it didn't
+      // work" is not enough to tell a gateway timeout from a permission problem.
+      say(e instanceof Error ? e.message : "Download failed.");
     } finally {
       setDownloading(false);
     }
@@ -418,7 +425,12 @@ export function ImmersivePostViewer({
   // strip could not do.
   const dismissResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_evt, g) =>
+      // Capture, not the bubbling variant: each post fills the screen with a
+      // Pressable for the double-tap vote, and the pager is a native scroll
+      // view. Both take the responder before it ever reaches this wrapper.
+      // Capture is asked top-down, so it gets the chance first — kept narrow
+      // (started at the edge, clearly rightward) so nothing else is affected.
+      onMoveShouldSetPanResponderCapture: (_evt, g) =>
         g.x0 <= 28 && g.dx > 20 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderRelease: (_evt, g) => {
         if (g.dx > 60) onCloseRef.current();
