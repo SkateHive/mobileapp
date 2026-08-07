@@ -3,6 +3,7 @@ import {
   View,
   FlatList,
   Alert,
+  Linking,
   Modal,
   PanResponder,
   Pressable,
@@ -21,7 +22,6 @@ import * as Haptics from "expo-haptics";
 import * as MediaLibrary from "expo-media-library";
 import { File, Paths } from "expo-file-system";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
 import { castVote, canPost } from "~/lib/posting";
@@ -196,9 +196,19 @@ function ImmersivePostItem({
     }
     try {
       setDownloading(true);
-      const perm = await MediaLibrary.requestPermissionsAsync();
+      // writeOnly: saving needs "Add Photos Only", which iOS grants far more
+      // readily than full library access — and reading the user's photos is
+      // not something this button has any business asking for.
+      const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) {
-        say("Allow photo access in Settings to save this.");
+        Alert.alert(
+          "Save to camera roll",
+          "SkateHive needs permission to add photos and videos.",
+          [
+            { text: "Not now", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+          ]
+        );
         return;
       }
       const clean = url.split("?")[0];
@@ -529,7 +539,6 @@ export function ImmersivePostViewer({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
         {/* Swipe back out to the grid, from the left edge only. A full-width
             gesture would fight both the image carousel and the vertical pager;
@@ -568,7 +577,6 @@ export function ImmersivePostViewer({
           />
         )}
       </SafeAreaProvider>
-      </GestureHandlerRootView>
     </Modal>
   );
 }
