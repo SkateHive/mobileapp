@@ -5,7 +5,6 @@ import {
   Alert,
   Linking,
   Modal,
-  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -392,10 +391,6 @@ export function ImmersivePostViewer({
   const votingLockRef = useRef<Record<string, boolean>>({});
   const [conversationPost, setConversationPost] = useState<any | null>(null);
 
-  // The responder above is built once, so it can't close over a stale onClose.
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
   const canVote = !!username && username !== "SPECTATOR";
 
   useEffect(() => {
@@ -427,27 +422,6 @@ export function ImmersivePostViewer({
   // a mostly vertical one (failOffsetY), and ignores anything that didn't start
   // within EDGE of the left side. runOnJS puts the callbacks on the JS thread,
   // so onClose and the flag below are plain JS.
-  // PanResponder, not gesture-handler: a GestureDetector around this list never
-  // activated, because a FlatList is a native scroll view and claims the touch
-  // first. The tab layout already dismisses this way over scrolling screens, so
-  // this is the mechanism that's known to work here. Claiming the responder
-  // mid-gesture also leaves vertical drags with the pager, which an overlay
-  // strip could not do.
-  const dismissResponder = useRef(
-    PanResponder.create({
-      // Capture, not the bubbling variant: each post fills the screen with a
-      // Pressable for the double-tap vote, and the pager is a native scroll
-      // view. Both take the responder before it ever reaches this wrapper.
-      // Capture is asked top-down, so it gets the chance first — kept narrow
-      // (started at the edge, clearly rightward) so nothing else is affected.
-      onMoveShouldSetPanResponderCapture: (_evt, g) =>
-        g.x0 <= 28 && g.dx > 20 && Math.abs(g.dx) > Math.abs(g.dy),
-      onPanResponderRelease: (_evt, g) => {
-        if (g.dx > 60) onCloseRef.current();
-      },
-    })
-  ).current;
-
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index ?? 0);
@@ -544,7 +518,7 @@ export function ImmersivePostViewer({
             gesture would fight both the image carousel and the vertical pager;
             the edge is where iOS itself puts back navigation. The close button
             stays — a gesture with no affordance shouldn't be the only exit. */}
-        <View style={styles.container} {...dismissResponder.panHandlers}>
+        <View style={styles.container}>
         <FlatList
           data={posts}
           keyExtractor={postKey}
