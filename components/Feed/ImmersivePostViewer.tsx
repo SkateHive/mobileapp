@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   View,
   FlatList,
+  Alert,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -133,11 +135,16 @@ function ImmersivePostItem({
     player.muted = isMuted;
   }, [isMuted, player]);
 
+  // Hold to pause, release to resume — the one gesture left free. A single tap
+  // can't do it: double-tap already votes, so a tap can only act after the
+  // ~280ms that tells the two apart, and the pause lands visibly late.
+  const [holding, setHolding] = useState(false);
+
   useEffect(() => {
     if (!videoUrl) return;
-    if (isActive) player.play();
+    if (isActive && !holding) player.play();
     else player.pause();
-  }, [isActive, videoUrl, player]);
+  }, [isActive, holding, videoUrl, player]);
 
   // The poster stays up until the surface actually renders a frame — the gateway
   // needs a second or two, and hiding it earlier just shows black. Playback state
@@ -177,16 +184,30 @@ function ImmersivePostItem({
   // Save the post's media (video or current image) to the camera roll.
   const handleDownload = useCallback(async () => {
     if (downloading) return;
+    // Alert, not the toast: toasts render in the root tree, which is BEHIND
+    // this full-screen Modal. Every outcome here was invisible, so a failing
+    // download and a working one looked exactly the same — like a dead button.
+    const say = (msg: string) => Alert.alert("Save to camera roll", msg);
     const url = videoUrl || images[imageIndex] || images[0];
     if (!url) {
-      onToast("Nothing to download", "error");
+      say("There's no media on this post to save.");
       return;
     }
     try {
       setDownloading(true);
-      const perm = await MediaLibrary.requestPermissionsAsync();
+      // writeOnly: saving needs "Add Photos Only", which iOS grants far more
+      // readily than full library access — and reading the user's photos is
+      // not something this button has any business asking for.
+      const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) {
-        onToast("Allow photo access to save", "error");
+        Alert.alert(
+          "Save to camera roll",
+          "SkateHive needs permission to add photos and videos.",
+          [
+            { text: "Not now", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+          ]
+        );
         return;
       }
       const clean = url.split("?")[0];
@@ -198,9 +219,11 @@ function ImmersivePostItem({
       const file = await File.downloadFileAsync(url, dest);
       await MediaLibrary.saveToLibraryAsync(file.uri);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onToast("Saved to camera roll", "success");
-    } catch {
-      onToast("Download failed", "error");
+      say("Saved.");
+    } catch (e) {
+      // The message matters: this failed silently for a while, and "it didn't
+      // work" is not enough to tell a gateway timeout from a permission problem.
+      say(e instanceof Error ? e.message : "Download failed.");
     } finally {
       setDownloading(false);
     }
@@ -225,7 +248,16 @@ function ImmersivePostItem({
           {poster && (!isActive || !hasFrames) && (
             <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} />
           )}
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleTap} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleTap}
+            onLongPress={() => setHolding(true)}
+            onPressOut={() => setHolding(false)}
+            // 500ms, not less: double-tap-to-vote waits ~280ms to tell one tap
+            // from two, so a shorter hold threshold fires the long press on the
+            // first tap of a slow double-tap and the vote never registers.
+            delayLongPress={500}
+          />
         </>
       ) : images.length > 0 ? (
         <FlatList
@@ -315,6 +347,11 @@ function ImmersivePostItem({
         onVote={isOwn ? undefined : () => onVote(post)}
         onComment={() => onComment(post)}
         onShare={() => onShare(post)}
+        // Back in the rail: behind an ActionSheet neither row did anything,
+        // because that sheet is a Modal inside this Modal and its action runs
+        // once it unmounts — the same nesting that wedged #38. Moving saving
+        // off the rail needs a sheet that isn't a second modal, so it stays put
+        // until then (#47).
         onDownload={isOwn ? handleDownload : undefined}
         isDownloading={downloading}
         isMuted={isMuted}
@@ -378,6 +415,13 @@ export function ImmersivePostViewer({
     setVoteCountStates(counts);
   }, [posts, username, voteOverrides]);
 
+  // Right-swipe that starts at the left edge, wrapping the list rather than
+  // overlaying it — an overlay strip swallows the touch before the pager sees
+  // it, which made a vertical drag near that edge feel broken. Here the pan
+  // only takes over for a clearly horizontal drag (activeOffsetX), gives up on
+  // a mostly vertical one (failOffsetY), and ignores anything that didn't start
+  // within EDGE of the left side. runOnJS puts the callbacks on the JS thread,
+  // so onClose and the flag below are plain JS.
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index ?? 0);
@@ -470,6 +514,10 @@ export function ImmersivePostViewer({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <SafeAreaProvider>
+        {/* Swipe back out to the grid, from the left edge only. A full-width
+            gesture would fight both the image carousel and the vertical pager;
+            the edge is where iOS itself puts back navigation. The close button
+            stays — a gesture with no affordance shouldn't be the only exit. */}
         <View style={styles.container}>
         <FlatList
           data={posts}
