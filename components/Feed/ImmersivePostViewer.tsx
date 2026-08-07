@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 import * as MediaLibrary from "expo-media-library";
 import { File, Paths } from "expo-file-system";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
 import { castVote, canPost } from "~/lib/posting";
@@ -28,6 +29,7 @@ import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { extractMediaFromBody, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
+import { ActionSheet } from "~/components/ui/ActionSheet";
 import { useVideoMuted } from "~/lib/video-mute";
 import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
@@ -114,6 +116,7 @@ function ImmersivePostItem({
   const [imageIndex, setImageIndex] = useState(0);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [actionsVisible, setActionsVisible] = useState(false);
   const lastTap = useRef(0);
   const burstRef = useRef<DollarBurstHandle>(null);
   const caption = captionFor(post);
@@ -133,11 +136,16 @@ function ImmersivePostItem({
     player.muted = isMuted;
   }, [isMuted, player]);
 
+  // Hold to pause, release to resume — the one gesture left free. A single tap
+  // can't do it: double-tap already votes, so a tap can only act after the
+  // ~280ms that tells the two apart, and the pause lands visibly late.
+  const [holding, setHolding] = useState(false);
+
   useEffect(() => {
     if (!videoUrl) return;
-    if (isActive) player.play();
+    if (isActive && !holding) player.play();
     else player.pause();
-  }, [isActive, videoUrl, player]);
+  }, [isActive, holding, videoUrl, player]);
 
   // The poster stays up until the surface actually renders a frame — the gateway
   // needs a second or two, and hiding it earlier just shows black. Playback state
@@ -225,7 +233,13 @@ function ImmersivePostItem({
           {poster && (!isActive || !hasFrames) && (
             <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} />
           )}
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleTap} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleTap}
+            onLongPress={() => setHolding(true)}
+            onPressOut={() => setHolding(false)}
+            delayLongPress={250}
+          />
         </>
       ) : images.length > 0 ? (
         <FlatList
@@ -314,11 +328,32 @@ function ImmersivePostItem({
         commentCount={post.children ?? 0}
         onVote={isOwn ? undefined : () => onVote(post)}
         onComment={() => onComment(post)}
-        onShare={() => onShare(post)}
-        onDownload={isOwn ? handleDownload : undefined}
-        isDownloading={downloading}
+        // Saving is rare and used to sit in the rail full time, taking the most
+        // valuable column on screen. It lives behind share now (#47).
+        onShare={() => (isOwn ? setActionsVisible(true) : onShare(post))}
         isMuted={isMuted}
         onToggleMute={videoUrl ? () => setMuted(!isMuted) : undefined}
+      />
+
+      <ActionSheet
+        visible={actionsVisible}
+        onClose={() => setActionsVisible(false)}
+        title="POST"
+        subtitle={`@${post.author}`}
+        items={[
+          {
+            key: "share",
+            icon: "share-outline",
+            title: "Share link",
+            onPress: () => onShare(post),
+          },
+          {
+            key: "download",
+            icon: "download-outline",
+            title: downloading ? "Saving…" : "Save to camera roll",
+            onPress: handleDownload,
+          },
+        ]}
       />
     </View>
   );
@@ -377,6 +412,20 @@ export function ImmersivePostViewer({
     setLikedStates(liked);
     setVoteCountStates(counts);
   }, [posts, username, voteOverrides]);
+
+  // Right-swipe that starts at the left edge. failOffsetY keeps a mostly
+  // vertical drag with the pager, and runOnJS lets onClose be called directly.
+  const dismissGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .activeOffsetX(20)
+        .failOffsetY([-20, 20])
+        .onEnd((e) => {
+          if (e.translationX > 60) onClose();
+        }),
+    [onClose]
+  );
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -469,6 +518,7 @@ export function ImmersivePostViewer({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
         <View style={styles.container}>
         <FlatList
@@ -493,6 +543,14 @@ export function ImmersivePostViewer({
         />
         </View>
 
+        {/* Swipe back out to the grid, from the left edge only. A full-width
+            gesture would fight both the image carousel and the vertical pager;
+            the edge is where iOS itself puts back navigation. The close button
+            stays — a gesture with no affordance shouldn't be the only exit. */}
+        <GestureDetector gesture={dismissGesture}>
+          <View style={styles.dismissEdge} />
+        </GestureDetector>
+
         {conversationPost && (
           <FullConversationDrawer
             visible={!!conversationPost}
@@ -503,12 +561,21 @@ export function ImmersivePostViewer({
           />
         )}
       </SafeAreaProvider>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
+  dismissEdge: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 28,
+    zIndex: 20,
+  },
   center: { alignItems: "center", justifyContent: "center" },
   topBar: {
     position: "absolute",
