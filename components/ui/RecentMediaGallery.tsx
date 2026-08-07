@@ -53,18 +53,29 @@ export function RecentMediaGallery({
     }
   }, []);
 
-  // Granting happens in Settings, which means leaving the app — so re-check on
-  // the way back, or the user returns to the same panel they just fixed.
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", async (state) => {
-      if (state !== "active" || hasPermission) return;
+  // Read-only check. Never prompts, so it's safe to run at launch: changing
+  // Photos access in Settings makes iOS kill the app, and the *request* call
+  // issued while the relaunched app is still inactive never resolves — which is
+  // what left this panel stuck on "Requesting permissions…" forever.
+  const checkPermission = useCallback(async () => {
+    try {
       const { status, canAskAgain: mayAsk } =
         await MediaLibrary.getPermissionsAsync();
       setHasPermission(status === "granted");
       setCanAskAgain(mayAsk);
+    } catch {
+      setHasPermission(false);
+    }
+  }, []);
+
+  // Granting happens in Settings, which means leaving the app — so re-check on
+  // the way back, or the user returns to the same panel they just fixed.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") checkPermission();
     });
     return () => sub.remove();
-  }, [hasPermission]);
+  }, [checkPermission]);
 
   const loadRecentMedia = useCallback(async () => {
     if (!hasPermission) return;
@@ -98,31 +109,13 @@ export function RecentMediaGallery({
     }
   }, [hasPermission, maxItems]);
 
-  // Ask what we already have before prompting. This used to depend on
-  // loadRecentMedia, whose identity changes with hasPermission, so granting
-  // access re-ran the whole thing mid-flight and left the panel stuck on
-  // "Requesting permissions…" — and it re-prompted on every mount besides.
+  // Only ever a read on mount. The prompt now belongs to the button, which also
+  // means opening the composer no longer throws a system dialog at people who
+  // just want to type.
   useEffect(() => {
-    (async () => {
-      try {
-        const current = await MediaLibrary.getPermissionsAsync();
-        setCanAskAgain(current.canAskAgain);
-        if (current.status === "granted") {
-          setHasPermission(true);
-          return;
-        }
-        if (current.canAskAgain) {
-          await requestPermission();
-          return;
-        }
-        setHasPermission(false);
-      } catch {
-        setHasPermission(false);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [requestPermission]);
+    setIsLoading(false);
+    checkPermission();
+  }, [checkPermission]);
 
   // Load only once access is actually there — including when it arrives late,
   // from Settings.
@@ -151,7 +144,7 @@ export function RecentMediaGallery({
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text style={styles.statusText}>Requesting permissions...</Text>
+          <Text style={styles.statusText}>Checking photo access...</Text>
         </View>
       </View>
     );
