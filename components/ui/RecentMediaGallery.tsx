@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  AppState,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as MediaLibrary from "expo-media-library";
@@ -32,11 +34,17 @@ export function RecentMediaGallery({
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  // iOS shows the permission dialog once. After a refusal, requesting again
+  // returns "denied" without presenting anything — which is why this button did
+  // nothing at all (#29). Past that point the only route is the Settings app.
+  const [canAskAgain, setCanAskAgain] = useState(true);
 
   const requestPermission = useCallback(async () => {
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const { status, canAskAgain: mayAsk } =
+        await MediaLibrary.requestPermissionsAsync();
       setHasPermission(status === "granted");
+      setCanAskAgain(mayAsk);
       return status === "granted";
     } catch (error) {
       console.error("Error requesting media library permission:", error);
@@ -44,6 +52,19 @@ export function RecentMediaGallery({
       return false;
     }
   }, []);
+
+  // Granting happens in Settings, which means leaving the app — so re-check on
+  // the way back, or the user returns to the same panel they just fixed.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", async (state) => {
+      if (state !== "active" || hasPermission) return;
+      const { status, canAskAgain: mayAsk } =
+        await MediaLibrary.getPermissionsAsync();
+      setHasPermission(status === "granted");
+      setCanAskAgain(mayAsk);
+    });
+    return () => sub.remove();
+  }, [hasPermission]);
 
   const loadRecentMedia = useCallback(async () => {
     if (!hasPermission) return;
@@ -124,13 +145,17 @@ export function RecentMediaGallery({
           <Ionicons name="images-outline" size={32} color={theme.colors.gray} />
           <Text style={styles.statusText}>Media access required</Text>
           <Text style={styles.subText}>
-            Grant permission to view your recent photos and videos
+            {canAskAgain
+              ? "Grant permission to view your recent photos and videos"
+              : "Photo access is off. Turn it on in Settings to see your recent photos and videos here — or use Add media, which needs no permission."}
           </Text>
           <Pressable
             style={styles.permissionButton}
-            onPress={requestPermission}
+            onPress={canAskAgain ? requestPermission : Linking.openSettings}
           >
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            <Text style={styles.permissionButtonText}>
+              {canAskAgain ? "Grant Permission" : "Open Settings"}
+            </Text>
           </Pressable>
         </View>
       </View>
