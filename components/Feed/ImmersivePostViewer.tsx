@@ -423,11 +423,17 @@ export function ImmersivePostViewer({
   // a mostly vertical one (failOffsetY), and ignores anything that didn't start
   // within EDGE of the left side. runOnJS puts the callbacks on the JS thread,
   // so onClose and the flag below are plain JS.
+  const listRef = useRef<FlatList<any>>(null);
   const dismissGesture = useMemo(() => {
     const EDGE = 28;
     let fromEdge = false;
     return Gesture.Pan()
       .runOnJS(true)
+      // Without this the pager claims the touch first and this never activates:
+      // a FlatList is a native scroll view, and it wins the race by default.
+      // Cast: gesture-handler types this as a ref to its own component, but a
+      // plain host-component ref is what it needs at runtime.
+      .simultaneousWithExternalGesture(listRef as any)
       .activeOffsetX(24)
       .failOffsetY([-16, 16])
       .onBegin((e) => {
@@ -538,6 +544,7 @@ export function ImmersivePostViewer({
         <GestureDetector gesture={dismissGesture}>
         <View style={styles.container}>
         <FlatList
+          ref={listRef}
           data={posts}
           keyExtractor={postKey}
           renderItem={renderItem}
