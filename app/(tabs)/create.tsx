@@ -12,8 +12,10 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
+  Switch,
 } from "react-native";
 import { router } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { Button } from "~/components/ui/button";
 import { Text } from "~/components/ui/text";
@@ -47,6 +49,7 @@ import {
   eligibleForCrosspost,
   hasEligibleHiveAccount,
   MIN_HP_TO_CROSSPOST,
+  isCrossPostEnabled,
 } from "~/lib/instagram";
 import { InstagramHandleModal } from "~/components/Instagram/InstagramHandleModal";
 import { VideoCoverPicker } from "~/components/create/VideoCoverPicker";
@@ -75,6 +78,12 @@ export default function CreatePost() {
   // the text ends up.
   const [igCaption, setIgCaption] = useState("");
   const [igCanCrossPost, setIgCanCrossPost] = useState(false);
+  // Account-wide setting (Profile → gear → Instagram). Off means the composer
+  // says nothing about Instagram at all: turning it off is a decision about
+  // every post, so re-asking on each one would be nagging.
+  const [igGlobalOn, setIgGlobalOn] = useState(true);
+  // Per-post opt-out, only meaningful while the global setting is on.
+  const [igCrossPost, setIgCrossPost] = useState(true);
 
   // Instagram first-time handle prompt (eligible classic-key accounts only)
   const [igModalVisible, setIgModalVisible] = useState(false);
@@ -125,6 +134,11 @@ export default function CreatePost() {
     caption?: string;
   }) => {
     try {
+      // Read the account-wide setting again at the last moment. The state below
+      // can be one screen out of date — the user may have turned it off in
+      // Profile after this composer already had its media — and publishing to
+      // Instagram against an explicit "no" is not a mistake worth risking.
+      if (!igCrossPost || !(await isCrossPostEnabled())) return;
       if (!session || !eligibleForCrosspost(session)) return; // classic-key only
       if (args.parentAuthor !== SNAPS_CONTAINER_AUTHOR) return; // main feed only
       if (!args.imageUrl && !args.videoUrl) return; // needs media
@@ -284,6 +298,13 @@ export default function CreatePost() {
       setIgCanCrossPost(false);
       return;
     }
+    // New media starts a new post, so the per-post switch goes back to the
+    // account-wide setting.
+    isCrossPostEnabled().then((on) => {
+      if (cancelled) return;
+      setIgGlobalOn(on);
+      setIgCrossPost(on);
+    });
     hasEligibleHiveAccount(session)
       .then((ok) => {
         if (!cancelled) setIgCanCrossPost(ok);
@@ -295,6 +316,24 @@ export default function CreatePost() {
       cancelled = true;
     };
   }, [media, session]);
+
+  // The composer stays mounted while you flip the setting over on the profile
+  // tab, and picking media isn't what brings you back — so re-read on focus.
+  // Only a global "off" overrides the per-post switch here: someone who turned
+  // it off for this post and stepped away shouldn't come back to it re-armed.
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    if (!isFocused) return;
+    let cancelled = false;
+    isCrossPostEnabled().then((on) => {
+      if (cancelled) return;
+      setIgGlobalOn(on);
+      if (!on) setIgCrossPost(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFocused]);
 
   const handleVideoPress = () => {
     if (!hasVideoInteraction) {
@@ -652,19 +691,35 @@ export default function CreatePost() {
                   />
                 )}
 
-                {igCanCrossPost && (
+                {igCanCrossPost && igGlobalOn && (
                   <View style={styles.captionBlock}>
-                    <Text style={styles.captionLabel}>INSTAGRAM CAPTION</Text>
-                    <TextInput
-                      style={styles.captionInput}
-                      value={igCaption}
-                      onChangeText={setIgCaption}
-                      placeholder={content.trim() || "Same as your post"}
-                      placeholderTextColor={theme.colors.muted}
-                      multiline
-                      maxLength={2200}
-                      editable={!isUploading}
-                    />
+                    <View style={styles.captionHeader}>
+                      <Text style={styles.captionLabel}>
+                        {igCrossPost ? "INSTAGRAM CAPTION" : "INSTAGRAM: OFF FOR THIS POST"}
+                      </Text>
+                      <Switch
+                        value={igCrossPost}
+                        onValueChange={setIgCrossPost}
+                        disabled={isUploading}
+                        trackColor={{
+                          false: theme.colors.border,
+                          true: theme.colors.primary,
+                        }}
+                        thumbColor={theme.colors.white}
+                      />
+                    </View>
+                    {igCrossPost && (
+                      <TextInput
+                        style={styles.captionInput}
+                        value={igCaption}
+                        onChangeText={setIgCaption}
+                        placeholder={content.trim() || "Same as your post"}
+                        placeholderTextColor={theme.colors.muted}
+                        multiline
+                        maxLength={2200}
+                        editable={!isUploading}
+                      />
+                    )}
                   </View>
                 )}
               </View>
@@ -801,6 +856,11 @@ const styles = StyleSheet.create({
   },
   captionBlock: {
     marginTop: theme.spacing.md,
+  },
+  captionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   captionLabel: {
     fontSize: theme.fontSizes.xs,
