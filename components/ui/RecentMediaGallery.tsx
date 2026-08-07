@@ -3,7 +3,6 @@ import {
   View,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   AppState,
   Linking,
@@ -38,7 +37,6 @@ export function RecentMediaGallery({
   // returns "denied" without presenting anything — which is why this button did
   // nothing at all (#29). Past that point the only route is the Settings app.
   const [canAskAgain, setCanAskAgain] = useState(true);
-  const [debugStatus, setDebugStatus] = useState("");
 
   // Read-only check. Never prompts, so it's safe to run at launch: changing
   // Photos access in Settings makes iOS kill the app, and the *request* call
@@ -47,17 +45,9 @@ export function RecentMediaGallery({
   const checkPermission = useCallback(async () => {
     try {
       const perm = await MediaLibrary.getPermissionsAsync();
-      // TEMPORARY: surfaced in the panel below. Granting from Settings still
-      // came back as "not granted" and guessing at why has cost enough rounds.
-      setDebugStatus(
-        `${perm.status} · askAgain=${perm.canAskAgain} · privileges=${
-          (perm as any).accessPrivileges ?? "?"
-        }`
-      );
       setHasPermission(perm.status === "granted");
       setCanAskAgain(perm.canAskAgain);
-    } catch (e) {
-      setDebugStatus(`threw: ${e instanceof Error ? e.message : String(e)}`);
+    } catch {
       setHasPermission(false);
     }
   }, []);
@@ -179,8 +169,6 @@ export function RecentMediaGallery({
               {canAskAgain ? "Grant Permission" : "Open Settings"}
             </Text>
           </Pressable>
-          {/* TEMPORARY diagnostic — remove before opening the PR. */}
-          {!!debugStatus && <Text style={styles.subText}>{debugStatus}</Text>}
         </View>
       </View>
     );
