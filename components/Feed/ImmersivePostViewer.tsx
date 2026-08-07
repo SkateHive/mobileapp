@@ -238,7 +238,10 @@ function ImmersivePostItem({
             onPress={handleTap}
             onLongPress={() => setHolding(true)}
             onPressOut={() => setHolding(false)}
-            delayLongPress={250}
+            // 500ms, not less: double-tap-to-vote waits ~280ms to tell one tap
+            // from two, so a shorter hold threshold fires the long press on the
+            // first tap of a slow double-tap and the vote never registers.
+            delayLongPress={500}
           />
         </>
       ) : images.length > 0 ? (
@@ -413,19 +416,27 @@ export function ImmersivePostViewer({
     setVoteCountStates(counts);
   }, [posts, username, voteOverrides]);
 
-  // Right-swipe that starts at the left edge. failOffsetY keeps a mostly
-  // vertical drag with the pager, and runOnJS lets onClose be called directly.
-  const dismissGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .runOnJS(true)
-        .activeOffsetX(20)
-        .failOffsetY([-20, 20])
-        .onEnd((e) => {
-          if (e.translationX > 60) onClose();
-        }),
-    [onClose]
-  );
+  // Right-swipe that starts at the left edge, wrapping the list rather than
+  // overlaying it — an overlay strip swallows the touch before the pager sees
+  // it, which made a vertical drag near that edge feel broken. Here the pan
+  // only takes over for a clearly horizontal drag (activeOffsetX), gives up on
+  // a mostly vertical one (failOffsetY), and ignores anything that didn't start
+  // within EDGE of the left side. runOnJS puts the callbacks on the JS thread,
+  // so onClose and the flag below are plain JS.
+  const dismissGesture = useMemo(() => {
+    const EDGE = 28;
+    let fromEdge = false;
+    return Gesture.Pan()
+      .runOnJS(true)
+      .activeOffsetX(24)
+      .failOffsetY([-16, 16])
+      .onBegin((e) => {
+        fromEdge = e.x <= EDGE;
+      })
+      .onEnd((e) => {
+        if (fromEdge && e.translationX > 60) onClose();
+      });
+  }, [onClose]);
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -520,6 +531,11 @@ export function ImmersivePostViewer({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
+        {/* Swipe back out to the grid, from the left edge only. A full-width
+            gesture would fight both the image carousel and the vertical pager;
+            the edge is where iOS itself puts back navigation. The close button
+            stays — a gesture with no affordance shouldn't be the only exit. */}
+        <GestureDetector gesture={dismissGesture}>
         <View style={styles.container}>
         <FlatList
           data={posts}
@@ -542,13 +558,6 @@ export function ImmersivePostViewer({
           initialNumToRender={2}
         />
         </View>
-
-        {/* Swipe back out to the grid, from the left edge only. A full-width
-            gesture would fight both the image carousel and the vertical pager;
-            the edge is where iOS itself puts back navigation. The close button
-            stays — a gesture with no affordance shouldn't be the only exit. */}
-        <GestureDetector gesture={dismissGesture}>
-          <View style={styles.dismissEdge} />
         </GestureDetector>
 
         {conversationPost && (
@@ -568,14 +577,6 @@ export function ImmersivePostViewer({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  dismissEdge: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 28,
-    zIndex: 20,
-  },
   center: { alignItems: "center", justifyContent: "center" },
   topBar: {
     position: "absolute",

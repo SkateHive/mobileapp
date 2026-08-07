@@ -86,13 +86,15 @@ function VideoItem({
   // when you leave it, and a clip that keeps playing carries its sound into
   // whatever screen you moved to.
   const isFocused = useIsFocused();
+  // Hold to pause, release to resume — same gesture as the immersive viewer.
+  const [holding, setHolding] = useState(false);
   useEffect(() => {
-    if (isActive && isFocused) {
+    if (isActive && isFocused && !holding) {
       player.play();
     } else {
       player.pause();
     }
-  }, [isActive, isFocused, player]);
+  }, [isActive, isFocused, holding, player]);
 
   // Track when video actually starts playing — depends only on player to avoid duplicate subscriptions
   useEffect(() => {
@@ -165,7 +167,15 @@ function VideoItem({
 
       {/* Double-tap-to-vote layer — sits over the video, under the action
           buttons/overlays (which are later siblings, so they keep their taps). */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={handleVideoTap} />
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={handleVideoTap}
+        onLongPress={() => setHolding(true)}
+        onPressOut={() => setHolding(false)}
+        // See the viewer: below ~500ms this eats the first tap of a double-tap
+        // vote.
+        delayLongPress={500}
+      />
 
       {/* "$" money burst at the tap point */}
       <DollarBurst ref={burstRef} />
