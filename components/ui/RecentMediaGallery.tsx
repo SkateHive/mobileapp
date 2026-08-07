@@ -38,20 +38,7 @@ export function RecentMediaGallery({
   // returns "denied" without presenting anything — which is why this button did
   // nothing at all (#29). Past that point the only route is the Settings app.
   const [canAskAgain, setCanAskAgain] = useState(true);
-
-  const requestPermission = useCallback(async () => {
-    try {
-      const { status, canAskAgain: mayAsk } =
-        await MediaLibrary.requestPermissionsAsync();
-      setHasPermission(status === "granted");
-      setCanAskAgain(mayAsk);
-      return status === "granted";
-    } catch (error) {
-      console.error("Error requesting media library permission:", error);
-      setHasPermission(false);
-      return false;
-    }
-  }, []);
+  const [debugStatus, setDebugStatus] = useState("");
 
   // Read-only check. Never prompts, so it's safe to run at launch: changing
   // Photos access in Settings makes iOS kill the app, and the *request* call
@@ -59,27 +46,28 @@ export function RecentMediaGallery({
   // what left this panel stuck on "Requesting permissions…" forever.
   const checkPermission = useCallback(async () => {
     try {
-      const { status, canAskAgain: mayAsk } =
-        await MediaLibrary.getPermissionsAsync();
-      setHasPermission(status === "granted");
-      setCanAskAgain(mayAsk);
-    } catch {
+      const perm = await MediaLibrary.getPermissionsAsync();
+      // TEMPORARY: surfaced in the panel below. Granting from Settings still
+      // came back as "not granted" and guessing at why has cost enough rounds.
+      setDebugStatus(
+        `${perm.status} · askAgain=${perm.canAskAgain} · privileges=${
+          (perm as any).accessPrivileges ?? "?"
+        }`
+      );
+      setHasPermission(perm.status === "granted");
+      setCanAskAgain(perm.canAskAgain);
+    } catch (e) {
+      setDebugStatus(`threw: ${e instanceof Error ? e.message : String(e)}`);
       setHasPermission(false);
     }
   }, []);
 
-  // Granting happens in Settings, which means leaving the app — so re-check on
-  // the way back, or the user returns to the same panel they just fixed.
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") checkPermission();
-    });
-    return () => sub.remove();
-  }, [checkPermission]);
-
+  // Truth by attempt, not by asking. On device the permission API reported
+  // status "denied" while iOS itself showed Expo Go with full photo access and
+  // accessPrivileges came back as "all" — most likely because saving now asks
+  // for write-only access, after which the read status stops reflecting
+  // reality. Whether the library can be listed is answered by listing it.
   const loadRecentMedia = useCallback(async () => {
-    if (!hasPermission) return;
-
     setIsLoading(true);
     try {
       const result = await MediaLibrary.getAssetsAsync({
@@ -101,27 +89,49 @@ export function RecentMediaGallery({
         }));
 
       setMediaAssets(assets);
+      setHasPermission(true);
     } catch (error) {
+      // The only reason this throws in practice is missing access, so it drives
+      // the panel rather than an alert the user can do nothing about.
       console.error("Error loading media assets:", error);
-      Alert.alert("Error", "Failed to load recent media");
+      setHasPermission(false);
     } finally {
       setIsLoading(false);
     }
-  }, [hasPermission, maxItems]);
+  }, [maxItems]);
 
-  // Only ever a read on mount. The prompt now belongs to the button, which also
-  // means opening the composer no longer throws a system dialog at people who
-  // just want to type.
+  // Declared after loadRecentMedia so it can hand straight over to it.
+  const requestPermission = useCallback(async () => {
+    try {
+      const { status, canAskAgain: mayAsk } =
+        await MediaLibrary.requestPermissionsAsync();
+      setCanAskAgain(mayAsk);
+      if (status === "granted") await loadRecentMedia();
+      else setHasPermission(false);
+    } catch (error) {
+      console.error("Error requesting media library permission:", error);
+      setHasPermission(false);
+    }
+  }, [loadRecentMedia]);
+
+  // Mount does not prompt: it just tries to list, and the outcome decides what
+  // is shown. checkPermission runs alongside only to know whether the button
+  // should prompt or send the user to Settings.
   useEffect(() => {
-    setIsLoading(false);
     checkPermission();
-  }, [checkPermission]);
+    loadRecentMedia();
+  }, [checkPermission, loadRecentMedia]);
 
-  // Load only once access is actually there — including when it arrives late,
-  // from Settings.
+  // Granting happens in Settings, which means leaving the app — so try again on
+  // the way back, or the user returns to the same panel they just fixed.
   useEffect(() => {
-    if (hasPermission) loadRecentMedia();
-  }, [hasPermission, loadRecentMedia]);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active" || hasPermission) return;
+      checkPermission();
+      loadRecentMedia();
+    });
+    return () => sub.remove();
+  }, [checkPermission, loadRecentMedia, hasPermission]);
 
   const handleMediaPress = useCallback(
     async (asset: MediaAsset) => {
@@ -169,6 +179,8 @@ export function RecentMediaGallery({
               {canAskAgain ? "Grant Permission" : "Open Settings"}
             </Text>
           </Pressable>
+          {/* TEMPORARY diagnostic — remove before opening the PR. */}
+          {!!debugStatus && <Text style={styles.subText}>{debugStatus}</Text>}
         </View>
       </View>
     );
