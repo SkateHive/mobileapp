@@ -3,6 +3,7 @@ import {
   View,
   FlatList,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,7 +20,7 @@ import * as Haptics from "expo-haptics";
 import * as MediaLibrary from "expo-media-library";
 import { File, Paths } from "expo-file-system";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
 import { castVote, canPost } from "~/lib/posting";
@@ -29,7 +30,6 @@ import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { extractMediaFromBody, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
-import { ActionSheet } from "~/components/ui/ActionSheet";
 import { useVideoMuted } from "~/lib/video-mute";
 import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
@@ -116,7 +116,6 @@ function ImmersivePostItem({
   const [imageIndex, setImageIndex] = useState(0);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [actionsVisible, setActionsVisible] = useState(false);
   const lastTap = useRef(0);
   const burstRef = useRef<DollarBurstHandle>(null);
   const caption = captionFor(post);
@@ -331,32 +330,16 @@ function ImmersivePostItem({
         commentCount={post.children ?? 0}
         onVote={isOwn ? undefined : () => onVote(post)}
         onComment={() => onComment(post)}
-        // Saving is rare and used to sit in the rail full time, taking the most
-        // valuable column on screen. It lives behind share now (#47).
-        onShare={() => (isOwn ? setActionsVisible(true) : onShare(post))}
+        onShare={() => onShare(post)}
+        // Back in the rail: behind an ActionSheet neither row did anything,
+        // because that sheet is a Modal inside this Modal and its action runs
+        // once it unmounts — the same nesting that wedged #38. Moving saving
+        // off the rail needs a sheet that isn't a second modal, so it stays put
+        // until then (#47).
+        onDownload={isOwn ? handleDownload : undefined}
+        isDownloading={downloading}
         isMuted={isMuted}
         onToggleMute={videoUrl ? () => setMuted(!isMuted) : undefined}
-      />
-
-      <ActionSheet
-        visible={actionsVisible}
-        onClose={() => setActionsVisible(false)}
-        title="POST"
-        subtitle={`@${post.author}`}
-        items={[
-          {
-            key: "share",
-            icon: "share-outline",
-            title: "Share link",
-            onPress: () => onShare(post),
-          },
-          {
-            key: "download",
-            icon: "download-outline",
-            title: downloading ? "Saving…" : "Save to camera roll",
-            onPress: handleDownload,
-          },
-        ]}
       />
     </View>
   );
@@ -392,6 +375,10 @@ export function ImmersivePostViewer({
   const votingLockRef = useRef<Record<string, boolean>>({});
   const [conversationPost, setConversationPost] = useState<any | null>(null);
 
+  // The responder above is built once, so it can't close over a stale onClose.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const canVote = !!username && username !== "SPECTATOR";
 
   useEffect(() => {
@@ -423,26 +410,21 @@ export function ImmersivePostViewer({
   // a mostly vertical one (failOffsetY), and ignores anything that didn't start
   // within EDGE of the left side. runOnJS puts the callbacks on the JS thread,
   // so onClose and the flag below are plain JS.
-  const listRef = useRef<FlatList<any>>(null);
-  const dismissGesture = useMemo(() => {
-    const EDGE = 28;
-    let fromEdge = false;
-    return Gesture.Pan()
-      .runOnJS(true)
-      // Without this the pager claims the touch first and this never activates:
-      // a FlatList is a native scroll view, and it wins the race by default.
-      // Cast: gesture-handler types this as a ref to its own component, but a
-      // plain host-component ref is what it needs at runtime.
-      .simultaneousWithExternalGesture(listRef as any)
-      .activeOffsetX(24)
-      .failOffsetY([-16, 16])
-      .onBegin((e) => {
-        fromEdge = e.x <= EDGE;
-      })
-      .onEnd((e) => {
-        if (fromEdge && e.translationX > 60) onClose();
-      });
-  }, [onClose]);
+  // PanResponder, not gesture-handler: a GestureDetector around this list never
+  // activated, because a FlatList is a native scroll view and claims the touch
+  // first. The tab layout already dismisses this way over scrolling screens, so
+  // this is the mechanism that's known to work here. Claiming the responder
+  // mid-gesture also leaves vertical drags with the pager, which an overlay
+  // strip could not do.
+  const dismissResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, g) =>
+        g.x0 <= 28 && g.dx > 20 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderRelease: (_evt, g) => {
+        if (g.dx > 60) onCloseRef.current();
+      },
+    })
+  ).current;
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -541,10 +523,8 @@ export function ImmersivePostViewer({
             gesture would fight both the image carousel and the vertical pager;
             the edge is where iOS itself puts back navigation. The close button
             stays — a gesture with no affordance shouldn't be the only exit. */}
-        <GestureDetector gesture={dismissGesture}>
-        <View style={styles.container}>
+        <View style={styles.container} {...dismissResponder.panHandlers}>
         <FlatList
-          ref={listRef}
           data={posts}
           keyExtractor={postKey}
           renderItem={renderItem}
@@ -565,7 +545,6 @@ export function ImmersivePostViewer({
           initialNumToRender={2}
         />
         </View>
-        </GestureDetector>
 
         {conversationPost && (
           <FullConversationDrawer
