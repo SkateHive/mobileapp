@@ -38,7 +38,7 @@ import { useUserComments } from "~/lib/hooks/useUserComments";
 import { convertVestToHive } from "~/lib/hive-utils";
 import { canPost } from "~/lib/posting";
 import * as Haptics from "expo-haptics";
-import { extractMediaFromBody, filterDeletedPosts, metadataImageUrl } from "~/lib/utils";
+import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 import { ImmersivePostViewer } from "~/components/Feed/ImmersivePostViewer";
@@ -298,19 +298,31 @@ export default function ProfileScreen() {
     // Tapping any tile opens the immersive post viewer at that post.
     const openViewer = () => setViewerIndex(index);
 
+    // Earnings, bottom-left: the video badge already owns the other corner.
+    // Hidden at zero — a grid of $0.00 makes a profile look dead.
+    const payout = formatPayout(item);
+    const earnings = payout ? (
+      <View style={styles.gridEarnings} pointerEvents="none">
+        <Text style={styles.gridEarningsText}>{payout}</Text>
+      </View>
+    ) : null;
+
     // Video posts show their poster frame; the clip plays in the viewer. Clips
     // without a poster keep the old inline player (see GridVideoTile).
     if (videoMedia) {
       return (
-        <GridVideoTile
-          videoUrl={videoMedia.url}
-          thumbnailUrl={getPostThumbnail(item)}
-          size={tileSize}
-          // Poster-less tiles fall back to a real player. Stop them while the
-          // viewer is open on top: nothing is visible, and they still decode.
-          isVisible={viewerIndex === null && visibleGridItems.has(item.permlink)}
-          onPress={openViewer}
-        />
+        <View>
+          <GridVideoTile
+            videoUrl={videoMedia.url}
+            thumbnailUrl={getPostThumbnail(item)}
+            size={tileSize}
+            // Poster-less tiles fall back to a real player. Stop them while the
+            // viewer is open on top: nothing is visible, and they still decode.
+            isVisible={viewerIndex === null && visibleGridItems.has(item.permlink)}
+            onPress={openViewer}
+          />
+          {earnings}
+        </View>
       );
     }
 
@@ -332,6 +344,7 @@ export default function ProfileScreen() {
             <Ionicons name="image-outline" size={28} color={theme.colors.muted} />
           </View>
         )}
+        {earnings}
       </Pressable>
     );
   }, [tileSize, getPostThumbnail, visibleGridItems, viewerIndex]);
@@ -1149,6 +1162,20 @@ const styles = StyleSheet.create({
   gridImage: {
     width: '100%',
     height: '100%',
+  },
+  gridEarnings: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  gridEarningsText: {
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.xxs,
   },
   gridPlaceholder: {
     flex: 1,

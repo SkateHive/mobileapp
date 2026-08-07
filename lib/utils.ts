@@ -160,3 +160,27 @@ export function metadataImageUrl(metadata: any): string | null {
   }
   return null;
 }
+
+/**
+ * What a post has earned, in HBD.
+ *
+ * Hive splits this across the payout window: while the post is open only
+ * `pending_payout_value` is set, and once it pays out that drops to zero and
+ * `total_payout_value` + `curator_payout_value` hold the final amount. Summing
+ * all three is what covers both phases — `pending || total` silently drops the
+ * curator half of every settled post.
+ */
+export function postPayout(post: any): number {
+  const num = (v: any) => parseFloat(String(v ?? '0')) || 0;
+  return (
+    num(post?.pending_payout_value) +
+    num(post?.total_payout_value) +
+    num(post?.curator_payout_value)
+  );
+}
+
+/** `$1.23`, or an empty string when there is nothing worth showing. */
+export function formatPayout(post: any): string {
+  const value = postPayout(post);
+  return value > 0 ? `$${value.toFixed(2)}` : '';
+}
