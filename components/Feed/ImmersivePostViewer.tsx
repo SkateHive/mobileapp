@@ -29,6 +29,7 @@ import { extractMediaFromBody, metadataImageUrl } from "~/lib/utils";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { useVideoMuted } from "~/lib/video-mute";
+import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 
 const postKey = (p: any) => `${p.author}/${p.permlink}`;
@@ -365,23 +366,23 @@ export function ImmersivePostViewer({
     if (visible) setCurrentIndex(initialIndex);
   }, [visible, initialIndex]);
 
-  // Seed liked/vote-count state from the posts' on-chain votes.
+  const voteOverrides = useVoteOverrides();
+
+  // Seed liked/vote-count state from the posts' on-chain votes, corrected by
+  // this session's votes — the profile query these posts come from is its own
+  // snapshot and lags a vote cast on another screen (#48).
   useEffect(() => {
     const liked: Record<string, boolean> = {};
     const counts: Record<string, number> = {};
     posts.forEach((p) => {
       const key = postKey(p);
-      liked[key] = !!(
-        username &&
-        (p.active_votes || []).some(
-          (v: any) => v.voter === username && (v.rshares ?? v.weight ?? 0) > 0
-        )
-      );
-      counts[key] = p.net_votes ?? (p.active_votes || []).length ?? 0;
+      const state = resolveVoteState(voteOverrides, p, username, p.net_votes ?? 0);
+      liked[key] = state.isLiked;
+      counts[key] = state.voteCount;
     });
     setLikedStates(liked);
     setVoteCountStates(counts);
-  }, [posts, username]);
+  }, [posts, username, voteOverrides]);
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -408,6 +409,7 @@ export function ImmersivePostViewer({
         setLikedStates((p) => ({ ...p, [key]: !wasLiked }));
         setVoteCountStates((p) => ({ ...p, [key]: wasLiked ? prevCount - 1 : prevCount + 1 }));
         await castVote(session!, post.author, post.permlink, wasLiked ? 0 : 10000);
+        recordVote(post.author, post.permlink, wasLiked ? 0 : 10000);
         showToast(wasLiked ? "Vote removed" : "Voted!", "success");
       } catch (error) {
         setLikedStates((p) => ({ ...p, [key]: wasLiked }));

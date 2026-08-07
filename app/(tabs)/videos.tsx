@@ -26,6 +26,7 @@ import { theme } from "~/lib/theme";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { useIsFocused } from "@react-navigation/native";
 import { useVideoMuted } from "~/lib/video-mute";
+import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
@@ -221,19 +222,24 @@ export default function VideosScreen() {
   const [voteCountStates, setVoteCountStates] = useState<Record<string, number>>({});
   const [conversationVideo, setConversationVideo] = useState<VideoPost | null>(null);
 
-  // Init liked/vote states when data arrives
+  const voteOverrides = useVoteOverrides();
+
+  // Init liked/vote states when data arrives. This feed is prefetched at login
+  // and cached for a minute, so on its own it happily shows an empty heart for
+  // a post voted on elsewhere — hence the session's votes on top (#48).
   useEffect(() => {
     if (videos.length === 0) return;
     const liked: Record<string, boolean> = {};
     const counts: Record<string, number> = {};
     videos.forEach((v) => {
       const key = `${v.author}-${v.permlink}`;
-      liked[key] = !!(username && v.active_votes?.some((vote) => vote.voter === username && vote.weight > 0));
-      counts[key] = v.votes;
+      const state = resolveVoteState(voteOverrides, v, username, v.votes);
+      liked[key] = state.isLiked;
+      counts[key] = state.voteCount;
     });
     setLikedStates(liked);
     setVoteCountStates(counts);
-  }, [videos, username]);
+  }, [videos, username, voteOverrides]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index ?? 0);
@@ -261,6 +267,7 @@ export default function VideosScreen() {
       setVoteCountStates((p) => ({ ...p, [key]: wasLiked ? prevCount - 1 : prevCount + 1 }));
 
       await castVote(session!, video.author, video.permlink, wasLiked ? 0 : 10000);
+      recordVote(video.author, video.permlink, wasLiked ? 0 : 10000);
       // No success toast — the $-confetti + heart fill are enough feedback.
     } catch (error) {
       setLikedStates((p) => ({ ...p, [key]: wasLiked }));

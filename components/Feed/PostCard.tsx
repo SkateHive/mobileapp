@@ -37,6 +37,7 @@ import { theme } from "~/lib/theme";
 import type { Media, NestedDiscussion } from "../../lib/types";
 import type { Discussion } from "@hiveio/dhive";
 import { extractMediaFromBody, removeVideoLinksFromBody, metadataImageUrl } from "~/lib/utils";
+import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 
 // Action-bar icons (upvote / comment) — sized to match the web footer.
 const ACTION_ICON_SIZE = 18;
@@ -112,14 +113,22 @@ export const PostCard = React.memo(
         : 0,
     );
 
-    // Sync voteCount when post.active_votes changes externally (e.g., data refresh)
+    const voteOverrides = useVoteOverrides();
+
+    // Sync with the fetched data when it changes (e.g. a refresh), corrected by
+    // any vote cast in this session. Without that correction a refetch inside
+    // the API's 60s cache window empties the heart on the very screen the vote
+    // was cast from (#48).
     useEffect(() => {
-      if (Array.isArray(post.active_votes)) {
-        setVoteCount(
-          post.active_votes.filter((vote: any) => vote.weight > 0).length,
-        );
-      }
-    }, [post.active_votes]);
+      if (!Array.isArray(post.active_votes)) return;
+      const { isLiked: liked, voteCount: count } = resolveVoteState(
+        voteOverrides,
+        post,
+        currentUsername,
+      );
+      setVoteCount(count);
+      setIsLiked(liked);
+    }, [post.active_votes, currentUsername, voteOverrides]);
 
     // Track the post's payout value for dynamic updates
     const [payoutValue, setPayoutValue] = useState(() => {
@@ -180,16 +189,6 @@ export const PostCard = React.memo(
       return formatTimeAbbreviated(date);
     }, [post.created]);
 
-    // Check if user has already voted on this post
-    useEffect(() => {
-      if (currentUsername && Array.isArray(post.active_votes)) {
-        const hasVoted = post.active_votes.some(
-          (vote: any) => vote.voter === currentUsername && vote.weight > 0,
-        );
-        setIsLiked(hasVoted);
-      }
-    }, [post.active_votes, currentUsername]);
-
     const handleMediaPress = useCallback((media: Media) => {
       setSelectedMedia(media);
       setIsModalVisible(true);
@@ -244,6 +243,13 @@ export const PostCard = React.memo(
           // for classic Hive-key accounts.
           await castVote(
             session,
+            post.author,
+            post.permlink,
+            previousLikedState ? 0 : Math.round(votePercentage * 100),
+          );
+
+          // Tell the rest of the app, which reads other snapshots of this post.
+          recordVote(
             post.author,
             post.permlink,
             previousLikedState ? 0 : Math.round(votePercentage * 100),
