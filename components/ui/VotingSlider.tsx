@@ -1,155 +1,221 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, Dimensions, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  PanResponder,
+  GestureResponderEvent,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '~/lib/theme';
 import { Text } from './text';
+
+const SPITFIRE = require('../../assets/images/spitfire.png');
+
+// The bar runs green → yellow → red, so a heavier vote reads as hotter. Same
+// ramp as the web slider.
+const TRACK_COLORS: readonly [string, string, ...string[]] = [
+  '#32CD32',
+  '#B4E600',
+  '#F2E205',
+  '#F27405',
+  '#E63946',
+];
+
+// The confirm button's yellow is its own thing, not theme.primary: it has to
+// sit on top of the green end of the track and still read as a button.
+const VOTE_YELLOW = '#E8F70C';
+
+const TRACK_HEIGHT = 16;
+const THUMB_SIZE = 34;
 
 interface VotingSliderProps {
   value: number;
   onValueChange: (value: number) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isVoting?: boolean;
   minimumValue?: number;
   maximumValue?: number;
   step?: number;
 }
 
-const { width: screenWidth } = Dimensions.get('window');
-const SLIDER_WIDTH = screenWidth * 0.55; // 55% of screen width to leave space for value
-
-export function VotingSlider({ 
-  value, 
-  onValueChange, 
-  minimumValue = 1, 
+/**
+ * The vote-weight bar, matching the web slider (#55): one gradient track with
+ * the Spitfire head as the thumb, a VOTE button carrying the live percentage,
+ * and an X to back out.
+ *
+ * Confirm and cancel live in here rather than in the caller because the button
+ * label is the slider's value — splitting them meant passing the number back
+ * out just to render it.
+ */
+export function VotingSlider({
+  value,
+  onValueChange,
+  onConfirm,
+  onCancel,
+  isVoting = false,
+  minimumValue = 1,
   maximumValue = 100,
-  step = 1 
+  step = 1,
 }: VotingSliderProps) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [trackLayout, setTrackLayout] = useState<{ x: number; width: number; y: number }>({ x: 0, width: SLIDER_WIDTH, y: 0 });
-  
-  const updateValueFromPosition = useCallback((pageX: number) => {
-    const relativeX = pageX - trackLayout.x;
-    const percentage = Math.max(0, Math.min(1, relativeX / trackLayout.width));
-    const newValue = minimumValue + percentage * (maximumValue - minimumValue);
-    const clampedValue = Math.max(minimumValue, Math.min(maximumValue, newValue));
-    const steppedValue = Math.round(clampedValue / step) * step;
-    onValueChange(steppedValue);
-  }, [onValueChange, minimumValue, maximumValue, step, trackLayout]);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const trackX = useRef(0);
+  const trackRef = useRef<View>(null);
 
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => false,
-    onStartShouldSetPanResponderCapture: () => true,
-    onMoveShouldSetPanResponderCapture: () => true,
-    
-    onPanResponderGrant: (event: GestureResponderEvent) => {
-      setIsDragging(true);
-      updateValueFromPosition(event.nativeEvent.pageX);
+  const updateFromPageX = useCallback(
+    (pageX: number) => {
+      if (!trackWidth) return;
+      const ratio = Math.max(0, Math.min(1, (pageX - trackX.current) / trackWidth));
+      const raw = minimumValue + ratio * (maximumValue - minimumValue);
+      const stepped = Math.round(raw / step) * step;
+      onValueChange(Math.max(minimumValue, Math.min(maximumValue, stepped)));
     },
-    
-    onPanResponderMove: (event: GestureResponderEvent) => {
-      updateValueFromPosition(event.nativeEvent.pageX);
-    },
-    
-    onPanResponderRelease: () => {
-      setIsDragging(false);
-    },
-    
-    onPanResponderTerminate: () => {
-      setIsDragging(false);
-    },
-  });
+    [trackWidth, minimumValue, maximumValue, step, onValueChange]
+  );
 
-  const onTrackLayout = useCallback((event: any) => {
-    const view = event.currentTarget || event.target;
-    view.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-      setTrackLayout({ x: pageX, width, y: pageY });
-    });
-  }, []);
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e: GestureResponderEvent) =>
+        updateRef.current(e.nativeEvent.pageX),
+      onPanResponderMove: (e: GestureResponderEvent) =>
+        updateRef.current(e.nativeEvent.pageX),
+    })
+  ).current;
 
-  const thumbPosition = ((value - minimumValue) / (maximumValue - minimumValue)) * SLIDER_WIDTH;
+  // The responder is built once, so it reads the current handler through a ref
+  // instead of capturing the first one.
+  const updateRef = useRef(updateFromPageX);
+  updateRef.current = updateFromPageX;
+
+  const ratio = (value - minimumValue) / (maximumValue - minimumValue);
+  // The head stays inside the track, and the dimming starts where it ends —
+  // so at 100% the head lands flush against the right edge with nothing left
+  // to dim, and at 1% it covers the sliver of bar behind it.
+  const thumbLeft = ratio * Math.max(0, trackWidth - THUMB_SIZE);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.sliderContainer}>
+    <View style={styles.row}>
+      <View
+        ref={trackRef}
+        style={styles.trackArea}
+        onLayout={() => {
+          trackRef.current?.measure((_x, _y, width, _h, pageX) => {
+            trackX.current = pageX;
+            setTrackWidth(width);
+          });
+        }}
+        {...pan.panHandlers}
+      >
+        <LinearGradient
+          colors={TRACK_COLORS}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.track}
+        />
+        {/* Everything past the thumb is dimmed, so the bar still shows how far
+            along you are — the gradient alone carries no position. */}
         <View
-          style={[styles.trackContainer, { width: SLIDER_WIDTH }]}
-          onLayout={onTrackLayout}
-          {...panResponder.panHandlers}
-        >
-          <View style={styles.track}>
-            <View 
-              style={[styles.progress, { width: thumbPosition }]} 
-            />
-          </View>
-          
-          <View
-            style={[
-              styles.thumb,
-              { 
-                left: Math.max(0, Math.min(SLIDER_WIDTH - 18, thumbPosition - 9)),
-                backgroundColor: isDragging ? theme.colors.primary : theme.colors.green,
-                transform: [{ scale: isDragging ? 1.2 : 1 }]
-              }
-            ]}
-          />
-        </View>
-        
-        <Text style={styles.valueText}>{value}%</Text>
+          style={[
+            styles.unfilled,
+            { left: thumbLeft + THUMB_SIZE, borderRadius: TRACK_HEIGHT / 2 },
+          ]}
+          pointerEvents="none"
+        />
+        <Image
+          source={SPITFIRE}
+          style={[styles.thumb, { left: thumbLeft }]}
+          contentFit="contain"
+          pointerEvents="none"
+        />
       </View>
+
+      <Pressable
+        style={[styles.voteButton, isVoting && styles.disabled]}
+        onPress={onConfirm}
+        disabled={isVoting}
+        accessibilityRole="button"
+        accessibilityLabel={`Vote ${value} percent`}
+        accessibilityState={{ disabled: isVoting }}
+      >
+        {isVoting ? (
+          <ActivityIndicator size="small" color={theme.colors.black} />
+        ) : (
+          <Text style={styles.voteText}>VOTE {value}%</Text>
+        )}
+      </Pressable>
+
+      <Pressable
+        style={styles.cancelButton}
+        onPress={onCancel}
+        disabled={isVoting}
+        accessibilityRole="button"
+        accessibilityLabel="Cancel vote"
+      >
+        <Ionicons name="close" size={18} color={theme.colors.white} />
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  row: {
     flex: 1,
-  },
-  sliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 32,
+    gap: theme.spacing.sm,
   },
-  trackContainer: {
-    position: 'relative',
-    height: 32,
+  trackArea: {
+    flex: 1,
+    height: 44, // the bar is thin; the touch target is not
     justifyContent: 'center',
-    paddingVertical: 14, // Good touch area
   },
   track: {
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
+    height: TRACK_HEIGHT,
+    borderRadius: TRACK_HEIGHT / 2,
     width: '100%',
   },
-  progress: {
-    height: 4,
-    backgroundColor: theme.colors.green,
-    borderRadius: 2,
+  unfilled: {
     position: 'absolute',
-    top: 0,
-    left: 0,
+    right: 0,
+    height: TRACK_HEIGHT,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   thumb: {
     position: 'absolute',
-    width: 18, // Reasonable size - not too big, not too small
-    height: 18,
-    backgroundColor: theme.colors.green,
-    borderRadius: 9,
-    top: 7, // Center vertically ((32 - 18) / 2)
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    borderWidth: 2,
-    borderColor: '#fff',
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
   },
-  valueText: {
-    fontSize: theme.fontSizes.sm,
-    color: theme.colors.green,
-    fontFamily: theme.fonts.regular,
-    minWidth: 35,
-    textAlign: 'right',
-    marginLeft: theme.spacing.xs,
+  voteButton: {
+    backgroundColor: VOTE_YELLOW,
+    paddingHorizontal: theme.spacing.sm,
+    // Fixed: the label runs from "VOTE 1%" to "VOTE 100%", and letting the
+    // button follow it resized the track under your finger while dragging.
+    minWidth: 92,
+    height: 30,
+    borderRadius: theme.borderRadius.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabled: { opacity: 0.6 },
+  voteText: {
+    color: theme.colors.black,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.xs,
+  },
+  cancelButton: {
+    width: 30,
+    height: 30,
+    borderRadius: theme.borderRadius.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

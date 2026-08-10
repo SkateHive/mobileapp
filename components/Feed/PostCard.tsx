@@ -218,33 +218,22 @@ export const PostCard = React.memo(
         const previousLikedState = isLiked;
         const previousVoteCount = voteCount;
         const previousPayoutValue = payoutValue;
+        const weight = Math.round(votePercentage * 100);
 
-        setIsLiked(!isLiked);
-        setVoteCount((prevCount) =>
-          previousLikedState ? prevCount - 1 : prevCount + 1,
-        );
+        setIsLiked(true);
+        setVoteCount((prevCount) => prevCount + 1);
 
-        // Update payout value if we have an estimation and user is voting (not unvoting)
-        if (estimatedValue > 0 && !previousLikedState) {
+        if (estimatedValue > 0) {
           setPayoutValue((prev) => prev + estimatedValue);
         }
 
         try {
           // Routes to the server for email (userbase) accounts, signs locally
           // for classic Hive-key accounts.
-          await castVote(
-            session,
-            post.author,
-            post.permlink,
-            previousLikedState ? 0 : Math.round(votePercentage * 100),
-          );
+          await castVote(session, post.author, post.permlink, weight);
 
           // Tell the rest of the app, which reads other snapshots of this post.
-          recordVote(
-            post.author,
-            post.permlink,
-            previousLikedState ? 0 : Math.round(votePercentage * 100),
-          );
+          recordVote(post.author, post.permlink, weight);
 
           // Show simple success toast
           showToast("Vote submitted!", "success");
@@ -468,46 +457,17 @@ export const PostCard = React.memo(
             {showSlider ? (
               /* Voting slider mode - takes entire bottom bar */
               <View style={styles.votingSliderContainer}>
+                {/* Confirm and cancel live inside the slider now: the button
+                    reads "VOTE 100%", so it needs the value anyway. */}
                 <VotingSlider
                   value={voteWeight}
                   onValueChange={setVoteWeight}
+                  onConfirm={() => handleVote(voteWeight)}
+                  onCancel={() => setShowSlider(false)}
+                  isVoting={isVoting}
                   minimumValue={1}
                   maximumValue={100}
                 />
-                <View style={styles.sliderControls}>
-                  <Pressable
-                    style={styles.cancelVoteButton}
-                    onPress={() => setShowSlider(false)}
-                    disabled={isVoting}
-                  >
-                    <FontAwesome
-                      name="times"
-                      size={22}
-                      color={theme.colors.gray}
-                    />
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.confirmVoteButton,
-                      isVoting && styles.disabledButton,
-                    ]}
-                    onPress={() => handleVote(voteWeight)}
-                    disabled={isVoting}
-                  >
-                    {isVoting ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={theme.colors.green}
-                      />
-                    ) : (
-                      <FontAwesome
-                        name="arrow-up"
-                        size={22}
-                        color={theme.colors.green}
-                      />
-                    )}
-                  </Pressable>
-                </View>
               </View>
             ) : (
               /* Normal bottom bar mode */
@@ -521,7 +481,10 @@ export const PostCard = React.memo(
                       styles.voteItem,
                       { opacity: isVoting ? 0.5 : pressed ? 0.7 : 0.9 },
                     ]}
-                    disabled={isVoting}
+                    // Inert once you've voted. Tapping again used to reopen the
+                    // slider and cast weight 0, which reads as "vote again" and
+                    // silently took the vote back instead.
+                    disabled={isVoting || isLiked}
                     hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     accessibilityRole="button"
                     // The count is hidden at 0, so the label carries it — an
@@ -531,8 +494,13 @@ export const PostCard = React.memo(
                         ? `Voted, ${voteCount} votes`
                         : `Upvote, ${voteCount} votes`
                     }
-                    accessibilityState={{ selected: isLiked, disabled: isVoting }}
-                    accessibilityHint="Double tap to choose a vote weight"
+                    accessibilityState={{
+                      selected: isLiked,
+                      disabled: isVoting || isLiked,
+                    }}
+                    accessibilityHint={
+                      isLiked ? undefined : "Double tap to choose a vote weight"
+                    }
                   >
                     <View style={styles.iconBox}>
                       {isLiked ? (
@@ -886,28 +854,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
-    height: 40,
+    height: 44,
     marginBottom: theme.spacing.xxs,
-  },
-  sliderControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-    marginLeft: theme.spacing.xs,
-  },
-  cancelVoteButton: {
-    padding: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    width: 36,
-    height: 36,
-  },
-  confirmVoteButton: {
-    padding: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    width: 36,
-    height: 36,
   },
   menuButton: {
     padding: theme.spacing.sm,
