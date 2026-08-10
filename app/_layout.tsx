@@ -169,6 +169,15 @@ export default function RootLayout() {
                           options={{
                             animation: 'slide_from_right',
                             gestureEnabled: true,
+                            // The edge-only recogniser never fired: the pager
+                            // fills the screen and takes the touch first. The
+                            // full-screen one is a pan and competes properly —
+                            // held to the left 60px by gestureResponseDistance,
+                            // which only applies in this mode, so a horizontal
+                            // swipe anywhere else still belongs to the image
+                            // carousel.
+                            fullScreenGestureEnabled: true,
+                            gestureResponseDistance: { start: 60 },
                             contentStyle: { backgroundColor: '#000' },
                           }}
                         />
