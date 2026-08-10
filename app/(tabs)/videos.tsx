@@ -206,7 +206,9 @@ function VideoItem({
         voteCount={voteCount}
         isVoting={isVoting}
         commentCount={item.replies ?? 0}
-        onVote={() => onVote(item)}
+        // Undefined once voted: the rail then renders the count without a
+        // button, the same shape it uses for your own posts.
+        onVote={isLiked ? undefined : () => onVote(item)}
         onComment={() => onComment(item)}
         onShare={() => onShare(item)}
         isMuted={isMuted}
@@ -269,15 +271,21 @@ export default function VideosScreen() {
 
     const wasLiked = likedStates[key];
     const prevCount = voteCountStates[key] || video.votes;
+    // A vote is final: tapping an already-voted heart used to cast weight 0 and
+    // quietly take it back, which is not what "vote again" looks like.
+    if (wasLiked) {
+      votingLockRef.current[key] = false;
+      return;
+    }
 
     try {
       setVotingStates((p) => ({ ...p, [key]: true }));
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setLikedStates((p) => ({ ...p, [key]: !wasLiked }));
-      setVoteCountStates((p) => ({ ...p, [key]: wasLiked ? prevCount - 1 : prevCount + 1 }));
+      setLikedStates((p) => ({ ...p, [key]: true }));
+      setVoteCountStates((p) => ({ ...p, [key]: prevCount + 1 }));
 
-      await castVote(session!, video.author, video.permlink, wasLiked ? 0 : 10000);
-      recordVote(video.author, video.permlink, wasLiked ? 0 : 10000);
+      await castVote(session!, video.author, video.permlink, 10000);
+      recordVote(video.author, video.permlink, 10000);
       // No success toast — the $-confetti + heart fill are enough feedback.
     } catch (error) {
       setLikedStates((p) => ({ ...p, [key]: wasLiked }));

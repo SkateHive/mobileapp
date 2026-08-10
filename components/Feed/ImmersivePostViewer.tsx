@@ -344,7 +344,7 @@ function ImmersivePostItem({
         voteCount={voteCount}
         isVoting={isVoting}
         commentCount={post.children ?? 0}
-        onVote={isOwn ? undefined : () => onVote(post)}
+        onVote={isOwn || isLiked ? undefined : () => onVote(post)}
         onComment={() => onComment(post)}
         onShare={() => onShare(post)}
         // Back in the rail: behind an ActionSheet neither row did anything,
@@ -441,14 +441,19 @@ export function ImmersivePostViewer({
 
       const wasLiked = likedStates[key];
       const prevCount = voteCountStates[key] ?? 0;
+      // A vote is final here too — see the Videos tab and the feed card.
+      if (wasLiked) {
+        votingLockRef.current[key] = false;
+        return;
+      }
       try {
         setVotingStates((p) => ({ ...p, [key]: true }));
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setLikedStates((p) => ({ ...p, [key]: !wasLiked }));
-        setVoteCountStates((p) => ({ ...p, [key]: wasLiked ? prevCount - 1 : prevCount + 1 }));
-        await castVote(session!, post.author, post.permlink, wasLiked ? 0 : 10000);
-        recordVote(post.author, post.permlink, wasLiked ? 0 : 10000);
-        showToast(wasLiked ? "Vote removed" : "Voted!", "success");
+        setLikedStates((p) => ({ ...p, [key]: true }));
+        setVoteCountStates((p) => ({ ...p, [key]: prevCount + 1 }));
+        await castVote(session!, post.author, post.permlink, 10000);
+        recordVote(post.author, post.permlink, 10000);
+        showToast("Voted!", "success");
       } catch (error) {
         setLikedStates((p) => ({ ...p, [key]: wasLiked }));
         setVoteCountStates((p) => ({ ...p, [key]: prevCount }));
