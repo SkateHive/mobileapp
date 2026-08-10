@@ -171,9 +171,11 @@ function ImmersivePostItem({
           onVote(post); // surfaces the login prompt
           return;
         }
+        // Same as the Videos tab: no celebration without a vote behind it.
+        if (isLiked) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         burstRef.current?.play(locationX, locationY);
-        if (!isLiked) onVote(post); // double-tap only ever likes
+        onVote(post);
       } else {
         lastTap.current = now;
       }

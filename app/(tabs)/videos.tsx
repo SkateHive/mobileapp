@@ -129,10 +129,13 @@ function VideoItem({
         onVote(item);
         return;
       }
+      // The burst celebrates a vote, so it only fires when one happens. On an
+      // already-voted post it was still playing and promising a vote that
+      // never came.
+      if (isLiked) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       burstRef.current?.play(locationX, locationY);
-      // IG-style: double-tap only ever likes; never removes an existing vote.
-      if (!isLiked) onVote(item);
+      onVote(item);
     } else {
       lastTap.current = now;
     }
