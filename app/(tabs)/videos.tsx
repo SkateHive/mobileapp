@@ -11,6 +11,8 @@ import {
   useWindowDimensions,
   ViewToken,
   type GestureResponderEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -262,6 +264,18 @@ export default function VideosScreen() {
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
+  // Where the scroll actually stopped, which viewability alone doesn't tell us:
+  // fling past two or three videos and viewableItems[0] can be a clip you flew
+  // over, with no further event once things settle — so the video on screen
+  // never gets play() and sits there frozen. The offset is unambiguous.
+  const settleOnIndex = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const index = Math.round(e.nativeEvent.contentOffset.y / SCREEN_HEIGHT);
+      setCurrentIndex(Math.max(0, Math.min(videos.length - 1, index)));
+    },
+    [SCREEN_HEIGHT, videos.length]
+  );
+
   const handleVote = useCallback(async (video: VideoPost) => {
     const key = `${video.author}-${video.permlink}`;
     if (!canPost(session)) {
@@ -377,6 +391,9 @@ export default function VideosScreen() {
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          // Both: a flick ends in momentum, a slow drag ends without it.
+          onMomentumScrollEnd={settleOnIndex}
+          onScrollEndDrag={settleOnIndex}
           removeClippedSubviews
           maxToRenderPerBatch={2}
           windowSize={3}

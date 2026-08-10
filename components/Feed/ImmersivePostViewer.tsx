@@ -11,6 +11,8 @@ import {
   Share,
   useWindowDimensions,
   type GestureResponderEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewToken,
 } from "react-native";
 import { Image } from "expo-image";
@@ -431,6 +433,16 @@ export function ImmersivePostViewer({
   ).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
+  // Same as the Videos tab: viewability can leave the index on a post you flew
+  // past, and then nothing plays. The scroll offset says where you landed.
+  const settleOnIndex = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const index = Math.round(e.nativeEvent.contentOffset.y / height);
+      setCurrentIndex(Math.max(0, Math.min(posts.length - 1, index)));
+    },
+    [height, posts.length]
+  );
+
   const handleVote = useCallback(
     async (post: any) => {
       const key = postKey(post);
@@ -539,6 +551,8 @@ export function ImmersivePostViewer({
           getItemLayout={(_, i) => ({ length: height, offset: height * i, index: i })}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          onMomentumScrollEnd={settleOnIndex}
+          onScrollEndDrag={settleOnIndex}
           onEndReached={hasMore ? onLoadMore : undefined}
           onEndReachedThreshold={0.8}
           removeClippedSubviews
