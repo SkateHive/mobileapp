@@ -4,7 +4,6 @@ import {
   FlatList,
   Alert,
   Linking,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -367,16 +366,15 @@ function ImmersivePostItem({
 
 // ─── The viewer (full-screen modal over the profile) ──────────────────────────
 interface ViewerProps {
-  visible: boolean;
   posts: any[];
   initialIndex: number;
   hasMore: boolean;
   onLoadMore: () => void;
+  /** Leaves the viewer — the route's back, not a modal's dismiss. */
   onClose: () => void;
 }
 
 export function ImmersivePostViewer({
-  visible,
   posts,
   initialIndex,
   hasMore,
@@ -397,9 +395,11 @@ export function ImmersivePostViewer({
 
   const canVote = !!username && username !== "SPECTATOR";
 
+  // Mounting is what "opening" means now, so the initial index only needs
+  // applying if the caller changes it under us.
   useEffect(() => {
-    if (visible) setCurrentIndex(initialIndex);
-  }, [visible, initialIndex]);
+    setCurrentIndex(initialIndex);
+  }, [initialIndex]);
 
   const voteOverrides = useVoteOverrides();
 
@@ -506,7 +506,7 @@ export function ImmersivePostViewer({
       return (
         <ImmersivePostItem
           post={item}
-          isActive={index === currentIndex && visible && !conversationPost}
+          isActive={index === currentIndex && !conversationPost}
           width={width}
           height={height}
           isLiked={likedStates[key] ?? false}
@@ -524,19 +524,14 @@ export function ImmersivePostViewer({
       );
     },
     [
-      currentIndex, visible, conversationPost, width, height, likedStates,
+      currentIndex, conversationPost, width, height, likedStates,
       voteCountStates, votingStates, canVote, username, handleVote, handleComment,
       handleShare, onClose, handleOpenProfile, showToast,
     ]
   );
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <SafeAreaProvider>
-        {/* Swipe back out to the grid, from the left edge only. A full-width
-            gesture would fight both the image carousel and the vertical pager;
-            the edge is where iOS itself puts back navigation. The close button
-            stays — a gesture with no affordance shouldn't be the only exit. */}
+    <SafeAreaProvider>
         <View style={styles.container}>
         <FlatList
           data={posts}
@@ -571,8 +566,7 @@ export function ImmersivePostViewer({
             partial
           />
         )}
-      </SafeAreaProvider>
-    </Modal>
+    </SafeAreaProvider>
   );
 }
 

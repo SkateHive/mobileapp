@@ -159,6 +159,19 @@ export default function RootLayout() {
                             contentStyle: { backgroundColor: theme.colors.background },
                           }}
                         />
+                        {/* Pushed, not presented as a modal: a stack screen
+                            gets iOS back-swipe for free, which is the whole
+                            reason the viewer moved off Modal (#35). The slide
+                            has to be set here — the stack defaults to no
+                            animation, and without one there's no gesture. */}
+                        <Stack.Screen
+                          name="post-viewer"
+                          options={{
+                            animation: 'slide_from_right',
+                            gestureEnabled: true,
+                            contentStyle: { backgroundColor: '#000' },
+                          }}
+                        />
                         <Stack.Screen
                           name="skate-dice/index"
                           options={{
