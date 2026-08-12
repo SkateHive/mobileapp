@@ -41,7 +41,8 @@ import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
-import { ImmersivePostViewer } from "~/components/Feed/ImmersivePostViewer";
+import { setViewerPayload, updateViewerPosts } from "~/lib/viewer-store";
+import { useIsFocused } from "@react-navigation/native";
 import { ActionSheet, type ActionSheetItem } from "~/components/ui/ActionSheet";
 
 const GRID_COLS = 3;
@@ -124,6 +125,7 @@ export default function ProfileScreen() {
     useAuth();
   const { showToast } = useToast();
   const params = useLocalSearchParams();
+  const isFocused = useIsFocused();
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
@@ -145,8 +147,6 @@ export default function ProfileScreen() {
   }, [session?.username]);
   const [modalType, setModalType] = useState<'followers' | 'following' | 'muted'>('followers');
   const [profileTab, setProfileTab] = useState<'grid' | 'posts'>('grid');
-  // Index (within gridPosts) of the post open in the immersive viewer; null = closed.
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   // Hive Power of the account being viewed — not necessarily the signed-in one.
   // Uses the same definition as the Instagram gate (the account's own
@@ -261,6 +261,13 @@ export default function ProfileScreen() {
     [visiblePosts, postHasMedia]
   );
 
+  // Feed later pages through to the viewer while it's open. It scrolls past the
+  // end and calls loadNextPage, which lands here — and without this the store
+  // would still hold the list as it was when the tile was tapped.
+  useEffect(() => {
+    updateViewerPosts(gridPosts, hasMore);
+  }, [gridPosts, hasMore]);
+
   // Auto-fill the grid until it has enough items to be scrollable (~5 rows).
   // Without this, short first pages leave the list unscrollable and onEndReached
   // never fires again (its first call lands while isLoading is true and is
@@ -295,8 +302,18 @@ export default function ProfileScreen() {
     const media = extractMediaFromBody(item.body);
     const videoMedia = media.find((m: any) => m.type === 'video');
 
-    // Tapping any tile opens the immersive post viewer at that post.
-    const openViewer = () => setViewerIndex(index);
+    // Tapping any tile opens the immersive post viewer at that post. The list
+    // goes through the store because route params can only carry strings, and
+    // this is a loaded page of posts plus the callback that fetches the next.
+    const openViewer = () => {
+      setViewerPayload({
+        posts: gridPosts,
+        initialIndex: index,
+        hasMore,
+        onLoadMore: loadNextPage,
+      });
+      router.push('/post-viewer');
+    };
 
     // Earnings, bottom-left: the video badge already owns the other corner.
     // Hidden at zero — a grid of $0.00 makes a profile look dead. Bare text,
@@ -327,9 +344,10 @@ export default function ProfileScreen() {
             videoUrl={videoMedia.url}
             thumbnailUrl={getPostThumbnail(item)}
             size={tileSize}
-            // Poster-less tiles fall back to a real player. Stop them while the
-            // viewer is open on top: nothing is visible, and they still decode.
-            isVisible={viewerIndex === null && visibleGridItems.has(item.permlink)}
+            // Poster-less tiles fall back to a real player. Stop them whenever
+            // this screen isn't the one in front — the viewer covers it now,
+            // and a tab switch used to leave them decoding too.
+            isVisible={isFocused && visibleGridItems.has(item.permlink)}
             onPress={openViewer}
           />
           {earnings}
@@ -358,7 +376,7 @@ export default function ProfileScreen() {
         {earnings}
       </Pressable>
     );
-  }, [tileSize, getPostThumbnail, visibleGridItems, viewerIndex]);
+  }, [tileSize, getPostThumbnail, visibleGridItems, isFocused, gridPosts, hasMore, loadNextPage]);
 
   const handleLogout = async () => {
     try {
@@ -849,18 +867,6 @@ export default function ProfileScreen() {
           maxToRenderPerBatch={3}
           windowSize={7}
           contentContainerStyle={styles.contentContainer}
-        />
-      )}
-
-      {/* Immersive post viewer — opens on the tapped grid post, swipe for more */}
-      {viewerIndex !== null && (
-        <ImmersivePostViewer
-          visible={viewerIndex !== null}
-          posts={gridPosts}
-          initialIndex={viewerIndex}
-          hasMore={hasMore}
-          onLoadMore={loadNextPage}
-          onClose={() => setViewerIndex(null)}
         />
       )}
 
