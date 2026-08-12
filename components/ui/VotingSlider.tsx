@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,20 +14,6 @@ import { theme } from '~/lib/theme';
 import { Text } from './text';
 
 const SPITFIRE = require('../../assets/images/spitfire.png');
-
-// The bar runs green → yellow → red, so a heavier vote reads as hotter. Same
-// ramp as the web slider.
-const TRACK_COLORS: readonly [string, string, ...string[]] = [
-  '#32CD32',
-  '#B4E600',
-  '#F2E205',
-  '#F27405',
-  '#E63946',
-];
-
-// The confirm button's yellow is its own thing, not theme.primary: it has to
-// sit on top of the green end of the track and still read as a button.
-const VOTE_YELLOW = '#E8F70C';
 
 const TRACK_HEIGHT = 16;
 const THUMB_SIZE = 34;
@@ -90,9 +76,13 @@ export function VotingSlider({
   ).current;
 
   // The responder is built once, so it reads the current handler through a ref
-  // instead of capturing the first one.
+  // instead of capturing the first one. Assigned in an effect, not during
+  // render: React can discard a render, and a ref written in one would leak a
+  // callback from work that never committed.
   const updateRef = useRef(updateFromPageX);
-  updateRef.current = updateFromPageX;
+  useLayoutEffect(() => {
+    updateRef.current = updateFromPageX;
+  }, [updateFromPageX]);
 
   const ratio = (value - minimumValue) / (maximumValue - minimumValue);
   // The head stays inside the track, and the dimming starts where it ends —
@@ -114,7 +104,7 @@ export function VotingSlider({
         {...pan.panHandlers}
       >
         <LinearGradient
-          colors={TRACK_COLORS}
+          colors={theme.gradients.vote}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={styles.track}
@@ -122,10 +112,9 @@ export function VotingSlider({
         {/* Everything past the thumb is dimmed, so the bar still shows how far
             along you are — the gradient alone carries no position. */}
         <View
-          style={[
-            styles.unfilled,
-            { left: thumbLeft + THUMB_SIZE, borderRadius: TRACK_HEIGHT / 2 },
-          ]}
+          // `left` stays inline: it changes on every drag frame, so hoisting it
+          // would just build the same object somewhere else.
+          style={[styles.unfilled, { left: thumbLeft + THUMB_SIZE }]}
           pointerEvents="none"
         />
         <Image
@@ -140,6 +129,9 @@ export function VotingSlider({
         style={[styles.voteButton, isVoting && styles.disabled]}
         onPress={onConfirm}
         disabled={isVoting}
+        // 30px tall by design — a taller button would drag the whole bar with
+        // it. hitSlop gets the touch target to 44 without touching the layout.
+        hitSlop={{ top: 7, bottom: 7 }}
         accessibilityRole="button"
         accessibilityLabel={`Vote ${value} percent`}
         accessibilityState={{ disabled: isVoting }}
@@ -155,6 +147,7 @@ export function VotingSlider({
         style={styles.cancelButton}
         onPress={onCancel}
         disabled={isVoting}
+        hitSlop={{ top: 7, bottom: 7, right: 7 }}
         accessibilityRole="button"
         accessibilityLabel="Cancel vote"
       >
@@ -185,7 +178,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     height: TRACK_HEIGHT,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: TRACK_HEIGHT / 2,
+    backgroundColor: theme.colors.scrim,
   },
   thumb: {
     position: 'absolute',
@@ -193,7 +187,7 @@ const styles = StyleSheet.create({
     height: THUMB_SIZE,
   },
   voteButton: {
-    backgroundColor: VOTE_YELLOW,
+    backgroundColor: theme.colors.voteButton,
     paddingHorizontal: theme.spacing.sm,
     // Fixed: the label runs from "VOTE 1%" to "VOTE 100%", and letting the
     // button follow it resized the track under your finger while dragging.

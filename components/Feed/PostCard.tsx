@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo } from "react";
+import React, { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { useSoftPostOverlay } from "~/lib/userbase/soft-post-context";
 import { FontAwesome } from "@expo/vector-icons";
@@ -85,6 +85,7 @@ export const PostCard = React.memo(
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
     const [isVoting, setIsVoting] = useState(false);
+    const voteLockRef = useRef(false);
     const [showSlider, setShowSlider] = useState(false);
     const [voteWeight, setVoteWeight] = useState(100);
     const [isLiked, setIsLiked] = useState(false);
@@ -186,6 +187,12 @@ export const PostCard = React.memo(
     }, []);
 
     const handleVote = async (customWeight?: number) => {
+      // Synchronous, unlike setIsVoting: React hasn't committed the disabled
+      // button yet when a second confirm arrives, and both would sail past
+      // isLiked === false and cast. The other two vote handlers lock the same
+      // way.
+      if (voteLockRef.current || isLiked) return;
+      voteLockRef.current = true;
       try {
         setIsVoting(true);
 
@@ -251,6 +258,7 @@ export const PostCard = React.memo(
         }
         showToast(errorMessage, "error");
       } finally {
+        voteLockRef.current = false;
         setIsVoting(false);
         setShowSlider(false);
       }

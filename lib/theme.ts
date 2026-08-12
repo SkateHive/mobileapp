@@ -16,6 +16,17 @@ export const theme = {
     lightGray: '#333333',     // dark gray for light backgrounds
     white: '#FFFFFF',         // white
     black: '#000000',         // black
+    voteButton: '#E8F70C',    // confirm on the voting bar — reads on the green end
+    scrim: 'rgba(0,0,0,0.6)', // dims media behind an overlay
+  },
+  gradients: {
+    // Vote weight, cool to hot: a heavier vote reads as hotter. Matches the web
+    // slider.
+    vote: ['#32CD32', '#B4E600', '#F2E205', '#F27405', '#E63946'] as [
+      string,
+      string,
+      ...string[],
+    ],
   },
   spacing: {
     xxs: 2,
