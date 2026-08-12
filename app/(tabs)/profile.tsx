@@ -41,7 +41,7 @@ import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
-import { setViewerPayload } from "~/lib/viewer-store";
+import { setViewerPayload, updateViewerPosts } from "~/lib/viewer-store";
 import { useIsFocused } from "@react-navigation/native";
 import { ActionSheet, type ActionSheetItem } from "~/components/ui/ActionSheet";
 
@@ -260,6 +260,13 @@ export default function ProfileScreen() {
     visiblePosts.filter(postHasMedia),
     [visiblePosts, postHasMedia]
   );
+
+  // Feed later pages through to the viewer while it's open. It scrolls past the
+  // end and calls loadNextPage, which lands here — and without this the store
+  // would still hold the list as it was when the tile was tapped.
+  useEffect(() => {
+    updateViewerPosts(gridPosts, hasMore);
+  }, [gridPosts, hasMore]);
 
   // Auto-fill the grid until it has enough items to be scrollable (~5 rows).
   // Without this, short first pages leave the list unscrollable and onEndReached

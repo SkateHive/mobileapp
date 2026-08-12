@@ -178,7 +178,7 @@ export default function RootLayout() {
                             // carousel.
                             fullScreenGestureEnabled: true,
                             gestureResponseDistance: { start: 60 },
-                            contentStyle: { backgroundColor: '#000' },
+                            contentStyle: { backgroundColor: theme.colors.black },
                           }}
                         />
                         <Stack.Screen

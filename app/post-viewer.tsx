@@ -20,9 +20,12 @@ export default function PostViewerScreen() {
   const payload = useViewerPayload();
 
   // Nothing to show: a cold deep link, or the store cleared behind us. Leaving
-  // beats rendering an empty black screen with no way out.
+  // beats rendering an empty black screen with no way out — and on a cold link
+  // there's no history to go back to, so that case needs somewhere to land.
   useEffect(() => {
-    if (!payload && router.canGoBack()) router.back();
+    if (payload) return;
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/feed');
   }, [payload]);
 
   if (!payload) return <View style={styles.empty} />;

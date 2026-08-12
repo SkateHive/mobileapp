@@ -27,6 +27,21 @@ export function setViewerPayload(next: ViewerPayload | null) {
   listeners.forEach((l) => l());
 }
 
+/**
+ * Keep an open viewer's list current as the profile pages in more posts.
+ *
+ * Without this the payload is a photograph taken when the tile was tapped: the
+ * viewer asks for more, the profile fetches it, and nothing ever reaches the
+ * viewer — endless scrolling that silently stops. A no-op when the viewer isn't
+ * open, so the profile can call it freely.
+ */
+export function updateViewerPosts(posts: any[], hasMore: boolean) {
+  if (!payload) return;
+  if (payload.posts === posts && payload.hasMore === hasMore) return;
+  payload = { ...payload, posts, hasMore };
+  listeners.forEach((l) => l());
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {
