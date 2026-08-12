@@ -27,6 +27,12 @@ import {
 } from "~/lib/hive-utils";
 import { prefetchVideoFeed, warmUpVideoAssets } from "~/lib/hooks/useQueries";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
+import {
+  loadLastAccountKind,
+  loadLastEmailAccount,
+  type LastAccountKind,
+  type LastEmailAccount,
+} from "~/lib/userbase/session-store";
 import { theme } from "~/lib/theme";
 import type { StoredUser } from "~/lib/types";
 
@@ -81,14 +87,43 @@ export default function Index() {
     }
   }, [isRealUser, isFocused]);
 
-  const heroUser = storedUsers[0];
+  // Coming back here (logging out, or backing out of the code screen) should
+  // land on the account card, never on a half-filled keypad.
+  React.useEffect(() => {
+    if (isFocused && !isRealUser) {
+      setPinForUser(null);
+      setPin("");
+      setSwitchingAccount(false);
+      setMessage("");
+    }
+  }, [isFocused, isRealUser]);
+
+  // Greet whichever account signed in last. Ranking Hive above email was wrong:
+  // logging out of a new email account brought back a Hive account from days
+  // ago, because the two are remembered in different places.
+  const hiveUser = storedUsers[0];
+  const [lastEmail, setLastEmail] = React.useState<LastEmailAccount | null>(null);
+  const [lastKind, setLastKind] = React.useState<LastAccountKind | null>(null);
+  React.useEffect(() => {
+    loadLastEmailAccount().then(setLastEmail).catch(() => {});
+    loadLastAccountKind().then(setLastKind).catch(() => {});
+  }, []);
+
+  const emailWins = lastKind === "email" && !!lastEmail;
+  const heroUser = emailWins ? undefined : hiveUser;
   const showHero = !!heroUser && !switchingAccount;
+  const showEmailHero = !showHero && !!lastEmail && !switchingAccount;
 
   const signIn = async (user: StoredUser, enteredPin?: string) => {
     try {
       setBusy(true);
       setMessage("");
       await loginStoredUser(user.username, enteredPin);
+      // Clear before leaving: this screen is reused when the user logs out, and
+      // a PIN left in state re-fires PinInput's onComplete the moment the pad
+      // remounts — signing straight back in, with no way to reach the login.
+      setPinForUser(null);
+      setPin("");
       router.replace("/(tabs)/videos");
     } catch (error) {
       const known =
@@ -201,6 +236,35 @@ export default function Index() {
                 <Text style={styles.switchAccount}>Back</Text>
               </Pressable>
             </View>
+          ) : showEmailHero ? (
+            <View style={styles.block}>
+              <Image
+                source={{ uri: `${HIVE_AVATAR_URL}/${lastEmail!.handle}/avatar` }}
+                style={styles.avatar}
+                contentFit="cover"
+              />
+              <Text style={styles.heroUsername}>@{lastEmail!.handle}</Text>
+
+              {/* No credential is kept for an email account, so the fastest
+                  path back in is a fresh code to the address we remember. */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  pressed && styles.primaryButtonPressed,
+                ]}
+                onPress={() =>
+                  router.push(`/email-login?email=${encodeURIComponent(lastEmail!.email)}`)
+                }
+                accessibilityRole="button"
+              >
+                <Ionicons name="mail-outline" size={20} color={theme.auth.onNeon} />
+                <Text style={styles.primaryLabel}>Continue with email</Text>
+              </Pressable>
+
+              <Pressable onPress={() => setSwitchingAccount(true)} hitSlop={12}>
+                <Text style={styles.switchAccount}>Switch account</Text>
+              </Pressable>
+            </View>
           ) : showHero ? (
             <View style={styles.block}>
               <Image
@@ -226,8 +290,13 @@ export default function Index() {
                   <>
                     {/* Ionicons, not lucide: this is the app's first screen,
                         and in dev Metro loads lucide's whole icon index before
-                        anything here renders — including the video. */}
-                    <Ionicons name="scan-outline" size={20} color={theme.auth.onNeon} />
+                        anything here renders — including the video. The icon
+                        follows the method, or it promises the wrong thing. */}
+                    <Ionicons
+                      name={heroUser.method === "pin" ? "keypad-outline" : "scan-outline"}
+                      size={20}
+                      color={theme.auth.onNeon}
+                    />
                     <Text style={styles.primaryLabel}>
                       {heroUser.method === "pin" ? "Sign in with PIN" : "Sign in with Face ID"}
                     </Text>
@@ -241,8 +310,35 @@ export default function Index() {
             </View>
           ) : (
             <View style={styles.block}>
-              {storedUsers.length > 0 && (
+              {(storedUsers.length > 0 || !!lastEmail) && (
                 <View style={styles.accountList}>
+                  {/* The remembered email account belongs in this list too — it
+                      only vanished because the list knows about Hive accounts,
+                      which is where the key lives. */}
+                  {!!lastEmail && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.emailRow,
+                        pressed && styles.emailRowPressed,
+                      ]}
+                      onPress={() =>
+                        router.push(
+                          `/email-login?email=${encodeURIComponent(lastEmail.email)}`
+                        )
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Continue as ${lastEmail.handle}`}
+                    >
+                      <Image
+                        source={{ uri: `${HIVE_AVATAR_URL}/${lastEmail.handle}/avatar` }}
+                        style={styles.rowAvatar}
+                        contentFit="cover"
+                      />
+                      <Text style={styles.rowUsername}>@{lastEmail.handle}</Text>
+                      <Text style={styles.rowMethod}>Email</Text>
+                    </Pressable>
+                  )}
+
                   <StoredUsersView
                     users={storedUsers}
                     onQuickLogin={(user) => {
@@ -332,6 +428,32 @@ const styles = StyleSheet.create({
   accountList: {
     width: "100%",
     marginBottom: theme.spacing.sm,
+  },
+  // Matches StoredUsersView's rows — same pill, same anatomy.
+  emailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.auth.surface,
+    borderWidth: 1,
+    borderColor: theme.auth.borderIdle,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: theme.spacing.sm,
+  },
+  emailRowPressed: { borderColor: theme.auth.neon },
+  rowAvatar: { width: 32, height: 32, borderRadius: 16 },
+  rowUsername: {
+    flex: 1,
+    color: theme.colors.white,
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+  },
+  rowMethod: {
+    color: theme.auth.textTertiary,
+    fontFamily: theme.fonts.default,
+    fontSize: 11,
   },
   emailInput: {
     width: "100%",

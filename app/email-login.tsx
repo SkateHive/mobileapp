@@ -146,17 +146,24 @@ export default function EmailLoginScreen() {
       const r = await verifyOtp(email, code.trim());
       if (!r.success) throw new Error(r.error || "Invalid code");
       if (r.token && r.user) {
-        await loginWithUserbase(r.token, r.user);
+        await loginWithUserbase(r.token, r.user, email);
         setUser(r.user);
+        // Clear before leaving the step, or a rejected earlier attempt follows
+        // the user onto the success screen.
+        setError(null);
         setStep("done");
       } else if (r.signupRequired && r.signupToken) {
         setSignupToken(r.signupToken);
+        setError(null);
         setStep("username");
       } else {
         throw new Error("Unexpected response");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid code");
+      // Wrong code: clear the boxes so the next attempt starts clean, instead
+      // of leaving six digits that can't be retried.
+      setCode("");
     } finally {
       setBusy(false);
     }
@@ -169,7 +176,7 @@ export default function EmailLoginScreen() {
     try {
       const r = await completeSignup(signupToken, name);
       if (!r.success || !r.token || !r.user) throw new Error(r.error || "Could not create account");
-      await loginWithUserbase(r.token, r.user);
+      await loginWithUserbase(r.token, r.user, email);
       setUser(r.user);
       setStep("done");
     } catch (e) {
@@ -224,12 +231,20 @@ export default function EmailLoginScreen() {
               {/* Submits on the sixth digit — see PinInput's onComplete. */}
               <PinInput
                 value={code}
-                onChangeText={setCode}
+                onChangeText={(t) => {
+                  if (error) setError(null);
+                  setCode(t);
+                }}
                 onComplete={verify}
                 autoFocus
                 showDigits
+                hasError={!!error}
               />
               {busy && <ActivityIndicator size="small" color={theme.auth.neon} />}
+              {/* Right under the boxes: the shared error line at the bottom of
+                  the screen sits behind the keypad, so a rejected code showed
+                  nothing but a spinner that stopped. */}
+              {!!error && !busy && <Text style={styles.otpError}>{error}</Text>}
               <Pressable
                 onPress={resend}
                 disabled={busy || resendIn > 0}
@@ -383,6 +398,12 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
   },
   resendCount: { color: theme.auth.neon },
+  otpError: {
+    color: theme.colors.danger,
+    fontFamily: theme.fonts.default,
+    fontSize: 12,
+    textAlign: "center",
+  },
   input: {
     backgroundColor: theme.colors.secondaryCard,
     borderRadius: theme.borderRadius.md,

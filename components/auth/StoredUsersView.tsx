@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, ScrollView, Pressable, Image, StyleSheet } from 'react-native';
-import { Text } from '../ui/text';
-import { Button } from '../ui/button';
+import { ScrollView, Pressable, Alert, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
 import { HIVE_AVATAR_URL } from '~/lib/constants';
 import type { StoredUser } from '../../lib/types';
@@ -13,107 +13,103 @@ interface StoredUsersViewProps {
   onDeleteUser?: (username: string) => void;
 }
 
+/**
+ * The saved accounts behind "Switch account" (#60).
+ *
+ * Pills, matching everything else on the sign-in screens. Removing an account
+ * is a long-press: a trash can sitting permanently beside every row put a
+ * destructive action one stray tap away, and made the list about deleting.
+ */
 export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUsersViewProps) {
+  const confirmDelete = (username: string) => {
+    if (!onDeleteUser) return;
+    Alert.alert(
+      `Remove @${username}?`,
+      'The key stored on this device is deleted. Your Hive account is not affected.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => onDeleteUser(username) },
+      ]
+    );
+  };
+
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={true}
-        bounces={false}
-      >
-        {users
-          .filter(user => user.username !== "SPECTATOR")
-          .map((user) => (
-            <View
-              key={user.username}
-              style={styles.userRow}
-            >
-              <Button
-                onPress={() => onQuickLogin(user)}
-                variant="ghost"
-                style={styles.userButton}
+    <ScrollView style={styles.list} bounces={false} showsVerticalScrollIndicator={false}>
+      {users
+        .filter((user) => user.username !== 'SPECTATOR')
+        .map((user) => (
+          <Pressable
+            key={user.username}
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            onPress={() => onQuickLogin(user)}
+            accessibilityRole="button"
+            accessibilityLabel={`Sign in as ${user.username}`}
+          >
+            <Image
+              source={{ uri: `${HIVE_AVATAR_URL}/${user.username}/avatar` }}
+              style={styles.avatar}
+              contentFit="cover"
+            />
+            <Text style={styles.username}>@{user.username}</Text>
+            <Text style={styles.method}>
+              {user.method === 'pin' ? 'PIN' : 'Face ID'}
+            </Text>
+            {onDeleteUser && (
+              <Pressable
+                onPress={() => confirmDelete(user.username)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${user.username}`}
               >
-                <View style={styles.userInfo}>
-                  <Image
-                    source={{ uri: `${HIVE_AVATAR_URL}/${user.username}/avatar` }}
-                    style={styles.avatar}
-                  />
-                  <Text style={styles.username}>
-                    {user.username}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="arrow-forward-outline"
-                  size={20}
-                  color={theme.colors.muted}
-                />
-              </Button>
-              {onDeleteUser && (
-                <Pressable
-                  onPress={() => onDeleteUser(user.username)}
-                  style={styles.deleteButton}
-                  accessibilityLabel={`Delete @${user.username}`}
-                  hitSlop={8}
-                >
+                {({ pressed }) => (
                   <Ionicons
                     name="trash-outline"
-                    size={22}
+                    size={16}
                     color={theme.colors.danger}
+                    style={pressed && styles.pressedIcon}
                   />
-                </Pressable>
-              )}
-            </View>
-          ))}
-      </ScrollView>
-    </View>
+                )}
+              </Pressable>
+            )}
+          </Pressable>
+        ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  list: {
     width: '100%',
-    maxWidth: 400,
-  },
-  scrollView: {
     maxHeight: 200,
   },
-  userRow: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.sm,
+    gap: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.auth.surface,
+    borderWidth: 1,
+    borderColor: theme.auth.borderIdle,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     marginBottom: theme.spacing.sm,
   },
-  userButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  rowPressed: { borderColor: theme.auth.neon },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.border,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   username: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: '500',
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
-    marginLeft: theme.spacing.sm,
+    flex: 1,
+    color: theme.colors.white,
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
   },
-  deleteButton: {
-    marginLeft: theme.spacing.sm,
-    padding: theme.spacing.sm,
-    borderRadius: 100,
+  method: {
+    color: theme.auth.textTertiary,
+    fontFamily: theme.fonts.default,
+    fontSize: 11,
   },
+  pressedIcon: { opacity: 0.5 },
 });

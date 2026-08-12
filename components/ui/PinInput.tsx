@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, TextInput, StyleSheet, Pressable, Text } from 'react-native';
+import { View, TextInput, StyleSheet, Text } from 'react-native';
 import { theme } from '~/lib/theme';
 
 interface PinInputProps {
@@ -13,6 +13,8 @@ interface PinInputProps {
    * secret and which people re-read while typing; off for a PIN.
    */
   showDigits?: boolean;
+  /** Paints the boxes red — the code was rejected. */
+  hasError?: boolean;
 }
 
 export function PinInput({
@@ -22,18 +24,24 @@ export function PinInput({
   onComplete,
   autoFocus = false,
   showDigits = false,
+  hasError = false,
 }: PinInputProps) {
   const inputRef = useRef<TextInput>(null);
 
+  // Fire once per completed value. onComplete's identity changes on every
+  // render of the parent, so without this guard the effect re-ran constantly
+  // while the boxes were full — verifying the same code over and over, and the
+  // repeat attempts failed after the first one consumed it.
+  const firedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (value.length === length && onComplete) {
-      onComplete(value);
+    if (value.length !== length) {
+      firedFor.current = null;
+      return;
     }
+    if (firedFor.current === value) return;
+    firedFor.current = value;
+    onComplete?.(value);
   }, [value, length, onComplete]);
-
-  const handlePress = () => {
-    inputRef.current?.focus();
-  };
 
   const handleChange = (text: string) => {
     const digits = text.replace(/[^0-9]/g, '').slice(0, length);
@@ -41,8 +49,10 @@ export function PinInput({
   };
 
   return (
-    <Pressable onPress={handlePress} style={styles.container}>
-      <View style={styles.boxes}>
+    // A View, not a Pressable: the transparent input on top already takes taps,
+    // and a Pressable wrapper swallowed the long-press that opens Paste.
+    <View style={styles.container}>
+      <View style={styles.boxes} pointerEvents="none">
         {Array.from({ length }, (_, i) => {
           const isFilled = i < value.length;
           const isActive = i === value.length;
@@ -53,6 +63,7 @@ export function PinInput({
                 styles.box,
                 isFilled && styles.boxFilled,
                 isActive && styles.boxActive,
+                hasError && styles.boxError,
               ]}
             >
               {isFilled &&
@@ -74,8 +85,13 @@ export function PinInput({
         autoFocus={autoFocus}
         style={styles.hiddenInput}
         caretHidden
+        // Lets iOS offer the code above the keyboard, and keeps the paste menu
+        // available on long-press.
+        textContentType="oneTimeCode"
+        autoComplete="one-time-code"
+        contextMenuHidden={false}
       />
-    </Pressable>
+    </View>
   );
 }
 
@@ -105,6 +121,9 @@ const styles = StyleSheet.create({
   boxActive: {
     borderColor: theme.auth.textTertiary,
   },
+  boxError: {
+    borderColor: theme.colors.danger,
+  },
   digit: {
     color: theme.auth.neon,
     fontFamily: theme.fonts.bold,
@@ -116,10 +135,17 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: theme.colors.primary,
   },
+  // Invisible, but it covers the boxes rather than being 0×0 offscreen: with
+  // nothing to long-press there was no way to paste a code copied out of an
+  // email, and one-time codes are exactly what people paste.
+  // Invisible but real: it sits on top of the boxes so a tap focuses it and a
+  // long-press offers Paste — one-time codes are exactly what people paste.
+  // Not fully transparent, because a zero-opacity input is unreliable to hit.
   hiddenInput: {
-    position: 'absolute',
-    opacity: 0,
-    height: 0,
-    width: 0,
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.02,
+    color: 'transparent',
+    fontSize: 20,
+    textAlign: 'center',
   },
 });
