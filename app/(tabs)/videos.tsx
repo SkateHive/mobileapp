@@ -11,6 +11,8 @@ import {
   useWindowDimensions,
   ViewToken,
   type GestureResponderEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -129,10 +131,13 @@ function VideoItem({
         onVote(item);
         return;
       }
+      // The burst celebrates a vote, so it only fires when one happens. On an
+      // already-voted post it was still playing and promising a vote that
+      // never came.
+      if (isLiked) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       burstRef.current?.play(locationX, locationY);
-      // IG-style: double-tap only ever likes; never removes an existing vote.
-      if (!isLiked) onVote(item);
+      onVote(item);
     } else {
       lastTap.current = now;
     }
@@ -206,7 +211,9 @@ function VideoItem({
         voteCount={voteCount}
         isVoting={isVoting}
         commentCount={item.replies ?? 0}
-        onVote={() => onVote(item)}
+        // Undefined once voted: the rail then renders the count without a
+        // button, the same shape it uses for your own posts.
+        onVote={isLiked ? undefined : () => onVote(item)}
         onComment={() => onComment(item)}
         onShare={() => onShare(item)}
         isMuted={isMuted}
@@ -257,6 +264,18 @@ export default function VideosScreen() {
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
+  // Where the scroll actually stopped, which viewability alone doesn't tell us:
+  // fling past two or three videos and viewableItems[0] can be a clip you flew
+  // over, with no further event once things settle — so the video on screen
+  // never gets play() and sits there frozen. The offset is unambiguous.
+  const settleOnIndex = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const index = Math.round(e.nativeEvent.contentOffset.y / SCREEN_HEIGHT);
+      setCurrentIndex(Math.max(0, Math.min(videos.length - 1, index)));
+    },
+    [SCREEN_HEIGHT, videos.length]
+  );
+
   const handleVote = useCallback(async (video: VideoPost) => {
     const key = `${video.author}-${video.permlink}`;
     if (!canPost(session)) {
@@ -269,15 +288,21 @@ export default function VideosScreen() {
 
     const wasLiked = likedStates[key];
     const prevCount = voteCountStates[key] || video.votes;
+    // A vote is final: tapping an already-voted heart used to cast weight 0 and
+    // quietly take it back, which is not what "vote again" looks like.
+    if (wasLiked) {
+      votingLockRef.current[key] = false;
+      return;
+    }
 
     try {
       setVotingStates((p) => ({ ...p, [key]: true }));
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setLikedStates((p) => ({ ...p, [key]: !wasLiked }));
-      setVoteCountStates((p) => ({ ...p, [key]: wasLiked ? prevCount - 1 : prevCount + 1 }));
+      setLikedStates((p) => ({ ...p, [key]: true }));
+      setVoteCountStates((p) => ({ ...p, [key]: prevCount + 1 }));
 
-      await castVote(session!, video.author, video.permlink, wasLiked ? 0 : 10000);
-      recordVote(video.author, video.permlink, wasLiked ? 0 : 10000);
+      await castVote(session!, video.author, video.permlink, 10000);
+      recordVote(video.author, video.permlink, 10000);
       // No success toast — the $-confetti + heart fill are enough feedback.
     } catch (error) {
       setLikedStates((p) => ({ ...p, [key]: wasLiked }));
@@ -366,6 +391,9 @@ export default function VideosScreen() {
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          // Both: a flick ends in momentum, a slow drag ends without it.
+          onMomentumScrollEnd={settleOnIndex}
+          onScrollEndDrag={settleOnIndex}
           removeClippedSubviews
           maxToRenderPerBatch={2}
           windowSize={3}

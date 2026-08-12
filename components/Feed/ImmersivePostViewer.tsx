@@ -11,6 +11,8 @@ import {
   Share,
   useWindowDimensions,
   type GestureResponderEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewToken,
 } from "react-native";
 import { Image } from "expo-image";
@@ -171,9 +173,11 @@ function ImmersivePostItem({
           onVote(post); // surfaces the login prompt
           return;
         }
+        // Same as the Videos tab: no celebration without a vote behind it.
+        if (isLiked) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         burstRef.current?.play(locationX, locationY);
-        if (!isLiked) onVote(post); // double-tap only ever likes
+        onVote(post);
       } else {
         lastTap.current = now;
       }
@@ -344,7 +348,7 @@ function ImmersivePostItem({
         voteCount={voteCount}
         isVoting={isVoting}
         commentCount={post.children ?? 0}
-        onVote={isOwn ? undefined : () => onVote(post)}
+        onVote={isOwn || isLiked ? undefined : () => onVote(post)}
         onComment={() => onComment(post)}
         onShare={() => onShare(post)}
         // Back in the rail: behind an ActionSheet neither row did anything,
@@ -429,6 +433,16 @@ export function ImmersivePostViewer({
   ).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
+  // Same as the Videos tab: viewability can leave the index on a post you flew
+  // past, and then nothing plays. The scroll offset says where you landed.
+  const settleOnIndex = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const index = Math.round(e.nativeEvent.contentOffset.y / height);
+      setCurrentIndex(Math.max(0, Math.min(posts.length - 1, index)));
+    },
+    [height, posts.length]
+  );
+
   const handleVote = useCallback(
     async (post: any) => {
       const key = postKey(post);
@@ -441,14 +455,19 @@ export function ImmersivePostViewer({
 
       const wasLiked = likedStates[key];
       const prevCount = voteCountStates[key] ?? 0;
+      // A vote is final here too — see the Videos tab and the feed card.
+      if (wasLiked) {
+        votingLockRef.current[key] = false;
+        return;
+      }
       try {
         setVotingStates((p) => ({ ...p, [key]: true }));
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setLikedStates((p) => ({ ...p, [key]: !wasLiked }));
-        setVoteCountStates((p) => ({ ...p, [key]: wasLiked ? prevCount - 1 : prevCount + 1 }));
-        await castVote(session!, post.author, post.permlink, wasLiked ? 0 : 10000);
-        recordVote(post.author, post.permlink, wasLiked ? 0 : 10000);
-        showToast(wasLiked ? "Vote removed" : "Voted!", "success");
+        setLikedStates((p) => ({ ...p, [key]: true }));
+        setVoteCountStates((p) => ({ ...p, [key]: prevCount + 1 }));
+        await castVote(session!, post.author, post.permlink, 10000);
+        recordVote(post.author, post.permlink, 10000);
+        showToast("Voted!", "success");
       } catch (error) {
         setLikedStates((p) => ({ ...p, [key]: wasLiked }));
         setVoteCountStates((p) => ({ ...p, [key]: prevCount }));
@@ -532,6 +551,8 @@ export function ImmersivePostViewer({
           getItemLayout={(_, i) => ({ length: height, offset: height * i, index: i })}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          onMomentumScrollEnd={settleOnIndex}
+          onScrollEndDrag={settleOnIndex}
           onEndReached={hasMore ? onLoadMore : undefined}
           onEndReachedThreshold={0.8}
           removeClippedSubviews
