@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, TextInput, StyleSheet, Pressable } from 'react-native';
+import { View, TextInput, StyleSheet, Pressable, Text } from 'react-native';
 import { theme } from '~/lib/theme';
 
 interface PinInputProps {
@@ -8,6 +8,11 @@ interface PinInputProps {
   length?: number;
   onComplete?: (pin: string) => void;
   autoFocus?: boolean;
+  /**
+   * Show the digits instead of dots. On for an emailed code, which is not a
+   * secret and which people re-read while typing; off for a PIN.
+   */
+  showDigits?: boolean;
 }
 
 export function PinInput({
@@ -16,6 +21,7 @@ export function PinInput({
   length = 6,
   onComplete,
   autoFocus = false,
+  showDigits = false,
 }: PinInputProps) {
   const inputRef = useRef<TextInput>(null);
 
@@ -49,7 +55,12 @@ export function PinInput({
                 isActive && styles.boxActive,
               ]}
             >
-              {isFilled && <View style={styles.dot} />}
+              {isFilled &&
+                (showDigits ? (
+                  <Text style={styles.digit}>{value[i]}</Text>
+                ) : (
+                  <View style={styles.dot} />
+                ))}
             </View>
           );
         })}
@@ -79,21 +90,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   box: {
-    width: 44,
+    width: 42,
     height: 52,
-    borderRadius: 10,
+    borderRadius: theme.borderRadius.full,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: theme.auth.borderIdle,
+    backgroundColor: theme.auth.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   boxFilled: {
-    borderColor: theme.colors.primary,
-    backgroundColor: 'rgba(50, 205, 50, 0.08)',
+    borderColor: theme.auth.neon,
   },
   boxActive: {
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderColor: theme.auth.textTertiary,
+  },
+  digit: {
+    color: theme.auth.neon,
+    fontFamily: theme.fonts.bold,
+    fontSize: 20,
   },
   dot: {
     width: 12,
