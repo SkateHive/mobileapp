@@ -188,6 +188,14 @@ export default function RootLayout() {
                           }}
                         />
                         <Stack.Screen
+                          name="hive-login"
+                          options={{
+                            animation: 'slide_from_right',
+                            gestureEnabled: true,
+                            contentStyle: { backgroundColor: theme.colors.background },
+                          }}
+                        />
+                        <Stack.Screen
                           name="email-login"
                           options={{
                             presentation: 'modal',

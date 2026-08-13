@@ -2,66 +2,82 @@ import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Text } from '~/components/ui/text';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MatrixRain } from '~/components/ui/loading-effects/MatrixRain';
+import { AuthBackground } from '~/components/auth/AuthBackground';
 import { theme } from '~/lib/theme';
 
-
+/**
+ * What SkateHive is — reached from the info button on the login screen.
+ *
+ * Shares that screen's treatment (#60): the same collage, the same scrim, the
+ * same floating back control. It used to be Matrix rain behind a large green
+ * heading, which read as a different app to anyone arriving from the login.
+ */
 export default function AboutScreen() {
   return (
     <View style={styles.container}>
-      <MatrixRain />
-      <View style={styles.content}>
-        {/* Header with back button */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={theme.colors.text}
-            />
-          </Pressable>
-          <Text style={styles.headerTitle}>Skatehive Community</Text>
-        </View>
+      <AuthBackground scrim="top" />
 
-        {/* Content */}
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          <Section title="🌍 What is Skatehive?">
-            <Bullet text="It's a worldwide crew of skaters, creators, and weirdos doing it our way." />
-            <Bullet text="Built on DIY, decentralization, and zero corporate bullsh*t." />
-            <Bullet text="No bosses, no brands calling shots — this is 100% skater-owned, skater-run." />
-          </Section>
+      <Pressable
+        onPress={() => router.back()}
+        style={styles.backButton}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Ionicons name="chevron-back" size={26} color={theme.colors.white} />
+      </Pressable>
 
-          <Section title="📼 Tech Revolution in Skateboarding">
-            <Bullet text="From VX tapes to IG clips — tech's always been part of the ride." />
-            <Bullet text="Skatehive is the next chapter: community-powered + crypto rewards = freedom." />
-          </Section>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Skatehive Community</Text>
 
-          <Section title="🚀 Why It Rips">
-            <Bullet text="Post-to-earn: film a trick, drop a story, share your vibe — get rewarded." />
-            <Bullet text="Infinity Mag: our own never-ending skate mag. No ads. No fluff." />
-            <Bullet text="Decentralized sponsorships: repping your crew, getting love from the people." />
-          </Section>
+        <Section title="🌍 What is Skatehive?">
+          <Bullet text="It's a worldwide crew of skaters, creators, and weirdos doing it our way." />
+          <Bullet text="Built on DIY, decentralization, and zero corporate bullsh*t." />
+          <Bullet text="No bosses, no brands calling shots — this is 100% skater-owned, skater-run." />
+        </Section>
 
-          <Section title="🧰 Open-Source = Total Freedom">
-            <Bullet text="Anyone can fork this sh*t — skateshops, collectives, your homie with a laptop." />
-            <Bullet text="Your content echoes across the skateverse. Powered by blockchain, owned by you." />
-          </Section>
+        <Section title="🐝 Your account, explained">
+          <Bullet text="You start with a lite account: post, comment and vote from day one, with no crypto setup at all." />
+          <Bullet text="Your posts are real posts on the Hive blockchain — they just go out through @skatehive, the community account, instead of one of your own." />
+          <Bullet text="A few things need an account in your name: following people, editing your profile, and earning rewards directly." />
+        </Section>
 
-          <Section title="🤝 Community-First, Always">
-            <Bullet text="Likes, posts, comments — every move adds value to *our* world." />
-            <Bullet text="We set the tone. No AI deciding what's cool. No engagement farms." />
-          </Section>
+        <Section title="🔑 Getting your own Hive account">
+          <Bullet text="Creating a Hive account isn't free — it costs about 3 HIVE, or a creation token that someone with staked HIVE spends their resource credits to claim." />
+          <Bullet text="That's what 'sponsored' means: a skater in the crew covers that cost, and the account is yours, not ours." />
+          <Bullet text="Then you get your own keys. SkateHive only ever asks for the posting key — it can post, comment and vote, and it cannot move your funds." />
+          <Bullet text="Want yours? Ask the crew at skatehive.app." />
+        </Section>
 
-          <Section title="🛹 Our Mission">
-            <Bullet text="Put skate media back in skaters' hands. Forever." />
-            <Bullet text="Grow a real-deal global skate culture — raw, connected, and free AF." />
-          </Section>
-        </ScrollView>
-      </View>
+        <Section title="📼 Tech Revolution in Skateboarding">
+          <Bullet text="From VX tapes to IG clips — tech's always been part of the ride." />
+          <Bullet text="Skatehive is the next chapter: community-powered + crypto rewards = freedom." />
+        </Section>
+
+        <Section title="🚀 Why It Rips">
+          <Bullet text="Post-to-earn: film a trick, drop a story, share your vibe — get rewarded." />
+          <Bullet text="Infinity Mag: our own never-ending skate mag. No ads. No fluff." />
+          <Bullet text="Decentralized sponsorships: repping your crew, getting love from the people." />
+        </Section>
+
+        <Section title="🧰 Open-Source = Total Freedom">
+          <Bullet text="Anyone can fork this sh*t — skateshops, collectives, your homie with a laptop." />
+          <Bullet text="Your content echoes across the skateverse. Powered by blockchain, owned by you." />
+        </Section>
+
+        <Section title="🤝 Community-First, Always">
+          <Bullet text="Likes, posts, comments — every move adds value to *our* world." />
+          <Bullet text="We set the tone. No AI deciding what's cool. No engagement farms." />
+        </Section>
+
+        <Section title="🛹 Our Mission">
+          <Bullet text="Put skate media back in skaters' hands. Forever." />
+          <Bullet text="Grow a real-deal global skate culture — raw, connected, and free AF." />
+        </Section>
+      </ScrollView>
     </View>
   );
 }
-
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -75,73 +91,59 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Bullet({ text }: { text: string }) {
   return (
     <View style={styles.bullet}>
-      <Text style={styles.bulletText}>•</Text>
-      <Text style={styles.bulletContent}>{text}</Text>
+      <Text style={styles.bulletMark}>•</Text>
+      <Text style={styles.bulletText}>{text}</Text>
     </View>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  content: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: theme.spacing.md,
-    paddingTop: theme.spacing.xxxl + theme.spacing.sm, // Account for status bar
-  },
   backButton: {
-    padding: theme.spacing.sm,
+    position: 'absolute',
+    top: 56,
+    left: 18,
+    zIndex: 10,
   },
-  headerTitle: {
-    fontSize: theme.fontSizes.xxl,
+  content: {
+    paddingTop: 62,
+    paddingHorizontal: 24,
+    paddingBottom: theme.spacing.xxl,
+    gap: theme.spacing.lg,
+  },
+  title: {
+    color: theme.colors.white,
     fontFamily: theme.fonts.bold,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.sm,
-    paddingTop: theme.spacing.xs,
-    lineHeight: theme.fontSizes.xxl + theme.spacing.sm,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    fontSize: 18,
+    textAlign: 'center',
   },
   section: {
-    marginBottom: theme.spacing.lg,
+    gap: theme.spacing.xs,
   },
   sectionTitle: {
-    fontSize: theme.fontSizes.lg,
+    color: theme.auth.neon,
     fontFamily: theme.fonts.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-    lineHeight: theme.fontSizes.lg + theme.spacing.xs,
+    fontSize: 15,
   },
   bullet: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: theme.spacing.xs,
+    gap: theme.spacing.xs,
+  },
+  bulletMark: {
+    color: theme.auth.neon,
+    fontFamily: theme.fonts.default,
+    fontSize: 13,
+    lineHeight: 20,
   },
   bulletText: {
-    fontSize: theme.fontSizes.md,
-    lineHeight: theme.fontSizes.md + theme.spacing.xs,
-    marginRight: theme.spacing.xs,
-    color: theme.colors.primary,
-    fontFamily: theme.fonts.regular,
-  },
-  bulletContent: {
-    fontSize: theme.fontSizes.md,
-    lineHeight: theme.fontSizes.md + theme.spacing.xs,
     flex: 1,
-    color: theme.colors.text,
-    fontFamily: theme.fonts.regular,
+    color: theme.auth.textLight,
+    fontFamily: theme.fonts.default,
+    fontSize: 13,
+    lineHeight: 20,
   },
 });

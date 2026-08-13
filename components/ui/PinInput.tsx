@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, TextInput, StyleSheet, Pressable } from 'react-native';
+import { View, TextInput, StyleSheet, Text } from 'react-native';
 import { theme } from '~/lib/theme';
 
 interface PinInputProps {
@@ -8,6 +8,18 @@ interface PinInputProps {
   length?: number;
   onComplete?: (pin: string) => void;
   autoFocus?: boolean;
+  /**
+   * Show the digits instead of dots. On for an emailed code, which is not a
+   * secret and which people re-read while typing; off for a PIN.
+   */
+  showDigits?: boolean;
+  /** Paints the boxes red — the code was rejected. */
+  hasError?: boolean;
+  /**
+   * Offer iOS one-time-code autofill. Only for a code that arrived by email or
+   * SMS — a local PIN is not one, and suggesting one there is nonsense.
+   */
+  oneTimeCode?: boolean;
 }
 
 export function PinInput({
@@ -16,18 +28,26 @@ export function PinInput({
   length = 6,
   onComplete,
   autoFocus = false,
+  showDigits = false,
+  hasError = false,
+  oneTimeCode = false,
 }: PinInputProps) {
   const inputRef = useRef<TextInput>(null);
 
+  // Fire once per completed value. onComplete's identity changes on every
+  // render of the parent, so without this guard the effect re-ran constantly
+  // while the boxes were full — verifying the same code over and over, and the
+  // repeat attempts failed after the first one consumed it.
+  const firedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (value.length === length && onComplete) {
-      onComplete(value);
+    if (value.length !== length) {
+      firedFor.current = null;
+      return;
     }
+    if (firedFor.current === value) return;
+    firedFor.current = value;
+    onComplete?.(value);
   }, [value, length, onComplete]);
-
-  const handlePress = () => {
-    inputRef.current?.focus();
-  };
 
   const handleChange = (text: string) => {
     const digits = text.replace(/[^0-9]/g, '').slice(0, length);
@@ -35,8 +55,10 @@ export function PinInput({
   };
 
   return (
-    <Pressable onPress={handlePress} style={styles.container}>
-      <View style={styles.boxes}>
+    // A View, not a Pressable: the transparent input on top already takes taps,
+    // and a Pressable wrapper swallowed the long-press that opens Paste.
+    <View style={styles.container}>
+      <View style={styles.boxes} pointerEvents="none">
         {Array.from({ length }, (_, i) => {
           const isFilled = i < value.length;
           const isActive = i === value.length;
@@ -47,9 +69,15 @@ export function PinInput({
                 styles.box,
                 isFilled && styles.boxFilled,
                 isActive && styles.boxActive,
+                hasError && styles.boxError,
               ]}
             >
-              {isFilled && <View style={styles.dot} />}
+              {isFilled &&
+                (showDigits ? (
+                  <Text style={styles.digit}>{value[i]}</Text>
+                ) : (
+                  <View style={styles.dot} />
+                ))}
             </View>
           );
         })}
@@ -63,8 +91,13 @@ export function PinInput({
         autoFocus={autoFocus}
         style={styles.hiddenInput}
         caretHidden
+        // Lets iOS offer an emailed code above the keyboard; the paste menu on
+        // long-press works either way.
+        textContentType={oneTimeCode ? 'oneTimeCode' : 'none'}
+        autoComplete={oneTimeCode ? 'one-time-code' : 'off'}
+        contextMenuHidden={false}
       />
-    </Pressable>
+    </View>
   );
 }
 
@@ -79,21 +112,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   box: {
-    width: 44,
+    width: 42,
     height: 52,
-    borderRadius: 10,
+    borderRadius: theme.borderRadius.full,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: theme.auth.borderIdle,
+    backgroundColor: theme.auth.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   boxFilled: {
-    borderColor: theme.colors.primary,
-    backgroundColor: 'rgba(50, 205, 50, 0.08)',
+    borderColor: theme.auth.neon,
   },
   boxActive: {
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderColor: theme.auth.textTertiary,
+  },
+  boxError: {
+    borderColor: theme.colors.danger,
+  },
+  digit: {
+    color: theme.auth.neon,
+    fontFamily: theme.fonts.bold,
+    fontSize: 20,
   },
   dot: {
     width: 12,
@@ -101,10 +141,17 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: theme.colors.primary,
   },
+  // Invisible, but it covers the boxes rather than being 0×0 offscreen: with
+  // nothing to long-press there was no way to paste a code copied out of an
+  // email, and one-time codes are exactly what people paste.
+  // Invisible but real: it sits on top of the boxes so a tap focuses it and a
+  // long-press offers Paste — one-time codes are exactly what people paste.
+  // Not fully transparent, because a zero-opacity input is unreliable to hit.
   hiddenInput: {
-    position: 'absolute',
-    opacity: 0,
-    height: 0,
-    width: 0,
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.02,
+    color: 'transparent',
+    fontSize: 20,
+    textAlign: 'center',
   },
 });

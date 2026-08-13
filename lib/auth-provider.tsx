@@ -32,6 +32,8 @@ import { logout as userbaseLogout } from './userbase/api';
 import {
   loadUserbaseSession,
   saveUserbaseSession,
+  saveLastEmailAccount,
+  saveLastAccountKind,
   clearUserbaseSession,
 } from './userbase/session-store';
 import {
@@ -83,7 +85,7 @@ interface AuthContextType {
   blacklistedList: string[];
   login: (username: string, postingKey: string, method: EncryptionMethod, pin?: string) => Promise<void>;
   loginStoredUser: (username: string, pin?: string) => Promise<void>;
-  loginWithUserbase: (token: string, user: UserbaseUser) => Promise<void>;
+  loginWithUserbase: (token: string, user: UserbaseUser, email?: string) => Promise<void>;
   logout: () => Promise<void>;
   enterSpectatorMode: () => Promise<void>;
   deleteAllStoredUsers: () => Promise<void>;
@@ -285,8 +287,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Log in a server-custody email (userbase) account: persist the bearer token
   // and mark the app authenticated. No local posting key (the server signs).
-  const loginWithUserbase = async (token: string, user: UserbaseUser) => {
+  const loginWithUserbase = async (token: string, user: UserbaseUser, email?: string) => {
     await saveUserbaseSession(token, user);
+    // Remembered past logout so the login screen can greet this account by
+    // name — no credential involved, just the handle and the address to send
+    // the next code to.
+    if (email) await saveLastEmailAccount({ handle: user.handle, email });
+    await saveLastAccountKind('email');
     setUsername(user.handle);
     setIsAuthenticated(true);
     setSession({
@@ -385,6 +392,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: Date.now(),
       };
       await updateStoredUsers(user);
+      await saveLastAccountKind('hive');
       const loginTime = Date.now();
       setUsername(normalizedUsername);
       setIsAuthenticated(true);
@@ -451,6 +459,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(true);
       setSession({ username: selectedUsername, decryptedKey, loginTime, kind: 'hive' });
       await updateStoredUsers({ username: selectedUsername, method: encryptedKey.method, createdAt: encryptedKey.createdAt });
+      await saveLastAccountKind('hive');
       // Cache the active session so the user stays logged in for 30 days.
       await saveActiveSession({ username: selectedUsername, decryptedKey, loginTime });
 

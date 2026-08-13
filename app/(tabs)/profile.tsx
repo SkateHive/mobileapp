@@ -575,21 +575,25 @@ export default function ProfileScreen() {
         <Text style={[styles.profileName, { marginTop: theme.spacing.md }]}>
           @{currentUsername}
         </Text>
-        <Text
-          style={[
-            styles.errorText,
-            {
-              marginTop: 10,
-              textAlign: "center",
-              paddingHorizontal: 32,
-              color: theme.colors.muted,
-              lineHeight: 20,
-            },
-          ]}
-        >
-          Lite account — your posts go out via @skatehive. Get sponsored to
-          claim @{currentUsername} on Hive.
+        {/* Most people never open the info button on the login screen, but
+            everyone opens their own profile — so the explanation lives here
+            too, short, with the long version a tap away (#62). */}
+        <Text style={styles.liteTitle}>Lite account</Text>
+        <Text style={styles.liteBody}>
+          You can post, comment and vote right now. Your posts go out through
+          @skatehive, the community account, because @{currentUsername} doesn't
+          exist on the Hive blockchain yet.
         </Text>
+        <Text style={styles.liteBody}>
+          Creating one costs real money — around 3 HIVE — so the crew sponsors
+          it. Once it's yours, you get your own name on chain, you can follow
+          people and edit your profile, and rewards land directly with you.
+        </Text>
+
+        <Pressable onPress={() => router.push("/about")} style={styles.liteLearnMore}>
+          <Text style={styles.liteLearnMoreText}>How this works ›</Text>
+        </Pressable>
+
         <Pressable onPress={logout} style={{ marginTop: 24 }}>
           <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.fontSizes.md }}>
             Log out
@@ -1179,6 +1183,31 @@ const styles = StyleSheet.create({
   gridImage: {
     width: '100%',
     height: '100%',
+  },
+  liteTitle: {
+    color: theme.colors.white,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
+    marginTop: theme.spacing.md,
+  },
+  liteBody: {
+    color: theme.colors.muted,
+    fontFamily: theme.fonts.default,
+    fontSize: theme.fontSizes.sm,
+    lineHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+    marginTop: theme.spacing.sm,
+  },
+  liteLearnMore: {
+    marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+  },
+  liteLearnMoreText: {
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.sm,
   },
   gridEarnings: {
     position: 'absolute',

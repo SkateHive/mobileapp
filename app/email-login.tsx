@@ -10,7 +10,9 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import { PinInput } from "~/components/ui/PinInput";
+import { AuthBackground } from "~/components/auth/AuthBackground";
 import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { theme } from "~/lib/theme";
@@ -30,10 +32,28 @@ type Step = "email" | "otp" | "username" | "done";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** `bielcx@gmail.com` → `b•••@gmail.com`, as in the design. */
+function maskEmail(address: string): string {
+  const [name, domain] = address.split("@");
+  if (!domain) return address;
+  return `${name.slice(0, 1)}•••@${domain}`;
+}
+
+const RESEND_SECONDS = 60;
+
 export default function EmailLoginScreen() {
   const { loginWithUserbase } = useAuth();
-  const [step, setStep] = useState<Step>("email");
-  const [email, setEmail] = useState("");
+  // The entry screen collects the address and hands it over, so arriving with
+  // one means the code is already on its way and this opens on the keypad.
+  const params = useLocalSearchParams<{ email?: string }>();
+  const handedEmail = typeof params.email === "string" ? params.email : "";
+  // Arriving with an address means the code is already on its way, so open on
+  // the keypad — starting at "email" flashed the send form for a moment first.
+  const [step, setStep] = useState<Step>(() =>
+    EMAIL_RE.test(handedEmail) ? "otp" : "email"
+  );
+  const [email, setEmail] = useState(handedEmail);
+  const [resendIn, setResendIn] = useState(0);
   const [code, setCode] = useState("");
   const [signupToken, setSignupToken] = useState("");
   const [handle, setHandle] = useState("");
@@ -88,12 +108,42 @@ export default function EmailLoginScreen() {
       if (!r.success) throw new Error(r.error || "Could not send code");
       setEmail(em);
       setStep("otp");
+      setResendIn(RESEND_SECONDS);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send code");
+      // If the handed-off send failed there is no code coming, so fall back to
+      // the form rather than leaving the user staring at an empty keypad.
+      setStep("email");
     } finally {
       setBusy(false);
     }
   };
+
+  // No dedicated resend endpoint exists — requesting a code again is the same
+  // call, which is why the cooldown below is the only thing rate-limiting it.
+  const resend = async () => {
+    if (resendIn > 0 || busy) return;
+    setCode("");
+    // Clear the rejection too, or the fresh boxes come up red with the old
+    // message under them.
+    setError(null);
+    await sendCode();
+  };
+
+  // Sent from the entry screen: fire the request once on arrival so the user
+  // lands straight on the keypad.
+  const autoSent = useRef(false);
+  useEffect(() => {
+    if (autoSent.current || !handedEmail || !EMAIL_RE.test(handedEmail)) return;
+    autoSent.current = true;
+    sendCode();
+  }, [handedEmail]);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
 
   const verify = async () => {
     if (!/^\d{6}$/.test(code.trim())) {
@@ -106,17 +156,24 @@ export default function EmailLoginScreen() {
       const r = await verifyOtp(email, code.trim());
       if (!r.success) throw new Error(r.error || "Invalid code");
       if (r.token && r.user) {
-        await loginWithUserbase(r.token, r.user);
+        await loginWithUserbase(r.token, r.user, email);
         setUser(r.user);
+        // Clear before leaving the step, or a rejected earlier attempt follows
+        // the user onto the success screen.
+        setError(null);
         setStep("done");
       } else if (r.signupRequired && r.signupToken) {
         setSignupToken(r.signupToken);
+        setError(null);
         setStep("username");
       } else {
         throw new Error("Unexpected response");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid code");
+      // Wrong code: clear the boxes so the next attempt starts clean, instead
+      // of leaving six digits that can't be retried.
+      setCode("");
     } finally {
       setBusy(false);
     }
@@ -129,7 +186,7 @@ export default function EmailLoginScreen() {
     try {
       const r = await completeSignup(signupToken, name);
       if (!r.success || !r.token || !r.user) throw new Error(r.error || "Could not create account");
-      await loginWithUserbase(r.token, r.user);
+      await loginWithUserbase(r.token, r.user, email);
       setUser(r.user);
       setStep("done");
     } catch (e) {
@@ -141,13 +198,20 @@ export default function EmailLoginScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerBtn} disabled={busy}>
-          <Ionicons name="close" size={26} color={busy ? theme.colors.muted : theme.colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Email login</Text>
-        <View style={styles.headerBtn} />
-      </View>
+      {/* Same collage as the screen before it — this used to be flat black with
+          a title bar, which broke the flow in half. */}
+      <AuthBackground scrim="top" />
+
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={styles.closeButton}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
+      >
+        <Ionicons name="close" size={26} color={busy ? theme.colors.muted : theme.colors.white} />
+      </Pressable>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -172,19 +236,44 @@ export default function EmailLoginScreen() {
 
           {step === "otp" && (
             <>
-              <Text style={styles.label}>Enter the code sent to</Text>
-              <Text style={styles.emailEcho}>{email}</Text>
-              <TextInput
-                style={[styles.input, styles.codeInput]}
-                placeholder="••••••"
-                placeholderTextColor={theme.colors.muted}
+              <Text style={styles.otpTitle}>Enter the code</Text>
+              <Text style={styles.otpSubtitle}>
+                sent to <Text style={styles.otpEmail}>{maskEmail(email)}</Text>
+              </Text>
+              {/* Submits on the sixth digit — see PinInput's onComplete. */}
+              <PinInput
                 value={code}
-                onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
-                keyboardType="number-pad"
-                maxLength={6}
-                editable={!busy}
+                onChangeText={(t) => {
+                  if (error) setError(null);
+                  setCode(t);
+                }}
+                onComplete={verify}
+                autoFocus
+                showDigits
+                oneTimeCode
+                hasError={!!error}
               />
-              <PrimaryButton label="Verify" onPress={verify} busy={busy} disabled={code.length !== 6} />
+              {busy && <ActivityIndicator size="small" color={theme.auth.neon} />}
+              {/* Right under the boxes: the shared error line at the bottom of
+                  the screen sits behind the keypad, so a rejected code showed
+                  nothing but a spinner that stopped. */}
+              {!!error && !busy && <Text style={styles.otpError}>{error}</Text>}
+              <Pressable
+                onPress={resend}
+                disabled={busy || resendIn > 0}
+                hitSlop={12}
+                accessibilityRole="button"
+              >
+                <Text style={styles.resend}>
+                  {resendIn > 0 ? (
+                    <>
+                      Resend in <Text style={styles.resendCount}>0:{String(resendIn).padStart(2, "0")}</Text>
+                    </>
+                  ) : (
+                    "Resend code"
+                  )}
+                </Text>
+              </Pressable>
               <Pressable onPress={() => { setStep("email"); setCode(""); setError(null); }} disabled={busy}>
                 <Text style={styles.linkText}>Use a different email</Text>
               </Pressable>
@@ -247,7 +336,8 @@ export default function EmailLoginScreen() {
             </View>
           )}
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {/* The OTP step shows its own message under the boxes. */}
+          {error && step !== "otp" ? <Text style={styles.errorText}>{error}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -290,9 +380,44 @@ const styles = StyleSheet.create({
   },
   headerBtn: { width: 40, alignItems: "center" },
   headerTitle: { fontFamily: theme.fonts.bold, fontSize: theme.fontSizes.lg, color: theme.colors.text },
-  body: { padding: theme.spacing.lg, gap: theme.spacing.sm },
+  // Content sits under the status bar, where the keypad leaves room for it.
+  body: { paddingTop: 62, paddingHorizontal: 24, paddingBottom: 18, gap: 14 },
+  closeButton: {
+    position: "absolute",
+    top: 56,
+    left: 18,
+    zIndex: 10,
+  },
   label: { color: theme.colors.muted, fontFamily: theme.fonts.bold, fontSize: theme.fontSizes.sm, marginTop: theme.spacing.sm },
   emailEcho: { color: theme.colors.text, fontFamily: theme.fonts.bold, fontSize: theme.fontSizes.md, marginBottom: theme.spacing.sm },
+  otpTitle: {
+    color: theme.colors.white,
+    fontFamily: theme.fonts.bold,
+    fontSize: 18,
+    textAlign: "center",
+  },
+  otpSubtitle: {
+    color: theme.auth.textSecondary,
+    fontFamily: theme.fonts.default,
+    fontSize: 12,
+    textAlign: "center",
+    marginBottom: theme.spacing.md,
+  },
+  otpEmail: { color: theme.auth.neon },
+  resend: {
+    color: theme.auth.textTertiary,
+    fontFamily: theme.fonts.default,
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: theme.spacing.md,
+  },
+  resendCount: { color: theme.auth.neon },
+  otpError: {
+    color: theme.colors.danger,
+    fontFamily: theme.fonts.default,
+    fontSize: 12,
+    textAlign: "center",
+  },
   input: {
     backgroundColor: theme.colors.secondaryCard,
     borderRadius: theme.borderRadius.md,
