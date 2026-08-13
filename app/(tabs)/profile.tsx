@@ -35,7 +35,9 @@ import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
-import { convertVestToHive } from "~/lib/hive-utils";
+import { convertVestToHive, isNameFreeOnHive } from "~/lib/hive-utils";
+import { loadUserbaseSession } from "~/lib/userbase/session-store";
+import { getSession } from "~/lib/userbase/api";
 import { canPost } from "~/lib/posting";
 import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
@@ -152,6 +154,12 @@ export default function ProfileScreen() {
   // Uses the same definition as the Instagram gate (the account's own
   // vesting_shares), so the two never disagree for your own profile.
   const [hivePower, setHivePower] = useState<number | null>(null);
+  // Only asked for a lite account looking at its own profile — null while
+  // unknown, so a failed check says nothing rather than something wrong.
+  const [nameFreeOnHive, setNameFreeOnHive] = useState<boolean | null>(null);
+  // A lite account's picture comes from SkateHive's own server: it has no Hive
+  // account, so images.hive.blog 404s for its handle.
+  const [liteAvatar, setLiteAvatar] = useState<string | null>(null);
   // Only needed by poster-less video tiles, which fall back to a real player —
   // gating on visibility keeps offscreen clips from decoding.
   const [visibleGridItems, setVisibleGridItems] = useState<Set<string>>(new Set());
@@ -174,6 +182,36 @@ export default function ProfileScreen() {
 
   // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
+
+  // A lite account's handle is held in SkateHive's database, never on chain —
+  // so it can still be registered by anyone. Asked once, only for your own lite
+  // profile, since that's the only place the answer is actionable.
+  const isLiteOwnProfile =
+    session?.kind === "userbase" && profileUsername === currentUsername;
+  useEffect(() => {
+    if (!isLiteOwnProfile || !currentUsername) return;
+    let cancelled = false;
+    isNameFreeOnHive(currentUsername).then((free) => {
+      if (!cancelled) setNameFreeOnHive(free);
+    });
+    // The stored copy is whatever the server said at login and is never
+    // updated, so an avatar assigned afterwards would never show. Ask the
+    // server, fall back to the copy.
+    loadUserbaseSession().then(async (s) => {
+      if (cancelled || !s?.user) return;
+      setLiteAvatar(s.user.avatar_url);
+      try {
+        const fresh = await getSession(s.token);
+        if (cancelled || !fresh?.success || !fresh.user) return;
+        setLiteAvatar(fresh.user.avatar_url);
+      } catch {
+        // Offline or the endpoint is unhappy — the stored copy still stands.
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLiteOwnProfile, currentUsername]);
   useEffect(() => {
     setFollowersModalVisible(false);
     setEditProfileVisible(false);
@@ -567,38 +605,107 @@ export default function ProfileScreen() {
     (error || !hiveAccount)
   ) {
     return (
-      <View style={styles.errorContainer}>
-        <Image
-          source={require("../../assets/images/icon-android.png")}
-          style={styles.spectatorLogo}
-        />
-        <Text style={[styles.profileName, { marginTop: theme.spacing.md }]}>
-          @{currentUsername}
-        </Text>
+      <View style={styles.container}>
+        {/* A real profile header, not a notice: same avatar, same name row as
+            everyone else's. Seeing the shape of the thing is what makes wanting
+            your own account obvious — the panel below stands in for the grid
+            until there is a way to list a lite account's posts. */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileHeaderRow}>
+            <View style={styles.profileImageContainer}>
+              {liteAvatar ? (
+                <Image source={{ uri: liteAvatar }} style={styles.profileImage} contentFit="cover" />
+              ) : (
+                <Image
+                  source={require("../../assets/images/icon-android.png")}
+                  style={styles.profileImage}
+                  contentFit="cover"
+                />
+              )}
+            </View>
+
+            <View style={styles.nameSection}>
+              {/* The handle leads here, not the display name: it's the name
+                  being claimed on Hive, and the text below talks about it by
+                  name. A different name above that only confuses. */}
+              <View style={styles.nameRow}>
+                <Text style={styles.profileName} numberOfLines={1}>
+                  {currentUsername}
+                </Text>
+              </View>
+              <Text style={styles.username} numberOfLines={2}>
+                @{currentUsername}
+              </Text>
+
+              {/* Zero, not hidden: an empty stat is the point — it shows what a
+                  Hive account would start filling. */}
+              <Pressable style={styles.hpChip} onPress={explainHivePower} hitSlop={8}>
+                <Text style={styles.hpChipText}>0 HP</Text>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={12}
+                  color={theme.colors.muted}
+                />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.statsCard}>
+          <View style={styles.statCell}>
+            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statLabel}>Clips</Text>
+          </View>
+          <View style={[styles.statCell, styles.statCellMiddle]}>
+            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </View>
+          <View style={styles.statCell}>
+            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </View>
+        </View>
+
+        {/* Stands in for the grid, in the same place the clips would be. */}
+        <View style={styles.liteCard}>
         {/* Most people never open the info button on the login screen, but
             everyone opens their own profile — so the explanation lives here
             too, short, with the long version a tap away (#62). */}
+        {/* Short on purpose: this screen is where someone lands, not where they
+            study. The cost, who covers it and what changes are all one tap away
+            in About — four paragraphs here just got skipped. */}
         <Text style={styles.liteTitle}>Lite account</Text>
         <Text style={styles.liteBody}>
-          You can post, comment and vote right now. Your posts go out through
-          @skatehive, the community account, because @{currentUsername} doesn't
-          exist on the Hive blockchain yet.
+          You can post, comment and vote. Your posts go out through @skatehive
+          until @{currentUsername} exists on Hive.
         </Text>
-        <Text style={styles.liteBody}>
-          Creating one costs real money — around 3 HIVE — so the crew sponsors
-          it. Once it's yours, you get your own name on chain, you can follow
-          people and edit your profile, and rewards land directly with you.
-        </Text>
+
+        {/* The handle is reserved in SkateHive's database but not on chain, so
+            it can still be taken by anyone. Telling people while it's theirs to
+            claim beats letting them find out afterwards (#63). */}
+        {nameFreeOnHive === true && (
+          <Text style={styles.liteAvailable}>
+            The name is still free — claim it and it's yours. Usually costs you
+            nothing.
+          </Text>
+        )}
+        {nameFreeOnHive === false && (
+          <Text style={styles.liteBody}>
+            @{currentUsername} is taken on Hive — your own account will need
+            another name.
+          </Text>
+        )}
 
         <Pressable onPress={() => router.push("/about")} style={styles.liteLearnMore}>
-          <Text style={styles.liteLearnMoreText}>How this works ›</Text>
+          <Text style={styles.liteLearnMoreText}>How to get your own ›</Text>
         </Pressable>
 
-        <Pressable onPress={logout} style={{ marginTop: 24 }}>
-          <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.fontSizes.md }}>
-            Log out
-          </Text>
-        </Pressable>
+          <Pressable onPress={logout} style={{ marginTop: 24 }}>
+            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.fontSizes.md }}>
+              Log out
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -1183,6 +1290,23 @@ const styles = StyleSheet.create({
   gridImage: {
     width: '100%',
     height: '100%',
+  },
+  // Sits where the grid would be, so the screen reads as a profile with its
+  // content area explained rather than as an error page.
+  liteCard: {
+    flex: 1,
+    paddingTop: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.md,
+    alignItems: 'center',
+  },
+  liteAvailable: {
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.default,
+    fontSize: theme.fontSizes.sm,
+    lineHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+    marginTop: theme.spacing.sm,
   },
   liteTitle: {
     color: theme.colors.white,
