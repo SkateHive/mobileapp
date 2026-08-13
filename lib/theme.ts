@@ -36,6 +36,20 @@ export const theme = {
     textSecondary: '#9fb59f',
     textTertiary: '#7a8f7a',
     textLight: '#cfe8cf',
+    // Scrims over the video collage. Two shapes: controls at the bottom of the
+    // screen, or content at the top with the keypad below.
+    scrimBottom: ['rgba(0,0,0,0.25)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.88)', '#000000'] as [
+      string,
+      string,
+      ...string[],
+    ],
+    scrimBottomStops: [0, 0.35, 0.72, 1] as [number, number, ...number[]],
+    scrimTop: ['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)', '#000000'] as [
+      string,
+      string,
+      ...string[],
+    ],
+    scrimTopStops: [0, 0.6, 1] as [number, number, ...number[]],
   },
   gradients: {
     // Vote weight, cool to hot: a heavier vote reads as hotter. Matches the web

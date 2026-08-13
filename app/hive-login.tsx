@@ -38,6 +38,7 @@ export default function HiveLoginScreen() {
   const [username, setUsername] = React.useState("");
   const [postingKey, setPostingKey] = React.useState("");
   const [pin, setPin] = React.useState("");
+  const [confirmPin, setConfirmPin] = React.useState("");
   const [method, setMethod] = React.useState<EncryptionMethod>("pin");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -50,8 +51,13 @@ export default function HiveLoginScreen() {
   }, []);
 
   // The key is encrypted at rest either way; this chooses what unlocks it.
+  // The PIN is typed twice on purpose: it is set once and never shown again, so
+  // a typo here locks the stored key away for good — the only way back would be
+  // deleting the account and entering the posting key again.
+  const pinsMatch = pin.length === 6 && pin === confirmPin;
+  const pinMismatch = confirmPin.length === 6 && pin !== confirmPin;
   const canSubmit =
-    !!username.trim() && !!postingKey.trim() && (method === "biometric" || pin.length === 6);
+    !!username.trim() && !!postingKey.trim() && (method === "biometric" || pinsMatch);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -83,6 +89,8 @@ export default function HiveLoginScreen() {
         hitSlop={12}
         style={styles.backButton}
         disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
       >
         <Ionicons name="chevron-back" size={26} color={theme.colors.white} />
       </Pressable>
@@ -152,6 +160,16 @@ export default function HiveLoginScreen() {
             <>
               <Text style={styles.caption}>Create a 6-digit PIN</Text>
               <PinInput value={pin} onChangeText={setPin} />
+
+              <Text style={styles.caption}>Type it again</Text>
+              <PinInput
+                value={confirmPin}
+                onChangeText={setConfirmPin}
+                hasError={pinMismatch}
+              />
+              {pinMismatch && (
+                <Text style={styles.error}>Those PINs don't match.</Text>
+              )}
             </>
           )}
 

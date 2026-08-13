@@ -3,21 +3,16 @@ import { AppState, StyleSheet, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
 import { useIsFocused } from "@react-navigation/native";
+import { theme } from "~/lib/theme";
 
 const CLIP = require("../../assets/videos/background.mp4");
 
-/** Scrim stops per screen — the collage is busy, and how busy varies. */
+/** Scrim per screen — the collage is busy, and how busy varies. */
 const SCRIMS = {
   // Controls sit at the bottom, so the dark end is down there.
-  bottom: {
-    colors: ["rgba(0,0,0,0.25)", "rgba(0,0,0,0.15)", "rgba(0,0,0,0.88)", "#000000"] as const,
-    locations: [0, 0.35, 0.72, 1] as const,
-  },
+  bottom: { colors: theme.auth.scrimBottom, locations: theme.auth.scrimBottomStops },
   // Content sits at the top and the keypad covers the rest: darker throughout.
-  top: {
-    colors: ["rgba(0,0,0,0.6)", "rgba(0,0,0,0.85)", "#000000"] as const,
-    locations: [0, 0.6, 1] as const,
-  },
+  top: { colors: theme.auth.scrimTop, locations: theme.auth.scrimTopStops },
 } as const;
 
 /**
@@ -51,11 +46,12 @@ export function AuthBackground({ scrim = "bottom" }: { scrim?: keyof typeof SCRI
 
   // iOS pauses playback when the app goes to the background, and screen focus
   // never changes across that — so without this the clip comes back frozen.
+  // Pausing on the way out matters too: nothing should decode off-screen.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state !== "active" || !isFocused) return;
       try {
-        player.play();
+        if (state === "active" && isFocused) player.play();
+        else player.pause();
       } catch {}
     });
     return () => sub.remove();
@@ -72,8 +68,8 @@ export function AuthBackground({ scrim = "bottom" }: { scrim?: keyof typeof SCRI
         nativeControls={false}
       />
       <LinearGradient
-        colors={colors as unknown as [string, string, ...string[]]}
-        locations={locations as unknown as [number, number, ...number[]]}
+        colors={colors}
+        locations={locations}
         style={StyleSheet.absoluteFill}
       />
     </View>

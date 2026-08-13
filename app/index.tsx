@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
 import { Image } from "expo-image";
+import * as LocalAuthentication from "expo-local-authentication";
 import React from "react";
 import {
   ActivityIndicator,
@@ -107,6 +108,20 @@ export default function Index() {
   React.useEffect(() => {
     loadLastEmailAccount().then(setLastEmail).catch(() => {});
     loadLastAccountKind().then(setLastKind).catch(() => {});
+  }, []);
+
+  // What this device actually offers, so the button doesn't promise Face ID on
+  // a fingerprint phone. Falls back to the generic word when unknown.
+  const [biometricLabel, setBiometricLabel] = React.useState("biometrics");
+  React.useEffect(() => {
+    LocalAuthentication.supportedAuthenticationTypesAsync()
+      .then((types) => {
+        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION))
+          setBiometricLabel("Face ID");
+        else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT))
+          setBiometricLabel("Touch ID");
+      })
+      .catch(() => {});
   }, []);
 
   const emailWins = lastKind === "email" && !!lastEmail;
@@ -298,7 +313,9 @@ export default function Index() {
                       color={theme.auth.onNeon}
                     />
                     <Text style={styles.primaryLabel}>
-                      {heroUser.method === "pin" ? "Sign in with PIN" : "Sign in with Face ID"}
+                      {heroUser.method === "pin"
+                        ? "Sign in with PIN"
+                        : `Sign in with ${biometricLabel}`}
                     </Text>
                   </>
                 )}

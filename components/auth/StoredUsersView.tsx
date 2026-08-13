@@ -51,8 +51,11 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
               contentFit="cover"
             />
             <Text style={styles.username}>@{user.username}</Text>
+            {/* "Biometrics", not "Face ID": StoredUser records the method, not
+                the modality, and this same value covers Touch ID and device
+                authentication. */}
             <Text style={styles.method}>
-              {user.method === 'pin' ? 'PIN' : 'Face ID'}
+              {user.method === 'pin' ? 'PIN' : 'Biometrics'}
             </Text>
             {onDeleteUser && (
               <Pressable

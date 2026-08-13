@@ -17,7 +17,13 @@ export default function AboutScreen() {
     <View style={styles.container}>
       <AuthBackground scrim="top" />
 
-      <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={12}>
+      <Pressable
+        onPress={() => router.back()}
+        style={styles.backButton}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
         <Ionicons name="chevron-back" size={26} color={theme.colors.white} />
       </Pressable>
 

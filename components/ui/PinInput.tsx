@@ -15,6 +15,11 @@ interface PinInputProps {
   showDigits?: boolean;
   /** Paints the boxes red — the code was rejected. */
   hasError?: boolean;
+  /**
+   * Offer iOS one-time-code autofill. Only for a code that arrived by email or
+   * SMS — a local PIN is not one, and suggesting one there is nonsense.
+   */
+  oneTimeCode?: boolean;
 }
 
 export function PinInput({
@@ -25,6 +30,7 @@ export function PinInput({
   autoFocus = false,
   showDigits = false,
   hasError = false,
+  oneTimeCode = false,
 }: PinInputProps) {
   const inputRef = useRef<TextInput>(null);
 
@@ -85,10 +91,10 @@ export function PinInput({
         autoFocus={autoFocus}
         style={styles.hiddenInput}
         caretHidden
-        // Lets iOS offer the code above the keyboard, and keeps the paste menu
-        // available on long-press.
-        textContentType="oneTimeCode"
-        autoComplete="one-time-code"
+        // Lets iOS offer an emailed code above the keyboard; the paste menu on
+        // long-press works either way.
+        textContentType={oneTimeCode ? 'oneTimeCode' : 'none'}
+        autoComplete={oneTimeCode ? 'one-time-code' : 'off'}
         contextMenuHidden={false}
       />
     </View>

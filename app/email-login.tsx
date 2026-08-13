@@ -47,7 +47,11 @@ export default function EmailLoginScreen() {
   // one means the code is already on its way and this opens on the keypad.
   const params = useLocalSearchParams<{ email?: string }>();
   const handedEmail = typeof params.email === "string" ? params.email : "";
-  const [step, setStep] = useState<Step>("email");
+  // Arriving with an address means the code is already on its way, so open on
+  // the keypad — starting at "email" flashed the send form for a moment first.
+  const [step, setStep] = useState<Step>(() =>
+    EMAIL_RE.test(handedEmail) ? "otp" : "email"
+  );
   const [email, setEmail] = useState(handedEmail);
   const [resendIn, setResendIn] = useState(0);
   const [code, setCode] = useState("");
@@ -107,6 +111,9 @@ export default function EmailLoginScreen() {
       setResendIn(RESEND_SECONDS);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send code");
+      // If the handed-off send failed there is no code coming, so fall back to
+      // the form rather than leaving the user staring at an empty keypad.
+      setStep("email");
     } finally {
       setBusy(false);
     }
@@ -117,6 +124,9 @@ export default function EmailLoginScreen() {
   const resend = async () => {
     if (resendIn > 0 || busy) return;
     setCode("");
+    // Clear the rejection too, or the fresh boxes come up red with the old
+    // message under them.
+    setError(null);
     await sendCode();
   };
 
@@ -197,6 +207,8 @@ export default function EmailLoginScreen() {
         hitSlop={12}
         style={styles.closeButton}
         disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
       >
         <Ionicons name="close" size={26} color={busy ? theme.colors.muted : theme.colors.white} />
       </Pressable>
@@ -238,6 +250,7 @@ export default function EmailLoginScreen() {
                 onComplete={verify}
                 autoFocus
                 showDigits
+                oneTimeCode
                 hasError={!!error}
               />
               {busy && <ActivityIndicator size="small" color={theme.auth.neon} />}
@@ -323,7 +336,8 @@ export default function EmailLoginScreen() {
             </View>
           )}
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {/* The OTP step shows its own message under the boxes. */}
+          {error && step !== "otp" ? <Text style={styles.errorText}>{error}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
