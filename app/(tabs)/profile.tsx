@@ -700,10 +700,11 @@ export default function ProfileScreen() {
           <Text style={styles.liteLearnMoreText}>How to get your own ›</Text>
         </Pressable>
 
-          <Pressable onPress={logout} style={{ marginTop: 24 }}>
-            <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bold, fontSize: theme.fontSizes.md }}>
-              Log out
-            </Text>
+          {/* handleLogout, not logout: it catches a failed sign-out and leaves
+              for "/" afterwards. Calling the raw one left you on a profile you
+              were no longer signed into. */}
+          <Pressable onPress={handleLogout} style={styles.liteLogout}>
+            <Text style={styles.liteLogoutText}>Log out</Text>
           </Pressable>
         </View>
       </View>
@@ -1322,6 +1323,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
     marginTop: theme.spacing.sm,
+  },
+  liteLogout: {
+    marginTop: theme.spacing.lg,
+  },
+  liteLogoutText: {
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+    fontSize: theme.fontSizes.md,
   },
   liteLearnMore: {
     marginTop: theme.spacing.md,

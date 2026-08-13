@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { AuthBackground } from '~/components/auth/AuthBackground';
+import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
 
 /**
@@ -100,10 +101,22 @@ export default function AboutScreen() {
 
 /** Opens in the in-app browser, so nobody loses the app to a signup page. */
 function LinkButton({ label, url }: { label: string; url: string }) {
+  const { showToast } = useToast();
+
+  const open = async () => {
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      // No browser, or the system refused it. Silence would look like a dead
+      // button on the one control that leads somewhere.
+      showToast("Couldn't open the link", "error");
+    }
+  };
+
   return (
     <Pressable
       style={({ pressed }) => [styles.linkButton, pressed && styles.linkButtonPressed]}
-      onPress={() => WebBrowser.openBrowserAsync(url)}
+      onPress={open}
       accessibilityRole="link"
       accessibilityLabel={label}
     >
