@@ -212,18 +212,19 @@ export default function ProfileScreen() {
   }, [profileUsername]);
 
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
-  // Your own lite profile shows the explainer card instead of a grid, and the
-  // handle isn't on Hive yet, so asking for its posts is a round trip that can
-  // only fail (#61). Gated on the session, which is known synchronously —
-  // gating on `hiveAccount` would make every other profile wait for the account
-  // before starting its posts request, and that hook has no cache.
+  // A lite account with nothing on chain yet: its handle would only make the
+  // node answer "account does not exist" (#61). The `!hiveAccount` half matters
+  // as much as the session half — once the crew sponsors the account it does
+  // exist, the profile below stops showing the explainer, and its posts have to
+  // be fetched like anyone else's. Same condition as that render, deliberately.
+  const liteWithoutHiveAccount = isLiteOwnProfile && (error || !hiveAccount);
   const {
     posts: userPosts,
     isLoading: isLoadingPosts,
     loadNextPage,
     hasMore,
     refresh: refreshPosts,
-  } = useUserComments(isLiteOwnProfile ? null : profileUsername);
+  } = useUserComments(liteWithoutHiveAccount ? null : profileUsername);
 
   // Get thumbnail for a post — checks multiple sources
   const getPostThumbnail = useCallback((post: any): string | null => {
@@ -595,11 +596,7 @@ export default function ProfileScreen() {
   // Email/lite account with no on-chain Hive account yet — reuse the spectator
   // profile look (logo + handle) with a short, lite-specific CTA instead of a
   // wall of text or a profile-fetch error.
-  if (
-    session?.kind === "userbase" &&
-    profileUsername === currentUsername &&
-    (error || !hiveAccount)
-  ) {
+  if (liteWithoutHiveAccount) {
     return (
       <View style={styles.container}>
         {/* A real profile header, not a notice: same avatar, same name row as
