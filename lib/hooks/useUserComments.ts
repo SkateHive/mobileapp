@@ -6,6 +6,12 @@ interface LastPostInfo {
   permlink: string;
 }
 
+/** Did the node reject this because the account isn't on Hive? */
+function isMissingAccount(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /does not exist|invalid account name/i.test(message);
+}
+
 export function useUserComments(username: string | null) {
   const lastPostRef = useRef<LastPostInfo | null>(null);
   const fetchedPermlinksRef = useRef<Set<string>>(new Set());
@@ -82,7 +88,14 @@ export function useUserComments(username: string | null) {
 
         if (result.length < 20) hasMoreData = false;
       } catch (error) {
-        console.error('Error fetching user posts:', error);
+        // A handle with no Hive account behind it is an expected state, not a
+        // failure: lite accounts post through @skatehive and are not on chain
+        // until the crew sponsors them. The node answers "Account x does not
+        // exist", or "invalid account name" for a handle Hive would never
+        // accept. Either way there is nothing to fetch and nothing to report.
+        if (!isMissingAccount(error)) {
+          console.error('Error fetching user posts:', error);
+        }
         hasMoreData = false;
       }
     }

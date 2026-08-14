@@ -212,13 +212,18 @@ export default function ProfileScreen() {
   }, [profileUsername]);
 
   const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
+  // Your own lite profile shows the explainer card instead of a grid, and the
+  // handle isn't on Hive yet, so asking for its posts is a round trip that can
+  // only fail (#61). Gated on the session, which is known synchronously —
+  // gating on `hiveAccount` would make every other profile wait for the account
+  // before starting its posts request, and that hook has no cache.
   const {
     posts: userPosts,
     isLoading: isLoadingPosts,
     loadNextPage,
     hasMore,
     refresh: refreshPosts,
-  } = useUserComments(profileUsername);
+  } = useUserComments(isLiteOwnProfile ? null : profileUsername);
 
   // Get thumbnail for a post — checks multiple sources
   const getPostThumbnail = useCallback((post: any): string | null => {
