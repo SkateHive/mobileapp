@@ -2,7 +2,9 @@ import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Text } from '~/components/ui/text';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { AuthBackground } from '~/components/auth/AuthBackground';
+import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
 
 /**
@@ -42,11 +44,10 @@ export default function AboutScreen() {
           <Bullet text="A few things need an account in your name: following people, editing your profile, and earning rewards directly." />
         </Section>
 
-        <Section title="🔑 Getting your own Hive account">
-          <Bullet text="Creating a Hive account isn't free — it costs about 3 HIVE, or a creation token that someone with staked HIVE spends their resource credits to claim." />
-          <Bullet text="That's what 'sponsored' means: a skater in the crew covers that cost, and the account is yours, not ours." />
-          <Bullet text="Then you get your own keys. SkateHive only ever asks for the posting key — it can post, comment and vote, and it cannot move your funds." />
-          <Bullet text="Want yours? Ask the crew at skatehive.app." />
+        <Section title="🛹 Your own account, once you post">
+          <Bullet text="Post your first clip and the crew sponsors a Hive account in your name. Your keys reach you by email, and the app links them to your login for you." />
+          <Bullet text="Nothing to buy, nothing to set up, no form to fill. Skate, post, and the account follows." />
+          <Bullet text="Already have a Hive account? Use 'Sign in with Hive' on the login screen — the posting key is all it ever asks for." />
         </Section>
 
         <Section title="📼 Tech Revolution in Skateboarding">
@@ -145,5 +146,24 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.default,
     fontSize: 13,
     lineHeight: 20,
+  },
+  links: {
+    gap: theme.spacing.sm,
+  },
+  linkButton: {
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.auth.neon,
+    backgroundColor: theme.auth.surface,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.md,
+  },
+  linkButtonPressed: { backgroundColor: theme.auth.neonPressed },
+  linkButtonText: {
+    color: theme.auth.neon,
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
   },
 });
