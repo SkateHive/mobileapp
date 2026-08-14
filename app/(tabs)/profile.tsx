@@ -35,7 +35,7 @@ import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
-import { convertVestToHive } from "~/lib/hive-utils";
+import { convertVestToHive, isMissingAccountError } from "~/lib/hive-utils";
 import { loadUserbaseSession } from "~/lib/userbase/session-store";
 import { getSession } from "~/lib/userbase/api";
 import { canPost } from "~/lib/posting";
@@ -217,7 +217,11 @@ export default function ProfileScreen() {
   // as much as the session half — once the crew sponsors the account it does
   // exist, the profile below stops showing the explainer, and its posts have to
   // be fetched like anyone else's. Same condition as that render, deliberately.
-  const liteWithoutHiveAccount = isLiteOwnProfile && (error || !hiveAccount);
+  // A node being down is not the same as an account not existing: treating
+  // every failure as absence would show the lite card, and hide the grid, to a
+  // sponsored user on a flaky connection.
+  const accountIsMissing = !hiveAccount && (!error || isMissingAccountError(error));
+  const liteWithoutHiveAccount = isLiteOwnProfile && accountIsMissing;
   const {
     posts: userPosts,
     isLoading: isLoadingPosts,

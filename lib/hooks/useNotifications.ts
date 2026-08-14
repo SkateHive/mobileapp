@@ -9,11 +9,17 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   // Ref so the interval callback always reads the latest value without causing interval recreation
   const isLoadingMoreRef = useRef(false);
+  // Switching accounts leaves the previous request in flight. Without this, its
+  // response lands after the new account's state was cleared and the old
+  // account's notifications appear under the new one. Same guard the badge
+  // count in notifications-context already uses.
+  const requestIdRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(0);
   const [hasMore, setHasMore] = useState(true);
 
   const fetchNotifications = useCallback(async (refresh: boolean = false) => {
+    const requestId = ++requestIdRef.current;
     // Email (userbase) accounts may have no on-chain Hive account yet → skip.
     if (!username || username === 'SPECTATOR' || session?.kind === 'userbase') {
       setNotifications([]);
@@ -32,6 +38,7 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
       
       setError(null);
       const allNotifications = await fetchAllNotifications(username, 50); // Start with 50 notifications
+      if (requestId !== requestIdRef.current) return;
       setNotifications(allNotifications);
       setLastRefresh(Date.now());
       
@@ -40,10 +47,11 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
         setHasMore(false);
       }
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Error fetching notifications:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) setIsLoading(false);
     }
   }, [username, session?.kind]);
 
@@ -58,6 +66,7 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
       return;
     }
 
+    const requestId = ++requestIdRef.current;
     try {
       isLoadingMoreRef.current = true;
       setIsLoadingMore(true);
@@ -66,7 +75,8 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
       // Get the last notification ID for pagination
       const lastId = notifications.length > 0 ? notifications[notifications.length - 1].id : undefined;
       const moreNotifications = await fetchAllNotifications(username, 50, lastId);
-      
+      if (requestId !== requestIdRef.current) return;
+
       if (moreNotifications.length === 0) {
         setHasMore(false);
       } else {
@@ -85,11 +95,14 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
         }
       }
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Error loading more notifications:', err);
       setError(err instanceof Error ? err.message : 'Failed to load more notifications');
     } finally {
-      isLoadingMoreRef.current = false;
-      setIsLoadingMore(false);
+      if (requestId === requestIdRef.current) {
+        isLoadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      }
     }
   }, [username, session?.kind, notifications, isLoadingMore, hasMore]);
 

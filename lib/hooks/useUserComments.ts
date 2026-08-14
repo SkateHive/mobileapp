@@ -1,15 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getUserComments, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
+import { getUserComments, isMissingAccountError, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
 
 interface LastPostInfo {
   author: string;
   permlink: string;
-}
-
-/** Did the node reject this because the account isn't on Hive? */
-function isMissingAccount(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /does not exist|invalid account name/i.test(message);
 }
 
 export function useUserComments(username: string | null) {
@@ -93,7 +87,7 @@ export function useUserComments(username: string | null) {
         // until the crew sponsors them. The node answers "Account x does not
         // exist", or "invalid account name" for a handle Hive would never
         // accept. Either way there is nothing to fetch and nothing to report.
-        if (!isMissingAccount(error)) {
+        if (!isMissingAccountError(error)) {
           console.error('Error fetching user posts:', error);
         }
         hasMoreData = false;
