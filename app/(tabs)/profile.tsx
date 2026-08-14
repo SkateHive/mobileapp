@@ -605,7 +605,18 @@ export default function ProfileScreen() {
             until there is a way to list a lite account's posts. */}
         <View style={styles.profileSection}>
           <View style={styles.profileHeaderRow}>
-            <View style={styles.profileImageContainer}>
+            {/* TEMPORARY (#68) — see the other one below. REMOVE BEFORE THE PR. */}
+            <Pressable
+              style={styles.profileImageContainer}
+              onLongPress={
+                __DEV__
+                  ? () => {
+                      void resetOnboarding();
+                      showToast("Onboarding reset", "success");
+                    }
+                  : undefined
+              }
+            >
               {liteAvatar ? (
                 <Image source={{ uri: liteAvatar }} style={styles.profileImage} contentFit="cover" />
               ) : (
@@ -615,7 +626,7 @@ export default function ProfileScreen() {
                   contentFit="cover"
                 />
               )}
-            </View>
+            </Pressable>
 
             <View style={styles.nameSection}>
               {/* The handle leads here, not the display name: it's the name
