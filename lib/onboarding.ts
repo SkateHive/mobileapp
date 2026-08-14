@@ -44,15 +44,6 @@ export async function markStepSeen(step: OnboardingStep): Promise<void> {
   }
 }
 
-/** Reset for testing the flow without reinstalling. */
-export async function resetOnboarding(): Promise<void> {
-  seen = new Set();
-  listeners.forEach((l) => l());
-  try {
-    await SecureStore.deleteItemAsync(KEY);
-  } catch {}
-}
-
 /**
  * `show` stays false until the stored set has actually loaded, so the coach
  * never flashes in front of someone who already dismissed him.

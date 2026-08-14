@@ -41,8 +41,6 @@ import { getSession } from "~/lib/userbase/api";
 import { canPost } from "~/lib/posting";
 import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
-// TEMPORARY (#68) — remove with the long-press reset below.
-import { resetOnboarding } from "~/lib/onboarding";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 import { setViewerPayload, updateViewerPosts } from "~/lib/viewer-store";
@@ -605,18 +603,7 @@ export default function ProfileScreen() {
             until there is a way to list a lite account's posts. */}
         <View style={styles.profileSection}>
           <View style={styles.profileHeaderRow}>
-            {/* TEMPORARY (#68) — see the other one below. REMOVE BEFORE THE PR. */}
-            <Pressable
-              style={styles.profileImageContainer}
-              onLongPress={
-                __DEV__
-                  ? () => {
-                      void resetOnboarding();
-                      showToast("Onboarding reset", "success");
-                    }
-                  : undefined
-              }
-            >
+            <View style={styles.profileImageContainer}>
               {liteAvatar ? (
                 <Image source={{ uri: liteAvatar }} style={styles.profileImage} contentFit="cover" />
               ) : (
@@ -626,7 +613,7 @@ export default function ProfileScreen() {
                   contentFit="cover"
                 />
               )}
-            </Pressable>
+            </View>
 
             <View style={styles.nameSection}>
               {/* The handle leads here, not the display name: it's the name
@@ -718,21 +705,9 @@ export default function ProfileScreen() {
       {/* Profile Section */}
       <View style={styles.profileSection}>
         <View style={styles.profileHeaderRow}>
-          {/* TEMPORARY (#68) — long-press the avatar to replay the onboarding
-              coach while iterating on it. REMOVE BEFORE THE PR. */}
-          <Pressable
-            style={styles.profileImageContainer}
-            onLongPress={
-              __DEV__
-                ? () => {
-                    void resetOnboarding();
-                    showToast("Onboarding reset", "success");
-                  }
-                : undefined
-            }
-          >
+          <View style={styles.profileImageContainer}>
             {renderProfileImage()}
-          </Pressable>
+          </View>
 
           <View style={styles.nameSection}>
             {/* Name row with gear icon */}
