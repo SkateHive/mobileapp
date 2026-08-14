@@ -41,6 +41,8 @@ import { getSession } from "~/lib/userbase/api";
 import { canPost } from "~/lib/posting";
 import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
+// TEMPORARY (#68) — remove with the long-press reset below.
+import { resetOnboarding } from "~/lib/onboarding";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
 import { setViewerPayload, updateViewerPosts } from "~/lib/viewer-store";
@@ -705,9 +707,21 @@ export default function ProfileScreen() {
       {/* Profile Section */}
       <View style={styles.profileSection}>
         <View style={styles.profileHeaderRow}>
-          <View style={styles.profileImageContainer}>
+          {/* TEMPORARY (#68) — long-press the avatar to replay the onboarding
+              coach while iterating on it. REMOVE BEFORE THE PR. */}
+          <Pressable
+            style={styles.profileImageContainer}
+            onLongPress={
+              __DEV__
+                ? () => {
+                    void resetOnboarding();
+                    showToast("Onboarding reset", "success");
+                  }
+                : undefined
+            }
+          >
             {renderProfileImage()}
-          </View>
+          </Pressable>
 
           <View style={styles.nameSection}>
             {/* Name row with gear icon */}
