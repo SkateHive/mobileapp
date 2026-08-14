@@ -10,6 +10,13 @@ const COACH_W = 1341;
 const COACH_H = 1173;
 const SCREEN_W = Dimensions.get("window").width;
 
+// Warm the art when this module is first imported, which happens with the feed
+// — long before any tip fires. Without it the balloon draws instantly (it is
+// just views) and he arrives late behind it, worst of all in Expo Go, where
+// every asset is fetched from the Metro server the moment a screen asks for it.
+const coachUri = Image.resolveAssetSource(COACH)?.uri;
+if (coachUri) void Image.prefetch(coachUri).catch(() => {});
+
 /**
  * The coach who explains the app (#68).
  *
