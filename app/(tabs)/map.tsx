@@ -423,7 +423,7 @@ export default function MapScreen() {
       <CoachTip
         step="map"
         enabled={!!spots?.length}
-        text="Every pin here is a spot somebody actually skated. Found one that's missing? Hit + and drop it — the map is only as good as what the crew puts on it."
+        text="Every pin here is a spot somebody actually skated. Found one that's missing? Hit + and drop it. The map is only as good as what the crew puts on it."
       />
     </View>
   );

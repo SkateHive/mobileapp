@@ -86,7 +86,9 @@ export function CoachTip({
 }
 
 const styles = StyleSheet.create({
-  scrim: { backgroundColor: "rgba(0,0,0,0.82)" },
+  // Light enough that the thing being explained is still visible behind it —
+  // the balloon is white, so legibility survives the dimmer scrim.
+  scrim: { backgroundColor: "rgba(0,0,0,0.6)" },
   character: {
     position: "absolute",
     bottom: -52,

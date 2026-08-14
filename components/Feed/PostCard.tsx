@@ -481,7 +481,7 @@ export const PostCard = React.memo(
                     the one thing a newcomer can't guess (#68). */}
                 <CoachTip
                   step="vote"
-                  text="That bar is real money. Slide it and part of your voting power goes to this skater — the further right, the bigger the cut. Rewards come from other skaters, not from us."
+                  text="That bar is real money. Slide it and part of your voting power goes to this skater. The further right, the bigger the cut. Rewards come from other skaters, not from us."
                 />
               </View>
             ) : (

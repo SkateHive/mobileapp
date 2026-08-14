@@ -17,8 +17,8 @@ import { theme } from "~/lib/theme";
  * `about.tsx` is still the long version, and the last line points there.
  */
 const LINES = [
-  "Yo. This is Skatehive — skaters only. No brands picking what's cool, no algorithm burying your clip. You film it, the crew decides.",
-  "One thing before you post: your clips land on a public blockchain. They're real and they stick around. Until you've got an account of your own, they go out through @skatehive — post your first one and the crew sponsors you.",
+  "Yo. This is Skatehive, skaters only. No brands picking what's cool, no algorithm burying your clip. You film it, the crew decides.",
+  "One thing before you post: your clips land on a public blockchain. They're real and they stick around. Until you've got an account of your own, they go out through @skatehive. Post your first one and the crew sponsors you.",
 ];
 
 export default function OnboardingScreen() {
