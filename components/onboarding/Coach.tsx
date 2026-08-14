@@ -93,20 +93,20 @@ const styles = StyleSheet.create({
   // Light enough that the thing being explained is still visible behind it —
   // the balloon is white, so legibility survives the dimmer scrim.
   scrim: { backgroundColor: "rgba(0,0,0,0.6)" },
-  // Smaller than full width and pushed right, so he covers less of whatever is
-  // being explained — most of which sits at the bottom of the screen.
   character: {
     position: "absolute",
-    bottom: -44,
-    right: -24,
-    width: "78%",
+    bottom: -52,
+    left: 0,
+    right: 0,
+    width: "100%",
     aspectRatio: 418 / 358,
   },
-  // Anchored to its bottom, not the top of the screen: pinned to the top, a
-  // short line left the tail floating a long way from his head.
+  // Anchored to its bottom rather than to the top of the screen, so the tail
+  // keeps the same short distance from his head whatever the length of the
+  // line. 35% clears the top of his hair without landing on it.
   balloonWrap: {
     position: "absolute",
-    bottom: "24%",
+    bottom: "35%",
     left: theme.spacing.md,
     right: theme.spacing.md,
     zIndex: 2,
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   tail: {
     position: "absolute",
     bottom: -16,
-    right: 78,
+    right: 140,
     width: 0,
     height: 0,
     borderLeftWidth: 12,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   tailInner: {
     position: "absolute",
     bottom: -9,
-    right: 82,
+    right: 144,
     width: 0,
     height: 0,
     borderLeftWidth: 8,
