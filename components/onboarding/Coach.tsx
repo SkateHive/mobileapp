@@ -103,10 +103,11 @@ const styles = StyleSheet.create({
   },
   // Anchored to its bottom rather than to the top of the screen, so the tail
   // keeps the same short distance from his head whatever the length of the
-  // line. 35% clears the top of his hair without landing on it.
+  // line. His hair reaches 32% of the screen and the tail hangs ~2% below the
+  // balloon, so 38% leaves the tail pointing at him without resting on him.
   balloonWrap: {
     position: "absolute",
-    bottom: "35%",
+    bottom: "38%",
     left: theme.spacing.md,
     right: theme.spacing.md,
     zIndex: 2,
