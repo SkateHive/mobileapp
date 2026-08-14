@@ -888,9 +888,27 @@ export default function ProfileScreen() {
   const handleRefresh = () => {
     autoFillPagesRef.current = 0;
     refreshPosts();
-    // The header is half of this screen — pulling down used to refresh only the
+    // The header is half of this screen. Pulling down used to refresh only the
     // grid, leaving avatar, bio and Hive Power frozen (#65).
     refetchAccount();
+  };
+
+  // Saving the profile is a chain write, and hivemind has not indexed it by the
+  // time the modal closes: refetching right away reads the old profile straight
+  // back, which is why saving appeared to do nothing until the user pulled down
+  // themselves. One retry a couple of blocks later lands the new one.
+  const savedRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (savedRetryRef.current) clearTimeout(savedRetryRef.current);
+    },
+    []
+  );
+
+  const handleProfileSaved = () => {
+    handleRefresh();
+    if (savedRetryRef.current) clearTimeout(savedRetryRef.current);
+    savedRetryRef.current = setTimeout(() => refetchAccount(), 6000);
   };
 
   return (
@@ -986,7 +1004,7 @@ export default function ProfileScreen() {
           visible={editProfileVisible}
           onClose={() => setEditProfileVisible(false)}
           currentProfile={hiveAccount?.metadata?.profile || {}}
-          onSaved={handleRefresh}
+          onSaved={handleProfileSaved}
         />
       )}
 
