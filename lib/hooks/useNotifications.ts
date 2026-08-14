@@ -17,6 +17,9 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
     // Email (userbase) accounts may have no on-chain Hive account yet → skip.
     if (!username || username === 'SPECTATOR' || session?.kind === 'userbase') {
       setNotifications([]);
+      // Say so, or the list stays armed for a next page that cannot exist and
+      // the first scroll asks Hive about a handle it has never heard of (#61).
+      setHasMore(false);
       return;
     }
 
@@ -45,7 +48,13 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
   }, [username, session?.kind]);
 
   const loadMoreNotifications = useCallback(async () => {
-    if (!username || username === 'SPECTATOR' || isLoadingMore || !hasMore) {
+    if (
+      !username ||
+      username === 'SPECTATOR' ||
+      session?.kind === 'userbase' ||
+      isLoadingMore ||
+      !hasMore
+    ) {
       return;
     }
 
@@ -82,7 +91,7 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
       isLoadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [username, notifications, isLoadingMore, hasMore]);
+  }, [username, session?.kind, notifications, isLoadingMore, hasMore]);
 
   const markAsRead = useCallback(async () => {
     if (!session || !session.decryptedKey || username === 'SPECTATOR') {
