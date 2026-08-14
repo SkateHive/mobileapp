@@ -1,8 +1,14 @@
-import { View, Image, Pressable, Modal, StyleSheet } from "react-native";
+import { View, Image, Pressable, Modal, Dimensions, StyleSheet } from "react-native";
 import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { useOnboardingStep, type OnboardingStep } from "~/lib/onboarding";
+
+const COACH = require("~/assets/images/skatehive-coach2.png");
+// Pixel size of the art, so his height is computed rather than inferred.
+const COACH_W = 1341;
+const COACH_H = 1173;
+const SCREEN_W = Dimensions.get("window").width;
 
 /**
  * The coach who explains the app (#68).
@@ -62,7 +68,7 @@ export function Coach({
         </Animated.View>
 
         <Image
-          source={require("~/assets/images/skatehive-coach2.png")}
+          source={COACH}
           style={styles.character}
           resizeMode="contain"
         />
@@ -93,13 +99,15 @@ const styles = StyleSheet.create({
   // Light enough that the thing being explained is still visible behind it —
   // the balloon is white, so legibility survives the dimmer scrim.
   scrim: { backgroundColor: "rgba(0,0,0,0.6)" },
+  // Explicit width and height rather than "100%" + aspectRatio: with the
+  // bigger art that combination fell back to the image's intrinsic size, 1341
+  // points wide, which put his head three quarters of the way up the screen.
   character: {
     position: "absolute",
     bottom: -52,
     left: 0,
-    right: 0,
-    width: "100%",
-    aspectRatio: 1341 / 1173,
+    width: SCREEN_W,
+    height: SCREEN_W * (COACH_H / COACH_W),
   },
   // Anchored to its bottom rather than to the top of the screen, so the tail
   // keeps the same short distance from his head whatever the length of the
