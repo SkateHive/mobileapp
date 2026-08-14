@@ -21,6 +21,7 @@ import { useVoteValue } from "~/lib/hooks/useVoteValue";
 import { useViewportTracker } from "~/lib/ViewportTracker";
 import { Text } from "../ui/text";
 import { VotingSlider } from "../ui/VotingSlider";
+import { CoachTip } from "../onboarding/Coach";
 import { MediaPreview } from "./MediaPreview";
 import { EnhancedMarkdownRenderer } from "../markdown/EnhancedMarkdownRenderer";
 import { SpotLocationLine } from "../spotmap/SpotLocationLine";
@@ -475,6 +476,12 @@ export const PostCard = React.memo(
                   isVoting={isVoting}
                   minimumValue={1}
                   maximumValue={100}
+                />
+                {/* Nothing on this bar says a vote is worth money, and it is
+                    the one thing a newcomer can't guess (#68). */}
+                <CoachTip
+                  step="vote"
+                  text="That bar is real money. Slide it and part of your voting power goes to this skater — the further right, the bigger the cut. Rewards come from other skaters, not from us."
                 />
               </View>
             ) : (

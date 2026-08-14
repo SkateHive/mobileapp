@@ -27,6 +27,7 @@ import {
   type UserbaseUser,
 } from "~/lib/userbase/api";
 import { useAuth } from "~/lib/auth-provider";
+import { useOnboardingStep } from "~/lib/onboarding";
 
 type Step = "email" | "otp" | "username" | "done";
 
@@ -61,6 +62,11 @@ export default function EmailLoginScreen() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Gated on the stored step rather than on "did we just create this account",
+  // so someone who signed up before onboarding existed still meets the coach.
+  const { show: introPending } = useOnboardingStep("intro");
+  const introSeen = !introPending;
 
   // Looping muted celebration clip for the success screen.
   const celebrationPlayer = useVideoPlayer(CELEBRATION, (p) => {
@@ -326,7 +332,7 @@ export default function EmailLoginScreen() {
               <Text style={styles.emailEcho}>@{user?.handle}</Text>
               <Pressable
                 style={styles.continueBtn}
-                onPress={() => router.replace("/(tabs)/videos")}
+                onPress={() => router.replace(introSeen ? "/(tabs)/videos" : "/onboarding")}
                 accessibilityRole="button"
                 accessibilityLabel="Continue"
               >
