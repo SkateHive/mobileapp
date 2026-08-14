@@ -62,7 +62,7 @@ export function Coach({
         </Animated.View>
 
         <Image
-          source={require("~/assets/images/skatehive-coach.png")}
+          source={require("~/assets/images/skatehive-coach2.png")}
           style={styles.character}
           resizeMode="contain"
         />
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     width: "100%",
-    aspectRatio: 418 / 358,
+    aspectRatio: 1341 / 1173,
   },
   // Anchored to its bottom rather than to the top of the screen, so the tail
   // keeps the same short distance from his head whatever the length of the
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   tail: {
     position: "absolute",
     bottom: -16,
-    right: 140,
+    right: 100,
     width: 0,
     height: 0,
     borderLeftWidth: 12,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   tailInner: {
     position: "absolute",
     bottom: -9,
-    right: 144,
+    right: 104,
     width: 0,
     height: 0,
     borderLeftWidth: 8,
