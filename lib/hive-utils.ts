@@ -434,26 +434,6 @@ export async function getProfile(username: string): Promise<any> {
 }
 
 /**
- * Is this name still unclaimed on Hive?
- *
- * A lite handle is reserved in SkateHive's own database but **not** on chain —
- * anyone can register it. The userbase check-username endpoint can't answer
- * this for the handle's own owner (it reports "already reserved", meaning
- * reserved by them), so the chain is the only source of truth (#63).
- *
- * Returns null when the question can't be answered, so callers can stay quiet
- * rather than claim a name is free on the strength of a failed request.
- */
-export async function isNameFreeOnHive(name: string): Promise<boolean | null> {
-  try {
-    const accounts = await HiveClient.database.getAccounts([name]);
-    return accounts.length === 0;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Get account posts/comments from a specific user
  * @param username - Hive username
  * @param sort - Sort type ('posts' or 'comments')

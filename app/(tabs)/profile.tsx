@@ -35,7 +35,7 @@ import { theme } from "~/lib/theme";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
-import { convertVestToHive, isNameFreeOnHive } from "~/lib/hive-utils";
+import { convertVestToHive } from "~/lib/hive-utils";
 import { loadUserbaseSession } from "~/lib/userbase/session-store";
 import { getSession } from "~/lib/userbase/api";
 import { canPost } from "~/lib/posting";
@@ -154,9 +154,6 @@ export default function ProfileScreen() {
   // Uses the same definition as the Instagram gate (the account's own
   // vesting_shares), so the two never disagree for your own profile.
   const [hivePower, setHivePower] = useState<number | null>(null);
-  // Only asked for a lite account looking at its own profile — null while
-  // unknown, so a failed check says nothing rather than something wrong.
-  const [nameFreeOnHive, setNameFreeOnHive] = useState<boolean | null>(null);
   // A lite account's picture comes from SkateHive's own server: it has no Hive
   // account, so images.hive.blog 404s for its handle.
   const [liteAvatar, setLiteAvatar] = useState<string | null>(null);
@@ -183,17 +180,11 @@ export default function ProfileScreen() {
   // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
 
-  // A lite account's handle is held in SkateHive's database, never on chain —
-  // so it can still be registered by anyone. Asked once, only for your own lite
-  // profile, since that's the only place the answer is actionable.
   const isLiteOwnProfile =
     session?.kind === "userbase" && profileUsername === currentUsername;
   useEffect(() => {
     if (!isLiteOwnProfile || !currentUsername) return;
     let cancelled = false;
-    isNameFreeOnHive(currentUsername).then((free) => {
-      if (!cancelled) setNameFreeOnHive(free);
-    });
     // The stored copy is whatever the server said at login and is never
     // updated, so an avatar assigned afterwards would never show. Ask the
     // server, fall back to the copy.
@@ -668,36 +659,22 @@ export default function ProfileScreen() {
 
         {/* Stands in for the grid, in the same place the clips would be. */}
         <View style={styles.liteCard}>
-        {/* Most people never open the info button on the login screen, but
-            everyone opens their own profile — so the explanation lives here
-            too, short, with the long version a tap away (#62). */}
         {/* Short on purpose: this screen is where someone lands, not where they
-            study. The cost, who covers it and what changes are all one tap away
-            in About — four paragraphs here just got skipped. */}
+            study — the long version is one tap away in About. And it asks for
+            nothing: the crew sponsors an account on the first post, so telling
+            people to go and create one themselves would only burn the name the
+            sponsorship is going to register (#63). */}
         <Text style={styles.liteTitle}>Lite account</Text>
         <Text style={styles.liteBody}>
           You can post, comment and vote. Your posts go out through @skatehive
           until @{currentUsername} exists on Hive.
         </Text>
-
-        {/* The handle is reserved in SkateHive's database but not on chain, so
-            it can still be taken by anyone. Telling people while it's theirs to
-            claim beats letting them find out afterwards (#63). */}
-        {nameFreeOnHive === true && (
-          <Text style={styles.liteAvailable}>
-            The name is still free — claim it and it's yours. Usually costs you
-            nothing.
-          </Text>
-        )}
-        {nameFreeOnHive === false && (
-          <Text style={styles.liteBody}>
-            @{currentUsername} is taken on Hive — your own account will need
-            another name.
-          </Text>
-        )}
+        <Text style={styles.liteAvailable}>
+          Post your first clip and the crew sponsors @{currentUsername} for you.
+        </Text>
 
         <Pressable onPress={() => router.push("/about")} style={styles.liteLearnMore}>
-          <Text style={styles.liteLearnMoreText}>How to get your own ›</Text>
+          <Text style={styles.liteLearnMoreText}>How this works ›</Text>
         </Pressable>
 
           {/* handleLogout, not logout: it catches a failed sign-out and leaves

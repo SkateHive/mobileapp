@@ -44,30 +44,11 @@ export default function AboutScreen() {
           <Bullet text="A few things need an account in your name: following people, editing your profile, and earning rewards directly." />
         </Section>
 
-        <Section title="🔑 Getting your own Hive account">
-          <Bullet text="An account has a price on the network — about 3 HIVE, or a creation token someone claims by spending resource credits. Somebody pays it, but it is almost never you." />
-          <Bullet text="That's what 'sponsored' means: a skater in the crew covers it, and the account is yours, not ours." />
-          <Bullet text="Then you get your own keys. SkateHive only ever asks for the posting key — it can post, comment and vote, and it cannot move your funds." />
-          <Bullet text="Want yours? Ask the crew — at skatehive.app, or wherever you find us." />
+        <Section title="🛹 Your own account, once you post">
+          <Bullet text="Post your first clip and the crew sponsors a Hive account in your name. Your keys reach you by email, and the app links them to your login for you." />
+          <Bullet text="Nothing to buy, nothing to set up, no form to fill. Skate, post, and the account follows." />
+          <Bullet text="Already have a Hive account? Use 'Sign in with Hive' on the login screen — the posting key is all it ever asks for." />
         </Section>
-
-        <Section title="🛠 Or create one yourself">
-          <Bullet text="Your SkateHive name is held for you here, but not on the Hive blockchain — until an account exists, anyone could register it. Your profile tells you whether it's still free." />
-          <Bullet text="signup.hive.io is the official portal, and it lists the services that will create your account — several do it free, covering the network cost for you." />
-          <Bullet text="A skater with an established Hive account can also make yours for free from Hive Keychain — creating accounts costs them resource credits rather than money, though it takes a decent amount of Hive Power to have one spare. Worth asking around." />
-          <Bullet text="Use the same name as your SkateHive handle if it's still available — that's how the two stay one identity." />
-          <Bullet text="Once it exists, come back and use 'Sign in with Hive' on the login screen. Bring the posting key, nothing else." />
-          <Bullet text="Then link it to your email account at skatehive.app, under available connections. Until you do, the app treats the two as separate accounts — same person, two logins." />
-        </Section>
-
-        {/* One official door on purpose. hiveonboard.com was in every Hive
-            tutorial as *the* free signup service, and its domain now 301s to an
-            unrelated shop — third-party links rot without warning, and hive.io
-            already lists whichever services are alive. Verify any link added
-            here by actually opening it. */}
-        <View style={styles.links}>
-          <LinkButton label="Sign up at hive.io ›" url="https://signup.hive.io" />
-        </View>
 
         <Section title="📼 Tech Revolution in Skateboarding">
           <Bullet text="From VX tapes to IG clips — tech's always been part of the ride." />
@@ -96,32 +77,6 @@ export default function AboutScreen() {
         </Section>
       </ScrollView>
     </View>
-  );
-}
-
-/** Opens in the in-app browser, so nobody loses the app to a signup page. */
-function LinkButton({ label, url }: { label: string; url: string }) {
-  const { showToast } = useToast();
-
-  const open = async () => {
-    try {
-      await WebBrowser.openBrowserAsync(url);
-    } catch {
-      // No browser, or the system refused it. Silence would look like a dead
-      // button on the one control that leads somewhere.
-      showToast("Couldn't open the link", "error");
-    }
-  };
-
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.linkButton, pressed && styles.linkButtonPressed]}
-      onPress={open}
-      accessibilityRole="link"
-      accessibilityLabel={label}
-    >
-      <Text style={styles.linkButtonText}>{label}</Text>
-    </Pressable>
   );
 }
 
