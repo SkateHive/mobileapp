@@ -114,10 +114,12 @@ function countryToFlag(location: string): string {
     IN: '🇮🇳', INDIA: '🇮🇳',
     PH: '🇵🇭', PHILIPPINES: '🇵🇭',
   };
-  // Try exact match first, then check if location contains a known key
+  // Try exact match first, then check if location contains a known country name.
+  // Two-letter codes are exact-match only: as substrings they hit half the map
+  // by accident — MOROCCO contains CO, SENEGAL contains SE, CHINA contains IN.
   if (map[loc]) return map[loc];
   for (const [key, flag] of Object.entries(map)) {
-    if (loc.includes(key)) return flag;
+    if (key.length > 2 && loc.includes(key)) return flag;
   }
   return '🌍';
 }
@@ -211,15 +213,15 @@ export default function ProfileScreen() {
     autoFillPagesRef.current = 0;
   }, [profileUsername]);
 
-  const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
+  const { hiveAccount, isLoading: isLoadingProfile, error, refetch: refetchAccount } =
+    useHiveAccount(profileUsername);
   // A lite account with nothing on chain yet: its handle would only make the
   // node answer "account does not exist" (#61). The `!hiveAccount` half matters
-  // as much as the session half — once the crew sponsors the account it does
+  // as much as the session half: once the crew sponsors the account it does
   // exist, the profile below stops showing the explainer, and its posts have to
   // be fetched like anyone else's. Same condition as that render, deliberately.
-  // A node being down is not the same as an account not existing: treating
-  // every failure as absence would show the lite card, and hide the grid, to a
-  // sponsored user on a flaky connection.
+  // And a node being down is not the same as an account not existing, or the
+  // lite card would replace the grid for a sponsored user on a flaky connection.
   const accountIsMissing = !hiveAccount && (!error || isMissingAccountError(error));
   const liteWithoutHiveAccount = isLiteOwnProfile && accountIsMissing;
   const {
@@ -488,12 +490,12 @@ export default function ProfileScreen() {
       "Hive Power",
       isOwnProfile
         ? "Hive Power is how much influence your account has on Hive.\n\n" +
-            "The more you hold, the more your votes are worth — so the posts you " +
+            "The more you hold, the more your votes are worth, so the posts you " +
             "vote on earn more, and so do you when others vote on yours.\n\n" +
             "You build it by earning rewards on your clips and keeping them as " +
             "Hive Power instead of cashing out."
         : "Hive Power is how much influence an account has on Hive.\n\n" +
-            "The more someone holds, the more their votes are worth — so the " +
+            "The more someone holds, the more their votes are worth, so the " +
             "posts they vote on earn more, and they earn more when others vote " +
             "on theirs.\n\n" +
             "It grows by earning rewards on clips and keeping them as Hive Power " +
@@ -886,6 +888,9 @@ export default function ProfileScreen() {
   const handleRefresh = () => {
     autoFillPagesRef.current = 0;
     refreshPosts();
+    // The header is half of this screen — pulling down used to refresh only the
+    // grid, leaving avatar, bio and Hive Power frozen (#65).
+    refetchAccount();
   };
 
   return (
