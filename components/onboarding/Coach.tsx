@@ -37,23 +37,27 @@ export function Coach({
         <Animated.View entering={FadeInUp.duration(260)} style={styles.balloonWrap}>
           <View style={styles.balloon}>
             <Text style={styles.balloonText}>{text}</Text>
+
+            {/* Inside the balloon, not under it: sitting below, they wedged
+                themselves between the tail and his head, and he read as
+                decoration next to a dialog rather than the one talking. */}
+            <View style={styles.actions}>
+              {secondaryLabel && onSecondary ? (
+                <Pressable onPress={onSecondary} hitSlop={12} style={styles.skip}>
+                  <Text style={styles.skipText}>{secondaryLabel}</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={onPrimary}
+                style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryText}>{primaryLabel}</Text>
+              </Pressable>
+            </View>
+
             <View style={styles.tail} />
             <View style={styles.tailInner} />
-          </View>
-
-          <View style={styles.actions}>
-            {secondaryLabel && onSecondary ? (
-              <Pressable onPress={onSecondary} hitSlop={12} style={styles.skip}>
-                <Text style={styles.skipText}>{secondaryLabel}</Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              onPress={onPrimary}
-              style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.primaryText}>{primaryLabel}</Text>
-            </Pressable>
           </View>
         </Animated.View>
 
@@ -102,7 +106,7 @@ const styles = StyleSheet.create({
   // short line left the tail floating a long way from his head.
   balloonWrap: {
     position: "absolute",
-    bottom: "27%",
+    bottom: "24%",
     left: theme.spacing.md,
     right: theme.spacing.md,
     zIndex: 2,
@@ -154,7 +158,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
     gap: theme.spacing.md,
-    marginTop: theme.spacing.lg,
+    marginTop: theme.spacing.md,
   },
   skip: { paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.sm },
   skipText: {
