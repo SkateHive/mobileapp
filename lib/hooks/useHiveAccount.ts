@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { ExtendedAccount } from "@hiveio/dhive";
 import { HiveClient, getProfile } from "../hive-utils";
 
@@ -17,6 +17,7 @@ export default function useHiveAccount(username: string | null) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     // Increment request ID to cancel stale responses
@@ -76,7 +77,13 @@ export default function useHiveAccount(username: string | null) {
     };
 
     fetchAccount();
-  }, [username]);
+  }, [username, reloadCount]);
 
-  return { hiveAccount, isLoading, error };
+  // Your own profile is a tab, so it mounts once and stays mounted: without a
+  // way to ask again, an avatar or bio edited elsewhere stayed stale until the
+  // app was restarted (#65). A counter rather than a cache — the real fix is
+  // moving this hook to React Query, which is what that issue is for.
+  const refetch = useCallback(() => setReloadCount((n) => n + 1), []);
+
+  return { hiveAccount, isLoading, error, refetch };
 }

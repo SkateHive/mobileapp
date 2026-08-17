@@ -114,10 +114,16 @@ function countryToFlag(location: string): string {
     IN: '🇮🇳', INDIA: '🇮🇳',
     PH: '🇵🇭', PHILIPPINES: '🇵🇭',
   };
-  // Try exact match first, then check if location contains a known key
+  // Exact match first. Then country names can match anywhere in the string, so
+  // "Sao Paulo, Brazil" works, while two-letter codes have to be a word of their
+  // own: as plain substrings they hit half the map by accident. MOROCCO contains
+  // CO, SENEGAL contains SE, CHINA contains IN. Splitting on non-letters keeps
+  // "SP, BR" working without that.
   if (map[loc]) return map[loc];
+  const words = loc.split(/[^A-Z]+/);
   for (const [key, flag] of Object.entries(map)) {
-    if (loc.includes(key)) return flag;
+    const found = key.length > 2 ? loc.includes(key) : words.includes(key);
+    if (found) return flag;
   }
   return '🌍';
 }
@@ -211,15 +217,15 @@ export default function ProfileScreen() {
     autoFillPagesRef.current = 0;
   }, [profileUsername]);
 
-  const { hiveAccount, isLoading: isLoadingProfile, error } = useHiveAccount(profileUsername);
+  const { hiveAccount, isLoading: isLoadingProfile, error, refetch: refetchAccount } =
+    useHiveAccount(profileUsername);
   // A lite account with nothing on chain yet: its handle would only make the
   // node answer "account does not exist" (#61). The `!hiveAccount` half matters
-  // as much as the session half — once the crew sponsors the account it does
+  // as much as the session half: once the crew sponsors the account it does
   // exist, the profile below stops showing the explainer, and its posts have to
   // be fetched like anyone else's. Same condition as that render, deliberately.
-  // A node being down is not the same as an account not existing: treating
-  // every failure as absence would show the lite card, and hide the grid, to a
-  // sponsored user on a flaky connection.
+  // And a node being down is not the same as an account not existing, or the
+  // lite card would replace the grid for a sponsored user on a flaky connection.
   const accountIsMissing = !hiveAccount && (!error || isMissingAccountError(error));
   const liteWithoutHiveAccount = isLiteOwnProfile && accountIsMissing;
   const {
@@ -488,12 +494,12 @@ export default function ProfileScreen() {
       "Hive Power",
       isOwnProfile
         ? "Hive Power is how much influence your account has on Hive.\n\n" +
-            "The more you hold, the more your votes are worth — so the posts you " +
+            "The more you hold, the more your votes are worth, so the posts you " +
             "vote on earn more, and so do you when others vote on yours.\n\n" +
             "You build it by earning rewards on your clips and keeping them as " +
             "Hive Power instead of cashing out."
         : "Hive Power is how much influence an account has on Hive.\n\n" +
-            "The more someone holds, the more their votes are worth — so the " +
+            "The more someone holds, the more their votes are worth, so the " +
             "posts they vote on earn more, and they earn more when others vote " +
             "on theirs.\n\n" +
             "It grows by earning rewards on clips and keeping them as Hive Power " +
@@ -593,7 +599,10 @@ export default function ProfileScreen() {
     );
   };
 
-  if (isLoadingProfile) {
+  // Only when there is nothing to show yet: pull-to-refresh and the post-save
+  // refetch both set this, and replacing a filled profile with a full-screen
+  // spinner mid-gesture is worse than a header that updates a moment later.
+  if (isLoadingProfile && !hiveAccount) {
     return <LoadingScreen />;
   }
 
@@ -886,6 +895,28 @@ export default function ProfileScreen() {
   const handleRefresh = () => {
     autoFillPagesRef.current = 0;
     refreshPosts();
+    // The header is half of this screen. Pulling down used to refresh only the
+    // grid, leaving avatar, bio and Hive Power frozen (#65).
+    refetchAccount();
+  };
+
+  // Saving the profile is a chain write, and hivemind has not indexed it by the
+  // time the modal closes: refetching right away reads the old profile straight
+  // back, which is why saving appeared to do nothing until the user pulled down
+  // themselves. One retry a couple of blocks later lands the new one.
+  const savedRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (savedRetryRef.current) clearTimeout(savedRetryRef.current);
+    },
+    []
+  );
+
+  const handleProfileSaved = () => {
+    // The account only: a bio or avatar edit leaves the grid untouched.
+    refetchAccount();
+    if (savedRetryRef.current) clearTimeout(savedRetryRef.current);
+    savedRetryRef.current = setTimeout(() => refetchAccount(), 6000);
   };
 
   return (
@@ -981,7 +1012,7 @@ export default function ProfileScreen() {
           visible={editProfileVisible}
           onClose={() => setEditProfileVisible(false)}
           currentProfile={hiveAccount?.metadata?.profile || {}}
-          onSaved={handleRefresh}
+          onSaved={handleProfileSaved}
         />
       )}
 

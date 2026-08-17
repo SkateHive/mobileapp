@@ -35,45 +35,45 @@ export default function AboutScreen() {
         <Section title="🌍 What is Skatehive?">
           <Bullet text="It's a worldwide crew of skaters, creators, and weirdos doing it our way." />
           <Bullet text="Built on DIY, decentralization, and zero corporate bullsh*t." />
-          <Bullet text="No bosses, no brands calling shots — this is 100% skater-owned, skater-run." />
+          <Bullet text="No bosses, no brands calling shots. This is 100% skater-owned, skater-run." />
         </Section>
 
         <Section title="🐝 Your account, explained">
           <Bullet text="You start with a lite account: post, comment and vote from day one, with no crypto setup at all." />
-          <Bullet text="Your posts are real posts on the Hive blockchain — they just go out through @skatehive, the community account, instead of one of your own." />
+          <Bullet text="Your posts are real posts on the Hive blockchain. They just go out through @skatehive, the community account, instead of one of your own." />
           <Bullet text="A few things need an account in your name: following people, editing your profile, and earning rewards directly." />
         </Section>
 
         <Section title="🛹 Your own account, once you post">
           <Bullet text="Post your first clip and the crew sponsors a Hive account in your name. Your keys reach you by email, and the app links them to your login for you." />
           <Bullet text="Nothing to buy, nothing to set up, no form to fill. Skate, post, and the account follows." />
-          <Bullet text="Already have a Hive account? Use 'Sign in with Hive' on the login screen — the posting key is all it ever asks for." />
+          <Bullet text="Already have a Hive account? Use 'Sign in with Hive' on the login screen. The posting key is all it ever asks for." />
         </Section>
 
         <Section title="📼 Tech Revolution in Skateboarding">
-          <Bullet text="From VX tapes to IG clips — tech's always been part of the ride." />
+          <Bullet text="From VX tapes to IG clips, tech's always been part of the ride." />
           <Bullet text="Skatehive is the next chapter: community-powered + crypto rewards = freedom." />
         </Section>
 
         <Section title="🚀 Why It Rips">
-          <Bullet text="Post-to-earn: film a trick, drop a story, share your vibe — get rewarded." />
+          <Bullet text="Post-to-earn: film a trick, drop a story, share your vibe, get rewarded." />
           <Bullet text="Infinity Mag: our own never-ending skate mag. No ads. No fluff." />
           <Bullet text="Decentralized sponsorships: repping your crew, getting love from the people." />
         </Section>
 
         <Section title="🧰 Open-Source = Total Freedom">
-          <Bullet text="Anyone can fork this sh*t — skateshops, collectives, your homie with a laptop." />
+          <Bullet text="Anyone can fork this sh*t: skateshops, collectives, your homie with a laptop." />
           <Bullet text="Your content echoes across the skateverse. Powered by blockchain, owned by you." />
         </Section>
 
         <Section title="🤝 Community-First, Always">
-          <Bullet text="Likes, posts, comments — every move adds value to *our* world." />
+          <Bullet text="Likes, posts, comments: every move adds value to *our* world." />
           <Bullet text="We set the tone. No AI deciding what's cool. No engagement farms." />
         </Section>
 
         <Section title="🛹 Our Mission">
           <Bullet text="Put skate media back in skaters' hands. Forever." />
-          <Bullet text="Grow a real-deal global skate culture — raw, connected, and free AF." />
+          <Bullet text="Grow a real-deal global skate culture: raw, connected, and free AF." />
         </Section>
       </ScrollView>
     </View>
