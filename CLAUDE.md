@@ -13,30 +13,6 @@ truth and update it there, not here.
 
 These build/release specifics are not in AGENTS.md.
 
-### Pre-PR checklist (Maestri note)
-Before opening any PR, read the connected Maestri note **"Checklist pré-PR —
-SkateHive mobile"** (CLI name: `checklist-pre-pr-skatehive`) and review the diff
-against it:
-
-```bash
-maestri note read "checklist-pre-pr-skatehive"
-```
-
-It is the review checklist, not a copy of AGENTS.md: theme tokens, security,
-build steps, scope of the diff, PR conventions.
-
-If you discover a new convention or a gotcha while working, **write it into the
-note yourself** instead of only mentioning it in chat:
-
-```bash
-maestri note edit "checklist-pre-pr-skatehive" "<existing line>" "<existing line>
-- [ ] <new check>"
-```
-
-Prefer `edit` over `write` so nothing already in the note is lost. This is about
-the *check*; a convention that belongs to the codebase itself still goes in
-AGENTS.md as well.
-
 ### Releasing to TestFlight (local Xcode build — NOT EAS)
 Builds are made locally in Xcode and uploaded to App Store Connect under the
 owner's personal Apple account. **EAS is not used** (free Expo account, queue too
