@@ -23,6 +23,7 @@ import { useToast } from "~/lib/toast-provider";
 import { useAuth } from "~/lib/auth-provider";
 import { canPost } from "~/lib/posting";
 import { useAllSpots } from "~/lib/hooks/useSpotmap";
+import { CoachTip } from "~/components/onboarding/Coach";
 import { MapSpotCard } from "~/components/spotmap/MapSpotCard";
 import { SpotMarker, ClusterMarker } from "~/components/spotmap/SpotMarker";
 import {
@@ -415,6 +416,15 @@ export default function MapScreen() {
           />
         )}
       </BottomSheet>
+
+      {/* First time someone opens the map, the coach says what it is (#68).
+          Waits for the spots to load — explaining an empty map explains
+          nothing. */}
+      <CoachTip
+        step="map"
+        enabled={!!spots?.length}
+        text="Every pin here is a spot somebody actually skated. Found one that's missing? Hit + and drop it. The map is only as good as what the crew puts on it."
+      />
     </View>
   );
 }

@@ -27,6 +27,7 @@ import {
   type UserbaseUser,
 } from "~/lib/userbase/api";
 import { useAuth } from "~/lib/auth-provider";
+import { useOnboardingStep } from "~/lib/onboarding";
 
 type Step = "email" | "otp" | "username" | "done";
 
@@ -61,6 +62,12 @@ export default function EmailLoginScreen() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Gated on the stored step rather than on "did we just create this account",
+  // so someone who signed up before onboarding existed still meets the coach.
+  // `ready` matters: before the stored set loads, "not pending" only means "not
+  // known yet", and a fast tap on Continue would skip the intro for good.
+  const { show: introPending, ready: onboardingReady } = useOnboardingStep("intro");
 
   // Looping muted celebration clip for the success screen.
   const celebrationPlayer = useVideoPlayer(CELEBRATION, (p) => {
@@ -326,7 +333,10 @@ export default function EmailLoginScreen() {
               <Text style={styles.emailEcho}>@{user?.handle}</Text>
               <Pressable
                 style={styles.continueBtn}
-                onPress={() => router.replace("/(tabs)/videos")}
+                onPress={() =>
+                  router.replace(introPending ? "/onboarding" : "/(tabs)/videos")
+                }
+                disabled={!onboardingReady}
                 accessibilityRole="button"
                 accessibilityLabel="Continue"
               >
