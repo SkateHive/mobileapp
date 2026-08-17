@@ -114,12 +114,16 @@ function countryToFlag(location: string): string {
     IN: '🇮🇳', INDIA: '🇮🇳',
     PH: '🇵🇭', PHILIPPINES: '🇵🇭',
   };
-  // Try exact match first, then check if location contains a known country name.
-  // Two-letter codes are exact-match only: as substrings they hit half the map
-  // by accident — MOROCCO contains CO, SENEGAL contains SE, CHINA contains IN.
+  // Exact match first. Then country names can match anywhere in the string, so
+  // "Sao Paulo, Brazil" works, while two-letter codes have to be a word of their
+  // own: as plain substrings they hit half the map by accident. MOROCCO contains
+  // CO, SENEGAL contains SE, CHINA contains IN. Splitting on non-letters keeps
+  // "SP, BR" working without that.
   if (map[loc]) return map[loc];
+  const words = loc.split(/[^A-Z]+/);
   for (const [key, flag] of Object.entries(map)) {
-    if (key.length > 2 && loc.includes(key)) return flag;
+    const found = key.length > 2 ? loc.includes(key) : words.includes(key);
+    if (found) return flag;
   }
   return '🌍';
 }
@@ -595,7 +599,10 @@ export default function ProfileScreen() {
     );
   };
 
-  if (isLoadingProfile) {
+  // Only when there is nothing to show yet: pull-to-refresh and the post-save
+  // refetch both set this, and replacing a filled profile with a full-screen
+  // spinner mid-gesture is worse than a header that updates a moment later.
+  if (isLoadingProfile && !hiveAccount) {
     return <LoadingScreen />;
   }
 
@@ -906,7 +913,8 @@ export default function ProfileScreen() {
   );
 
   const handleProfileSaved = () => {
-    handleRefresh();
+    // The account only: a bio or avatar edit leaves the grid untouched.
+    refetchAccount();
     if (savedRetryRef.current) clearTimeout(savedRetryRef.current);
     savedRetryRef.current = setTimeout(() => refetchAccount(), 6000);
   };
