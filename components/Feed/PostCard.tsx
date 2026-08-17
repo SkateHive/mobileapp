@@ -21,7 +21,7 @@ import { useVoteValue } from "~/lib/hooks/useVoteValue";
 import { useViewportTracker } from "~/lib/ViewportTracker";
 import { Text } from "../ui/text";
 import { VotingSlider } from "../ui/VotingSlider";
-import { CoachTip } from "../onboarding/Coach";
+import { CoachTip } from "~/components/onboarding/Coach";
 import { MediaPreview } from "./MediaPreview";
 import { EnhancedMarkdownRenderer } from "../markdown/EnhancedMarkdownRenderer";
 import { SpotLocationLine } from "../spotmap/SpotLocationLine";

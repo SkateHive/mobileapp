@@ -65,8 +65,9 @@ export default function EmailLoginScreen() {
 
   // Gated on the stored step rather than on "did we just create this account",
   // so someone who signed up before onboarding existed still meets the coach.
-  const { show: introPending } = useOnboardingStep("intro");
-  const introSeen = !introPending;
+  // `ready` matters: before the stored set loads, "not pending" only means "not
+  // known yet", and a fast tap on Continue would skip the intro for good.
+  const { show: introPending, ready: onboardingReady } = useOnboardingStep("intro");
 
   // Looping muted celebration clip for the success screen.
   const celebrationPlayer = useVideoPlayer(CELEBRATION, (p) => {
@@ -332,7 +333,10 @@ export default function EmailLoginScreen() {
               <Text style={styles.emailEcho}>@{user?.handle}</Text>
               <Pressable
                 style={styles.continueBtn}
-                onPress={() => router.replace(introSeen ? "/(tabs)/videos" : "/onboarding")}
+                onPress={() =>
+                  router.replace(introPending ? "/onboarding" : "/(tabs)/videos")
+                }
+                disabled={!onboardingReady}
                 accessibilityRole="button"
                 accessibilityLabel="Continue"
               >

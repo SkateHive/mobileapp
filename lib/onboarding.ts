@@ -19,17 +19,26 @@ const KEY = "onboarding_seen";
 export type OnboardingStep = "intro" | "vote" | "map";
 
 let seen: Set<OnboardingStep> | null = null;
+// One in-flight read, shared. Two callers racing the first load would each get
+// their own Set, and whichever wrote second would drop the other's dismissal,
+// bringing that coach back.
+let loading: Promise<Set<OnboardingStep>> | null = null;
 const listeners = new Set<() => void>();
 
 async function load(): Promise<Set<OnboardingStep>> {
   if (seen) return seen;
-  try {
-    const raw = await SecureStore.getItemAsync(KEY);
-    seen = new Set(raw ? (JSON.parse(raw) as OnboardingStep[]) : []);
-  } catch {
-    seen = new Set();
+  if (!loading) {
+    loading = (async () => {
+      try {
+        const raw = await SecureStore.getItemAsync(KEY);
+        seen = new Set(raw ? (JSON.parse(raw) as OnboardingStep[]) : []);
+      } catch {
+        seen = new Set();
+      }
+      return seen;
+    })();
   }
-  return seen;
+  return loading;
 }
 
 export async function markStepSeen(step: OnboardingStep): Promise<void> {
@@ -46,16 +55,20 @@ export async function markStepSeen(step: OnboardingStep): Promise<void> {
 
 /**
  * `show` stays false until the stored set has actually loaded, so the coach
- * never flashes in front of someone who already dismissed him.
+ * never flashes in front of someone who already dismissed him. `ready` says
+ * whether that load has happened: until it has, "not showing" means "don't
+ * know yet", and a caller deciding where to navigate has to wait for it.
  */
 export function useOnboardingStep(step: OnboardingStep, enabled = true) {
   const [show, setShow] = useState(false);
+  const [ready, setReady] = useState(seen !== null);
 
   useEffect(() => {
     let alive = true;
     const sync = () => {
       if (!alive) return;
       setShow(enabled && !(seen?.has(step) ?? true));
+      setReady(seen !== null);
     };
     listeners.add(sync);
     load().then(sync);
@@ -70,5 +83,5 @@ export function useOnboardingStep(step: OnboardingStep, enabled = true) {
     void markStepSeen(step);
   }, [step]);
 
-  return { show, dismiss };
+  return { show, ready, dismiss };
 }

@@ -14,7 +14,9 @@ import { theme } from "~/lib/theme";
  * wait — someone can post in the first thirty seconds, and a post is public,
  * permanent, and for now goes out under someone else's name.
  *
- * `about.tsx` is still the long version, and the last line points there.
+ * `about.tsx` is still the long version, reachable from the login screen's info
+ * button. It is deliberately not linked from here: this is two lines and a way
+ * in, not a reading list on someone's first minute in the app.
  */
 const LINES = [
   "Yo. This is Skatehive, skaters only. No brands picking what's cool, no algorithm burying your clip. You film it, the crew decides.",
