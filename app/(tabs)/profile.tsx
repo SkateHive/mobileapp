@@ -599,6 +599,23 @@ export default function ProfileScreen() {
     );
   };
 
+  // Saving the profile is a chain write, and hivemind has not indexed it by the
+  // time the modal closes: refetching right away reads the old profile straight
+  // back, which is why saving appeared to do nothing until the user pulled down
+  // themselves. One retry a couple of blocks later lands the new one.
+  //
+  // Declared here, above every early return below: the loading and lite paths
+  // return before this point, so a hook further down runs on some renders and
+  // not others, which is what "rendered more hooks than during the previous
+  // render" means.
+  const savedRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (savedRetryRef.current) clearTimeout(savedRetryRef.current);
+    },
+    []
+  );
+
   // Only when there is nothing to show yet: pull-to-refresh and the post-save
   // refetch both set this, and replacing a filled profile with a full-screen
   // spinner mid-gesture is worse than a header that updates a moment later.
@@ -899,18 +916,6 @@ export default function ProfileScreen() {
     // grid, leaving avatar, bio and Hive Power frozen (#65).
     refetchAccount();
   };
-
-  // Saving the profile is a chain write, and hivemind has not indexed it by the
-  // time the modal closes: refetching right away reads the old profile straight
-  // back, which is why saving appeared to do nothing until the user pulled down
-  // themselves. One retry a couple of blocks later lands the new one.
-  const savedRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (savedRetryRef.current) clearTimeout(savedRetryRef.current);
-    },
-    []
-  );
 
   const handleProfileSaved = () => {
     // The account only: a bio or avatar edit leaves the grid untouched.
