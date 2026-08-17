@@ -43,6 +43,20 @@ export interface Transaction {
 }
 
 
+/**
+ * Did this fail because the account simply isn't on Hive?
+ *
+ * An expected state, not a failure: lite accounts post through @skatehive and
+ * have no account of their own until the crew sponsors one. The node answers
+ * "Account x does not exist", or "invalid account name" for a handle Hive would
+ * never accept, and `useHiveAccount` raises its own "Account not found".
+ * Anything else — a node down, a timeout — is a real error and must stay loud.
+ */
+export function isMissingAccountError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /account not found|does not exist|invalid account name/i.test(message);
+}
+
 // --- Functions ---
 export async function sendOperation(privateKey: string, op: any[]): Promise<any> {
   return HiveClient.broadcast.sendOperations(op, PrivateKey.fromString(privateKey));
@@ -486,7 +500,10 @@ export async function getUserComments(
     
     return postsWithVotes;
   } catch (error) {
-    console.error('Error fetching user comments:', error);
+    // Callers decide what a missing account means; it is not worth a log line.
+    if (!isMissingAccountError(error)) {
+      console.error('Error fetching user comments:', error);
+    }
     throw error;
   }
 }

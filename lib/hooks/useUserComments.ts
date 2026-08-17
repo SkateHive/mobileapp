@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getUserComments, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
+import { getUserComments, isMissingAccountError, SNAPS_CONTAINER_AUTHOR, COMMUNITY_TAG } from '../hive-utils';
 
 interface LastPostInfo {
   author: string;
@@ -82,7 +82,14 @@ export function useUserComments(username: string | null) {
 
         if (result.length < 20) hasMoreData = false;
       } catch (error) {
-        console.error('Error fetching user posts:', error);
+        // A handle with no Hive account behind it is an expected state, not a
+        // failure: lite accounts post through @skatehive and are not on chain
+        // until the crew sponsors them. The node answers "Account x does not
+        // exist", or "invalid account name" for a handle Hive would never
+        // accept. Either way there is nothing to fetch and nothing to report.
+        if (!isMissingAccountError(error)) {
+          console.error('Error fetching user posts:', error);
+        }
         hasMoreData = false;
       }
     }
