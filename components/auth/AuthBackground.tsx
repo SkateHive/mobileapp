@@ -1,11 +1,14 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useIsFocused } from "@react-navigation/native";
 import { theme } from "~/lib/theme";
 
 const CLIP = require("../../assets/videos/background.mp4");
+// The clip's own first frame, so swapping one for the other is invisible.
+const POSTER = require("../../assets/images/auth-background-poster.jpg");
 
 /** Scrim per screen — the collage is busy, and how busy varies. */
 const SCRIMS = {
@@ -24,6 +27,10 @@ const SCRIMS = {
  * the other flat black.
  */
 export function AuthBackground({ scrim = "bottom" }: { scrim?: keyof typeof SCRIMS }) {
+  // A player shows nothing until it has decoded a frame, and every sign-in
+  // screen builds its own, so the flat black repeated at each step of the flow:
+  // entry, code, sign-up, onboarding (#76).
+  const [hasFrames, setHasFrames] = useState(false);
   const player = useVideoPlayer(CLIP, (p) => {
     p.loop = true;
     p.muted = true;
@@ -66,7 +73,19 @@ export function AuthBackground({ scrim = "bottom" }: { scrim?: keyof typeof SCRI
         contentFit="cover"
         player={player}
         nativeControls={false}
+        onFirstFrameRender={() => setHasFrames(true)}
       />
+      {/* Over the player, not under it: a VideoView with no frames yet is not
+          reliably transparent. Same fit as the video, and no fade, or the swap
+          would announce itself. */}
+      {!hasFrames && (
+        <Image
+          source={POSTER}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={0}
+        />
+      )}
       <LinearGradient
         colors={colors}
         locations={locations}
