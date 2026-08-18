@@ -37,6 +37,12 @@ Prefer `edit` over `write` so nothing already in the note is lost. This is about
 the *check*; a convention that belongs to the codebase itself still goes in
 AGENTS.md as well.
 
+The note lives on the repo owner's Maestri canvas, so `maestri` will not be on
+PATH for everyone. If the command is missing or the note is not connected, skip
+this section and review the diff against AGENTS.md, which covers the repository
+conventions. Say in the PR that the Maestri-specific checks were unavailable,
+rather than treating the review as complete.
+
 ### Releasing to TestFlight (local Xcode build — NOT EAS)
 Builds are made locally in Xcode and uploaded to App Store Connect under the
 owner's personal Apple account. **EAS is not used** (free Expo account, queue too
