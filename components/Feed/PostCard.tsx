@@ -385,83 +385,75 @@ export const PostCard = React.memo(
     return (
       <>
         <View style={styles.container}>
-          {/* Two-column layout: Profile pic | Everything else */}
-          <View style={styles.mainLayout}>
-            {/* Left column: Profile pic only */}
-            <View style={styles.leftColumn}>
-              <Pressable onPress={handleProfilePress}>
-                <Image
-                  source={{
-                    uri: displayAvatar,
-                  }}
-                  style={styles.profileImage}
-                  transition={200}
-                  recyclingKey={displayAuthor}
+          {/* Header: avatar sits on the name row, so the card is one block with
+              a single left edge instead of a portrait column beside it (#71) */}
+          <View style={styles.headerContainer}>
+            <Pressable onPress={handleProfilePress}>
+              <Image
+                source={{
+                  uri: displayAvatar,
+                }}
+                style={styles.profileImage}
+                transition={200}
+                recyclingKey={displayAuthor}
+              />
+            </Pressable>
+
+            <Pressable onPress={handleProfilePress} style={styles.authorPressable}>
+              <Text style={styles.authorText} numberOfLines={1}>
+                {displayAuthor}
+              </Text>
+            </Pressable>
+            <Text style={styles.dateText}>{formattedDate}</Text>
+
+            {/* Three dots menu - only show if not viewing own post */}
+            {currentUsername && post.author !== currentUsername && (
+              <Pressable onPress={handleUserMenuPress} style={styles.menuButton}>
+                <FontAwesome
+                  name="ellipsis-h"
+                  size={16}
+                  color={theme.colors.text}
                 />
               </Pressable>
-            </View>
-
-            {/* Right column: All content */}
-            <View style={styles.rightColumn}>
-              {/* Header with author and date */}
-              <View style={styles.headerContainer}>
-                <Pressable onPress={handleProfilePress}>
-                  <Text style={styles.authorText}>{displayAuthor}</Text>
-                </Pressable>
-                <Text style={styles.dateText}>{formattedDate}</Text>
-
-                {/* Three dots menu - only show if not viewing own post */}
-                {currentUsername && post.author !== currentUsername && (
-                  <Pressable
-                    onPress={handleUserMenuPress}
-                    style={styles.menuButton}
-                  >
-                    <FontAwesome
-                      name="ellipsis-h"
-                      size={16}
-                      color={theme.colors.text}
-                    />
-                  </Pressable>
-                )}
-              </View>
-
-              {/* Spot location — rich, tappable Google Maps link */}
-              {spot && (
-                <SpotLocationLine
-                  name={spot.name}
-                  lat={spot.lat}
-                  lng={spot.lng}
-                  address={spot.address}
-                />
-              )}
-
-              {/* Content */}
-              <Pressable onPress={handleBodyPress}>
-                {postContent !== "" && (
-                  <View style={styles.contentContainer}>
-                    <EnhancedMarkdownRenderer content={postContent} />
-                  </View>
-                )}
-              </Pressable>
-
-              {/* Media - outside Pressable so clicks don't open conversation */}
-              {media.length > 0 && (
-                <View style={styles.mediaContainer}>
-                  <MediaPreview
-                    media={media}
-                    onMediaPress={handleMediaPress}
-                    selectedMedia={selectedMedia}
-                    isModalVisible={isModalVisible}
-                    onCloseModal={() => setIsModalVisible(false)}
-                    isVisible={isVisible}
-                    thumbnailUrl={videoThumbnailUrl}
-                  />
-                </View>
-              )}
-            </View>
+            )}
           </View>
 
-          {/* Full-width action bar — outside mainLayout for better thumb reach */}
+          {/* Spot location — rich, tappable Google Maps link */}
+          {spot && (
+            <SpotLocationLine
+              name={spot.name}
+              lat={spot.lat}
+              lng={spot.lng}
+              address={spot.address}
+            />
+          )}
+
+          {/* Content */}
+          <Pressable onPress={handleBodyPress}>
+            {postContent !== "" && (
+              <View style={styles.contentContainer}>
+                <EnhancedMarkdownRenderer content={postContent} />
+              </View>
+            )}
+          </Pressable>
+
+          {/* Media - outside Pressable so clicks don't open conversation */}
+          {media.length > 0 && (
+            <View style={styles.mediaContainer}>
+              <MediaPreview
+                media={media}
+                onMediaPress={handleMediaPress}
+                selectedMedia={selectedMedia}
+                isModalVisible={isModalVisible}
+                onCloseModal={() => setIsModalVisible(false)}
+                isVisible={isVisible}
+                thumbnailUrl={videoThumbnailUrl}
+              />
+            </View>
+          )}
+
+          {/* Action bar: full-width row for thumb reach, contents inset to the
+              content column so the card reads as one block (#71) */}
           <View style={styles.bottomBar}>
             {showSlider ? (
               /* Voting slider mode - takes entire bottom bar */
@@ -749,17 +741,11 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 0,
     backgroundColor: theme.colors.card,
-    padding: 0,
-  },
-  mainLayout: {
-    flexDirection: "row",
-  },
-  leftColumn: {
-    width: 42, // Fixed width for profile pic column
-    marginRight: theme.spacing.sm,
-  },
-  rightColumn: {
-    flex: 1, // Takes remaining space
+    // Header, media and action bar all line up against this one inset (#71).
+    // Note it is the card's own, on top of whatever the screen already adds:
+    // the feed, profile and conversation each pad 16 too, the conversation
+    // drawer pads nothing, so the card is not equally inset everywhere.
+    paddingHorizontal: theme.spacing.md,
   },
   profileImage: {
     width: 40,
@@ -770,7 +756,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.sm,
-    marginBottom: 0,
+    // On the header, not on the body: a post with no text has no body to carry
+    // the gap, and its media would sit flush against the name row.
+    marginBottom: theme.spacing.sm,
+  },
+  // The name shares its row with the avatar now. Without this a long handle
+  // pushes the date and the menu off a narrow screen. It belongs on the
+  // Pressable, not on the Text: only the direct child of the row shrinks, and a
+  // View defaults to flexShrink 0, so the text would never get a narrow enough
+  // box for numberOfLines to truncate against.
+  authorPressable: {
+    flexShrink: 1,
   },
   authorText: {
     fontSize: theme.fontSizes.md, // Force consistent font size
@@ -783,7 +779,7 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
   },
   contentContainer: {
-    marginBottom: 0,
+    marginBottom: theme.spacing.sm,
   },
   contentText: {
     fontSize: theme.fontSizes.md, // Force consistent font size
@@ -809,7 +805,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
+    // Horizontal inset comes from the card container now.
     paddingVertical: theme.spacing.sm,
   },
   payoutContainer: {
@@ -824,6 +820,9 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: "row",
     alignItems: "center",
+    // Cancels actionItem's own padding so the vote icon starts on the card's
+    // left edge, not 8pt inside it. The tap target keeps the padding.
+    marginLeft: -theme.spacing.sm,
   },
   actionItem: {
     flexDirection: "row",
