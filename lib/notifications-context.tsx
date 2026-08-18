@@ -19,8 +19,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const { username, session } = useAuth();
   const [badgeCount, setBadgeCount] = useState(0);
   // Bumped whenever the count is set locally, so a fetch that was already in
-  // flight can't land afterwards with the pre-clear result. Same guard as
-  // useHiveAccount's requestIdRef.
+  // flight can't land afterwards with the pre-clear result.
   const requestIdRef = useRef(0);
   // Changing this restarts the periodic refresh below.
   const [refreshCycle, setRefreshCycle] = useState(0);
