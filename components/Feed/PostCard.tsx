@@ -399,7 +399,7 @@ export const PostCard = React.memo(
               />
             </Pressable>
 
-            <Pressable onPress={handleProfilePress}>
+            <Pressable onPress={handleProfilePress} style={styles.authorPressable}>
               <Text style={styles.authorText} numberOfLines={1}>
                 {displayAuthor}
               </Text>
@@ -760,14 +760,19 @@ const styles = StyleSheet.create({
     // the gap, and its media would sit flush against the name row.
     marginBottom: theme.spacing.sm,
   },
+  // The name shares its row with the avatar now. Without this a long handle
+  // pushes the date and the menu off a narrow screen. It belongs on the
+  // Pressable, not on the Text: only the direct child of the row shrinks, and a
+  // View defaults to flexShrink 0, so the text would never get a narrow enough
+  // box for numberOfLines to truncate against.
+  authorPressable: {
+    flexShrink: 1,
+  },
   authorText: {
     fontSize: theme.fontSizes.md, // Force consistent font size
     fontWeight: "bold",
     color: theme.colors.text,
     fontFamily: theme.fonts.bold,
-    // The name shares its row with the avatar now. Without this a long handle
-    // pushes the date and the menu off a narrow screen.
-    flexShrink: 1,
   },
   dateText: {
     fontSize: theme.fontSizes.xs, // Force consistent font size
