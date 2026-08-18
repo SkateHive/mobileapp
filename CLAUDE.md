@@ -39,8 +39,9 @@ AGENTS.md as well.
 
 The note lives on the repo owner's Maestri canvas, so `maestri` will not be on
 PATH for everyone. If the command is missing or the note is not connected, skip
-this section and review the diff against AGENTS.md instead, which carries the
-same conventions and is the source of truth for them.
+this section and review the diff against AGENTS.md, which covers the repository
+conventions. Say in the PR that the Maestri-specific checks were unavailable,
+rather than treating the review as complete.
 
 ### Releasing to TestFlight (local Xcode build — NOT EAS)
 Builds are made locally in Xcode and uploaded to App Store Connect under the
