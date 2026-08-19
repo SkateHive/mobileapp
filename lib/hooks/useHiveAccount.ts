@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ExtendedAccount } from "@hiveio/dhive";
-import { HiveClient, getProfile, isMissingAccountError } from "../hive-utils";
+import { HiveClient, getProfile, isMissingAccountError } from "~/lib/hive-utils";
 
 interface HiveAccountMetadataProps {
   [key: string]: any;
