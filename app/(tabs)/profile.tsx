@@ -43,6 +43,7 @@ import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
 import { GridVideoTile } from "~/components/Profile/GridVideoTile";
+import { ProfileHeader } from "~/components/Profile/ProfileHeader";
 import { setViewerPayload, updateViewerPosts } from "~/lib/viewer-store";
 import { useIsFocused } from "@react-navigation/native";
 import { ActionSheet, type ActionSheetItem } from "~/components/ui/ActionSheet";
@@ -84,49 +85,6 @@ const skeletonStyles = StyleSheet.create({
     gap: GRID_GAP,
   },
 });
-
-// Map common country names/codes to flag emojis
-function countryToFlag(location: string): string {
-  const loc = location.trim().toUpperCase();
-  const map: Record<string, string> = {
-    BR: '🇧🇷', BRAZIL: '🇧🇷', BRASIL: '🇧🇷',
-    US: '🇺🇸', USA: '🇺🇸', 'UNITED STATES': '🇺🇸',
-    UK: '🇬🇧', GB: '🇬🇧', 'UNITED KINGDOM': '🇬🇧', ENGLAND: '🇬🇧',
-    DE: '🇩🇪', GERMANY: '🇩🇪', DEUTSCHLAND: '🇩🇪',
-    FR: '🇫🇷', FRANCE: '🇫🇷',
-    ES: '🇪🇸', SPAIN: '🇪🇸', ESPAÑA: '🇪🇸',
-    PT: '🇵🇹', PORTUGAL: '🇵🇹',
-    MX: '🇲🇽', MEXICO: '🇲🇽', MÉXICO: '🇲🇽',
-    CA: '🇨🇦', CANADA: '🇨🇦',
-    AR: '🇦🇷', ARGENTINA: '🇦🇷',
-    AU: '🇦🇺', AUSTRALIA: '🇦🇺',
-    JP: '🇯🇵', JAPAN: '🇯🇵',
-    NL: '🇳🇱', NETHERLANDS: '🇳🇱',
-    IT: '🇮🇹', ITALY: '🇮🇹', ITALIA: '🇮🇹',
-    CL: '🇨🇱', CHILE: '🇨🇱',
-    CO: '🇨🇴', COLOMBIA: '🇨🇴',
-    PE: '🇵🇪', PERU: '🇵🇪',
-    VE: '🇻🇪', VENEZUELA: '🇻🇪',
-    SE: '🇸🇪', SWEDEN: '🇸🇪',
-    NO: '🇳🇴', NORWAY: '🇳🇴',
-    CR: '🇨🇷', 'COSTA RICA': '🇨🇷',
-    ZA: '🇿🇦', 'SOUTH AFRICA': '🇿🇦',
-    IN: '🇮🇳', INDIA: '🇮🇳',
-    PH: '🇵🇭', PHILIPPINES: '🇵🇭',
-  };
-  // Exact match first. Then country names can match anywhere in the string, so
-  // "Sao Paulo, Brazil" works, while two-letter codes have to be a word of their
-  // own: as plain substrings they hit half the map by accident. MOROCCO contains
-  // CO, SENEGAL contains SE, CHINA contains IN. Splitting on non-letters keeps
-  // "SP, BR" working without that.
-  if (map[loc]) return map[loc];
-  const words = loc.split(/[^A-Z]+/);
-  for (const [key, flag] of Object.entries(map)) {
-    const found = key.length > 2 ? loc.includes(key) : words.includes(key);
-    if (found) return flag;
-  }
-  return '🌍';
-}
 
 export default function ProfileScreen() {
   const { username: currentUsername, logout, session, followingList, updateUserRelationship } =
@@ -185,6 +143,7 @@ export default function ProfileScreen() {
 
   // Reset UI state when navigating between profiles
   const profileUsername = (params.username as string) || currentUsername;
+  const isSpectator = profileUsername === "SPECTATOR";
 
   const isLiteOwnProfile =
     session?.kind === "userbase" && profileUsername === currentUsername;
@@ -632,62 +591,35 @@ export default function ProfileScreen() {
         {/* A real profile header, not a notice: same avatar, same name row as
             everyone else's. Seeing the shape of the thing is what makes wanting
             your own account obvious — the panel below stands in for the grid
-            until there is a way to list a lite account's posts. */}
-        <View style={styles.profileSection}>
-          <View style={styles.profileHeaderRow}>
-            <View style={styles.profileImageContainer}>
-              {liteAvatar ? (
-                <Image source={{ uri: liteAvatar }} style={styles.profileImage} contentFit="cover" />
-              ) : (
-                <Image
-                  source={require("../../assets/images/icon-android.png")}
-                  style={styles.profileImage}
-                  contentFit="cover"
-                />
-              )}
-            </View>
+            until there is a way to list a lite account's posts.
 
-            <View style={styles.nameSection}>
-              {/* The handle leads here, not the display name: it's the name
-                  being claimed on Hive, and the text below talks about it by
-                  name. A different name above that only confuses. */}
-              <View style={styles.nameRow}>
-                <Text style={styles.profileName} numberOfLines={1}>
-                  {currentUsername}
-                </Text>
-              </View>
-              <Text style={styles.username} numberOfLines={2}>
-                @{currentUsername}
-              </Text>
-
-              {/* Zero, not hidden: an empty stat is the point — it shows what a
-                  Hive account would start filling. */}
-              <Pressable style={styles.hpChip} onPress={explainHivePower} hitSlop={8}>
-                <Text style={styles.hpChipText}>0 HP</Text>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={12}
-                  color={theme.colors.muted}
-                />
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.statsCard}>
-          <View style={styles.statCell}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Clips</Text>
-          </View>
-          <View style={[styles.statCell, styles.statCellMiddle]}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Following</Text>
-          </View>
-          <View style={styles.statCell}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Followers</Text>
-          </View>
-        </View>
+            The handle leads here, not a display name: it's the name being
+            claimed on Hive, and the card below talks about it by name. And the
+            stats read zero rather than being hidden, because an empty stat is
+            the point — it shows what a Hive account would start filling. */}
+        <ProfileHeader
+          avatar={
+            <Image
+              source={
+                liteAvatar
+                  ? { uri: liteAvatar }
+                  : require("../../assets/images/icon-android.png")
+              }
+              style={styles.profileImage}
+              contentFit="cover"
+            />
+          }
+          displayName={currentUsername ?? ""}
+          handle={currentUsername ?? ""}
+          hpLabel="0 HP"
+          hpAccessibilityLabel="0 Hive Power"
+          onHpPress={explainHivePower}
+          stats={[
+            { value: 0, label: "Clips" },
+            { value: 0, label: "Following" },
+            { value: 0, label: "Followers" },
+          ]}
+        />
 
         {/* Stands in for the grid, in the same place the clips would be. */}
         <View style={styles.liteCard}>
@@ -734,126 +666,76 @@ export default function ProfileScreen() {
   // Render the profile header section
   const renderProfileHeader = () => (
     <View>
-      {/* Profile Section */}
-      <View style={styles.profileSection}>
-        <View style={styles.profileHeaderRow}>
-          <View style={styles.profileImageContainer}>
-            {renderProfileImage()}
-          </View>
-
-          <View style={styles.nameSection}>
-            {/* Name row with gear icon */}
-            <View style={styles.nameRow}>
-              <Text style={styles.profileName} numberOfLines={1}>
-                {hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername}
-              </Text>
-              {!params.username && (
-                <Pressable
-                  onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
-                  hitSlop={12}
-                  style={styles.gearIcon}
-                >
-                  <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
-                </Pressable>
-              )}
-            </View>
-
-            {/* Handle, with country inline. Two lines because a long handle plus
-                a long country ("UNITED KINGDOM") would otherwise clip the country
-                away entirely — the column is already narrowed by the avatar. */}
-            <Text style={styles.username} numberOfLines={2}>
-              @{profileUsername}
-              {!!hiveAccount?.metadata?.profile?.location && (
-                <Text style={styles.username}>
-                  {"  ·  "}
-                  {countryToFlag(hiveAccount.metadata.profile.location)}{" "}
-                  {hiveAccount.metadata.profile.location}
-                </Text>
-              )}
-            </Text>
-
-            {/* Trimmed: bios routinely carry a trailing newline, which renders
-                as an empty second line. */}
-            {!!hiveAccount?.metadata?.profile?.about?.trim() && (
-              <Text style={styles.bio} numberOfLines={2}>
-                {hiveAccount.metadata.profile.about.trim()}
-              </Text>
-            )}
-
-            {/* Hive Power. Hidden until it resolves — the design asked for an
-                "earned" figure, which nothing exposes; HP is a real number the
-                app already trusts elsewhere. */}
-            {hivePower !== null && hivePower > 0 && (
-              <Pressable
-                style={styles.hpChip}
-                onPress={explainHivePower}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={`${Math.round(hivePower)} Hive Power. What is this?`}
-              >
-                <Text style={styles.hpChipText}>{Math.round(hivePower)} HP</Text>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={12}
-                  color={theme.colors.muted}
-                />
-              </Pressable>
-            )}
-          </View>
-        </View>
-
-        {/* Stats card */}
-        <View style={styles.statsCard}>
-          <View style={styles.statCell}>
-            <Text style={styles.statValue}>{gridPosts.length}</Text>
-            <Text style={styles.statLabel}>Clips</Text>
-          </View>
-
-          <Pressable
-            style={[styles.statCell, styles.statCellMiddle]}
-            onPress={handleFollowingPress}
-            disabled={profileUsername === "SPECTATOR"}
-          >
-            <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.following || "0"}</Text>
-            <Text style={styles.statLabel}>Following</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.statCell}
-            onPress={handleFollowersPress}
-            disabled={profileUsername === "SPECTATOR"}
-          >
-            <Text style={styles.statValue}>{hiveAccount?.profile?.stats?.followers || "0"}</Text>
-            <Text style={styles.statLabel}>Followers</Text>
-          </Pressable>
-        </View>
-
-        {/* Follow lives only on someone else's profile — your own keeps Edit
-            Profile behind the gear, as before. */}
-        {!!params.username && profileUsername !== currentUsername && profileUsername !== "SPECTATOR" && (
-          <Pressable
-            onPress={handleFollowToggle}
-            disabled={isFollowLoading}
-            style={({ pressed }) => [
-              styles.followButton,
-              isFollowingProfile ? styles.followButtonActive : styles.followButtonIdle,
-              { opacity: isFollowLoading ? 0.5 : pressed ? 0.85 : 1 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={isFollowingProfile ? `Unfollow ${profileUsername}` : `Follow ${profileUsername}`}
-            accessibilityState={{ selected: isFollowingProfile, disabled: isFollowLoading }}
-          >
-            <Text
-              style={[
-                styles.followButtonText,
-                isFollowingProfile ? styles.followButtonTextActive : styles.followButtonTextIdle,
-              ]}
+      <ProfileHeader
+        avatar={renderProfileImage()}
+        displayName={
+          hiveAccount?.metadata?.profile?.name || hiveAccount?.name || profileUsername
+        }
+        handle={profileUsername ?? ""}
+        location={hiveAccount?.metadata?.profile?.location}
+        bio={hiveAccount?.metadata?.profile?.about}
+        // Hidden until HP resolves, rather than showing a placeholder zero the
+        // way a lite account does: here the number is coming, it is not absent.
+        hpLabel={
+          hivePower !== null && hivePower > 0 ? `${Math.round(hivePower)} HP` : null
+        }
+        hpAccessibilityLabel={
+          hivePower !== null ? `${Math.round(hivePower)} Hive Power` : undefined
+        }
+        onHpPress={explainHivePower}
+        trailingAction={
+          !params.username && (
+            <Pressable
+              onPress={() => setSettingsMenuVisible(!settingsMenuVisible)}
+              hitSlop={12}
+              style={styles.gearIcon}
             >
-              {isFollowingProfile ? "Following" : "Follow"}
-            </Text>
-          </Pressable>
-        )}
-      </View>
+              <Ionicons name="settings-outline" size={18} color={theme.colors.muted} />
+            </Pressable>
+          )
+        }
+        stats={[
+          { value: gridPosts.length, label: "Clips" },
+          {
+            value: hiveAccount?.profile?.stats?.following || "0",
+            label: "Following",
+            // A spectator has nobody to list, so the cell stays flat.
+            onPress: isSpectator ? undefined : handleFollowingPress,
+          },
+          {
+            value: hiveAccount?.profile?.stats?.followers || "0",
+            label: "Followers",
+            onPress: isSpectator ? undefined : handleFollowersPress,
+          },
+        ]}
+        // Follow lives only on someone else's profile — your own keeps Edit
+        // Profile behind the gear, as before.
+        footer={
+          !!params.username && profileUsername !== currentUsername && !isSpectator && (
+            <Pressable
+              onPress={handleFollowToggle}
+              disabled={isFollowLoading}
+              style={({ pressed }) => [
+                styles.followButton,
+                isFollowingProfile ? styles.followButtonActive : styles.followButtonIdle,
+                { opacity: isFollowLoading ? 0.5 : pressed ? 0.85 : 1 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={isFollowingProfile ? `Unfollow ${profileUsername}` : `Follow ${profileUsername}`}
+              accessibilityState={{ selected: isFollowingProfile, disabled: isFollowLoading }}
+            >
+              <Text
+                style={[
+                  styles.followButtonText,
+                  isFollowingProfile ? styles.followButtonTextActive : styles.followButtonTextIdle,
+                ]}
+              >
+                {isFollowingProfile ? "Following" : "Follow"}
+              </Text>
+            </Pressable>
+          )
+        }
+      />
 
       {/* Show Create Account CTA only for SPECTATOR */}
       {profileUsername === "SPECTATOR" && <ProfileSpectatorInfo />}
@@ -1091,84 +973,8 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
   },
-  // Profile Section Styles
-  profileSection: {
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-    gap: 12,
-  },
-  profileHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: theme.spacing.md,
-  },
-  profileImageContainer: {
-    // No need for alignSelf since it's in a row now
-  },
-  nameSection: {
-    flex: 1,
-    gap: theme.spacing.xs,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   gearIcon: {
     padding: theme.spacing.xs,
-  },
-  profileName: {
-    fontSize: theme.fontSizes.xl,
-    fontFamily: theme.fonts.bold,
-    color: theme.colors.text,
-    lineHeight: theme.fontSizes.xl * 1.2,
-  },
-  username: {
-    fontSize: theme.fontSizes.sm,
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
-  },
-  bio: {
-    color: theme.colors.white,
-    fontFamily: theme.fonts.regular,
-    fontSize: theme.fontSizes.xs,
-    lineHeight: 18,
-    opacity: 0.8,
-  },
-  hpChip: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.full,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-    marginTop: theme.spacing.xxs,
-  },
-  hpChipText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: theme.fontSizes.xxs,
-    color: theme.colors.primary,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.lg,
-    paddingVertical: 10,
-  },
-  statCell: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  statCellMiddle: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: theme.colors.border,
   },
   followButton: {
     minHeight: 36,
@@ -1194,16 +1000,6 @@ const styles = StyleSheet.create({
   },
   followButtonTextActive: {
     color: theme.colors.muted,
-  },
-  statValue: {
-    fontFamily: theme.fonts.bold,
-    fontSize: theme.fontSizes.md,
-    color: theme.colors.text,
-  },
-  statLabel: {
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
-    fontSize: theme.fontSizes.xxs,
   },
   spectatorAvatar: {
     width: 96,
