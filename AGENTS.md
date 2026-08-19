@@ -132,7 +132,14 @@ QueryClientProvider
 
 6. **Video autoplay:** Uses viewport tracking (`lib/ViewportTracker.tsx`). Videos auto-play when 60%+ visible, pause when scrolled away.
 
-7. **No test suite:** There are no automated tests in the project currently. The `scripts/` directory is empty.
+7. **Double padding on PostCard:** `components/Feed/PostCard.tsx` has its own
+   `paddingHorizontal: theme.spacing.md`, and the screens rendering it add
+   theirs: feed, profile and conversation each apply 16, while the conversation
+   drawer applies none. The card is therefore not inset the same everywhere.
+   When changing card padding, check all four call sites instead of assuming
+   the value is global.
+
+8. **No test suite:** There are no automated tests in the project currently. The `scripts/` directory is empty.
 
 ## Environment Setup
 
