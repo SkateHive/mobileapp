@@ -612,6 +612,7 @@ export default function ProfileScreen() {
           displayName={currentUsername ?? ""}
           handle={currentUsername ?? ""}
           hpLabel="0 HP"
+          hpAccessibilityLabel="0 Hive Power"
           onHpPress={explainHivePower}
           stats={[
             { value: 0, label: "Clips" },
