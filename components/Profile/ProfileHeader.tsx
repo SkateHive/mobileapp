@@ -66,6 +66,9 @@ interface ProfileHeaderProps {
   /** Already formatted ("0 HP", "412 HP"). Null hides the chip entirely, which
       is what a Hive profile wants while HP is still resolving. */
   hpLabel?: string | null;
+  /** Spelled out for a screen reader, which would otherwise read "HP" letter by
+      letter. Falls back to the visible label. */
+  hpAccessibilityLabel?: string;
   onHpPress?: () => void;
   /** Sits at the end of the name row: the gear on your own profile. */
   trailingAction?: React.ReactNode;
@@ -89,6 +92,7 @@ export function ProfileHeader({
   location,
   bio,
   hpLabel,
+  hpAccessibilityLabel,
   onHpPress,
   trailingAction,
   stats,
@@ -136,7 +140,7 @@ export function ProfileHeader({
               onPress={onHpPress}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`${hpLabel}. What is this?`}
+              accessibilityLabel={`${hpAccessibilityLabel ?? hpLabel}. What is this?`}
             >
               <Text style={styles.hpChipText}>{hpLabel}</Text>
               <Ionicons

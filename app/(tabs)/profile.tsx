@@ -678,6 +678,9 @@ export default function ProfileScreen() {
         hpLabel={
           hivePower !== null && hivePower > 0 ? `${Math.round(hivePower)} HP` : null
         }
+        hpAccessibilityLabel={
+          hivePower !== null ? `${Math.round(hivePower)} Hive Power` : undefined
+        }
         onHpPress={explainHivePower}
         trailingAction={
           !params.username && (
