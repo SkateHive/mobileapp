@@ -199,6 +199,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   profileName: {
+    // Yields to the trailing action instead of shoving it out of the row: only
+    // the direct child of a flex row shrinks, and RN defaults it to 0, so a long
+    // display name would push the gear past the edge and out of its own touch
+    // target. Not flex: 1, which would collapse the space-between.
+    flexShrink: 1,
     fontSize: theme.fontSizes.xl,
     fontFamily: theme.fonts.bold,
     color: theme.colors.text,
