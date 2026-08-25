@@ -20,7 +20,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
       "appleTeamId": "JBJ68VAF83",
-      "buildNumber": "18",
+      "buildNumber": "21",
       "icon": "./assets/images/icon-ios.png",
       "entitlements": {
         "com.apple.security.application-groups": [
@@ -81,7 +81,8 @@
           "locationWhenInUsePermission": "SkateHive uses your location to show skate spots near you on the map."
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "./plugins/withScriptSandboxDisabled"
     ],
     "experiments": {
       "typedRoutes": true
