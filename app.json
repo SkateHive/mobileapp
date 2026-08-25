@@ -81,7 +81,8 @@
           "locationWhenInUsePermission": "SkateHive uses your location to show skate spots near you on the map."
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "./plugins/withScriptSandboxDisabled"
     ],
     "experiments": {
       "typedRoutes": true
