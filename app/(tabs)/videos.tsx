@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -36,33 +36,41 @@ import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst
 // ─── Native video item ─────────────────────────────────────────────────────
 // Each item gets its own expo-video player — no WebView overhead.
 
-function VideoItem({
-  item,
-  isActive,
-  username,
-  onVote,
-  onComment,
-  onShare,
-  votingStates,
-  likedStates,
-  voteCountStates,
-}: {
+// How far ahead a clip next to the current one buffers while it waits its
+// turn, so the swipe lands on a player that can start at once.
+const NEIGHBOR_BUFFER_SECONDS = 5;
+
+interface VideoItemProps {
   item: VideoPost;
   isActive: boolean;
+  /** Directly above or below the active clip: kept buffered, not playing. */
+  isNeighbor: boolean;
   username: string | null;
   onVote: (v: VideoPost) => void;
   onComment: (v: VideoPost) => void;
   onShare: (v: VideoPost) => void;
-  votingStates: Record<string, boolean>;
-  likedStates: Record<string, boolean>;
-  voteCountStates: Record<string, number>;
-}) {
+  // Scalars rather than the three state maps: with the maps, one vote anywhere
+  // in the feed re-rendered every mounted item; with scalars, only the item
+  // whose values changed does.
+  isLiked: boolean;
+  isVoting: boolean;
+  voteCount: number;
+}
+
+const VideoItem = React.memo(function VideoItem({
+  item,
+  isActive,
+  isNeighbor,
+  username,
+  onVote,
+  onComment,
+  onShare,
+  isLiked,
+  isVoting,
+  voteCount,
+}: VideoItemProps) {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const [isPlaying, setIsPlaying] = useState(false);
-  const key = `${item.author}-${item.permlink}`;
-  const isLiked = likedStates[key] ?? false;
-  const isVoting = votingStates[key] ?? false;
-  const voteCount = voteCountStates[key] ?? item.votes;
   const router = useRouter();
   // Mask the shared @skateuser account with the real (email/lite) author.
   const softOverlay = useSoftPostOverlay(item.author, item.permlink);
@@ -98,6 +106,20 @@ function VideoItem({
     }
   }, [isActive, isFocused, holding, player]);
 
+  // Warm the clips on either side of the active one: a paused AVPlayer still
+  // fills its forward buffer, so asking the neighbours for a few seconds means
+  // the next swipe starts playing instead of spinning. Everything further out
+  // is left at the automatic (minimal) buffer.
+  useEffect(() => {
+    try {
+      player.bufferOptions = {
+        preferredForwardBufferDuration: isActive || isNeighbor ? NEIGHBOR_BUFFER_SECONDS : 0,
+      };
+    } catch {
+      // Player already released during a fast scroll.
+    }
+  }, [isActive, isNeighbor, player]);
+
   // Track when video actually starts playing — depends only on player to avoid duplicate subscriptions
   useEffect(() => {
     const sub = player.addListener("playingChange", (e: { isPlaying: boolean }) => {
@@ -106,10 +128,10 @@ function VideoItem({
     return () => sub?.remove();
   }, [player]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => { try { player.pause(); } catch {} };
-  }, [player]);
+  // No pause-on-unmount here: useVideoPlayer releases the native player when
+  // the item unmounts (its cleanup runs first, being declared first), which
+  // stops playback and frees the decoder. A pause after that only produced a
+  // "native shared object not found" warning per released clip.
 
   const formatPayout = (payout: string) => {
     const value = parseFloat(payout) || 0;
@@ -222,7 +244,7 @@ function VideoItem({
       />
     </View>
   );
-}
+});
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
@@ -240,6 +262,12 @@ export default function VideosScreen() {
   const [conversationVideo, setConversationVideo] = useState<VideoPost | null>(null);
 
   const voteOverrides = useVoteOverrides();
+
+  // Latest per-item state, readable from callbacks that must not change
+  // identity: handleVote and renderItem read these instead of closing over
+  // the maps, so a vote doesn't hand every mounted item a new render function.
+  const itemStateRef = useRef({ currentIndex, likedStates, votingStates, voteCountStates });
+  itemStateRef.current = { currentIndex, likedStates, votingStates, voteCountStates };
 
   // Init liked/vote states when data arrives. This feed is prefetched at login
   // and cached for a minute, so on its own it happily shows an empty heart for
@@ -286,8 +314,8 @@ export default function VideosScreen() {
     if (votingLockRef.current[key]) return;
     votingLockRef.current[key] = true;
 
-    const wasLiked = likedStates[key];
-    const prevCount = voteCountStates[key] || video.votes;
+    const wasLiked = itemStateRef.current.likedStates[key];
+    const prevCount = itemStateRef.current.voteCountStates[key] || video.votes;
     // A vote is final: tapping an already-voted heart used to cast weight 0 and
     // quietly take it back, which is not what "vote again" looks like.
     if (wasLiked) {
@@ -312,7 +340,7 @@ export default function VideosScreen() {
       votingLockRef.current[key] = false;
       setVotingStates((p) => ({ ...p, [key]: false }));
     }
-  }, [session, votingStates, likedStates, voteCountStates, showToast]);
+  }, [session, showToast]);
 
   const handleComment = useCallback((video: VideoPost) => {
     setConversationVideo(video);
@@ -328,19 +356,33 @@ export default function VideosScreen() {
     } catch {}
   }, []);
 
-  const renderItem = useCallback(({ item, index }: { item: VideoPost; index: number }) => (
-    <VideoItem
-      item={item}
-      isActive={index === currentIndex}
-      username={username}
-      onVote={handleVote}
-      onComment={handleComment}
-      onShare={handleShare}
-      votingStates={votingStates}
-      likedStates={likedStates}
-      voteCountStates={voteCountStates}
-    />
-  ), [currentIndex, username, handleVote, handleComment, handleShare, votingStates, likedStates, voteCountStates]);
+  // Stable across swipes and votes: the changing values come in through the
+  // ref, and `extraData` below is what tells the list to re-run it. Each
+  // VideoItem is memoized on the scalars it gets, so only the items whose
+  // active/neighbour status or vote state actually changed re-render.
+  const renderItem = useCallback(({ item, index }: { item: VideoPost; index: number }) => {
+    const { currentIndex, likedStates, votingStates, voteCountStates } = itemStateRef.current;
+    const key = `${item.author}-${item.permlink}`;
+    return (
+      <VideoItem
+        item={item}
+        isActive={index === currentIndex}
+        isNeighbor={Math.abs(index - currentIndex) === 1}
+        username={username}
+        onVote={handleVote}
+        onComment={handleComment}
+        onShare={handleShare}
+        isLiked={likedStates[key] ?? false}
+        isVoting={votingStates[key] ?? false}
+        voteCount={voteCountStates[key] ?? item.votes}
+      />
+    );
+  }, [username, handleVote, handleComment, handleShare]);
+
+  const extraData = useMemo(
+    () => ({ currentIndex, likedStates, votingStates, voteCountStates }),
+    [currentIndex, likedStates, votingStates, voteCountStates]
+  );
 
   if (isLoading) {
     return (
@@ -372,6 +414,7 @@ export default function VideosScreen() {
         <FlatList
           data={videos}
           renderItem={renderItem}
+          extraData={extraData}
           keyExtractor={(item) => `${item.author}-${item.permlink}`}
           pagingEnabled
           showsVerticalScrollIndicator={false}
@@ -396,8 +439,11 @@ export default function VideosScreen() {
           onScrollEndDrag={settleOnIndex}
           removeClippedSubviews
           maxToRenderPerBatch={2}
-          windowSize={3}
-          initialNumToRender={1}
+          // Two screens either side: the clips directly above and below the
+          // active one stay mounted and buffered (see VideoItem), so a swipe
+          // lands on a player that is ready rather than one being created.
+          windowSize={5}
+          initialNumToRender={2}
           getItemLayout={(_, index) => ({
             length: SCREEN_HEIGHT,
             offset: SCREEN_HEIGHT * index,
