@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Share,
   useWindowDimensions,
+  Platform,
   ViewToken,
   type GestureResponderEvent,
   type NativeScrollEvent,
@@ -106,15 +107,19 @@ const VideoItem = React.memo(function VideoItem({
     }
   }, [isActive, isFocused, holding, player]);
 
-  // Warm the clips on either side of the active one: a paused AVPlayer still
-  // fills its forward buffer, so asking the neighbours for a few seconds means
-  // the next swipe starts playing instead of spinning. Everything further out
-  // is left at the automatic (minimal) buffer.
+  // Buffer by role. The active clip keeps the platform default — no cap on
+  // how far ahead it reads. The clips directly above and below ask for a few
+  // seconds while paused (a paused player still fills its forward buffer), so
+  // the next swipe lands on one that can start at once. Anything further out
+  // is held at zero on Android; on iOS zero means "let AVPlayer decide", which
+  // is aggressive, so far items keep the default there too.
   useEffect(() => {
     try {
-      player.bufferOptions = {
-        preferredForwardBufferDuration: isActive || isNeighbor ? NEIGHBOR_BUFFER_SECONDS : 0,
-      };
+      player.bufferOptions = isActive
+        ? {}
+        : isNeighbor
+          ? { preferredForwardBufferDuration: NEIGHBOR_BUFFER_SECONDS }
+          : Platform.select({ android: { preferredForwardBufferDuration: 0 }, default: {} });
     } catch {
       // Player already released during a fast scroll.
     }
@@ -439,10 +444,10 @@ export default function VideosScreen() {
           onScrollEndDrag={settleOnIndex}
           removeClippedSubviews
           maxToRenderPerBatch={2}
-          // Two screens either side: the clips directly above and below the
+          // One screen either side: the clips directly above and below the
           // active one stay mounted and buffered (see VideoItem), so a swipe
           // lands on a player that is ready rather than one being created.
-          windowSize={5}
+          windowSize={3}
           initialNumToRender={2}
           getItemLayout={(_, index) => ({
             length: SCREEN_HEIGHT,

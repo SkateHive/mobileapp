@@ -41,21 +41,27 @@ export function createTileVisibility(): TileVisibility {
   };
 }
 
-function useTileVisible(visibility: TileVisibility, permlink: string): boolean {
-  return useSyncExternalStore(visibility.subscribe, () => visibility.has(permlink));
+const noopSubscribe = () => () => {};
+
+/**
+ * Whether this tile is on screen. Only tiles that act on it subscribe (the
+ * autoplaying clip, and a poster-less tile still waiting for its frame); the
+ * rest pass `enabled=false` and never re-render on a scroll tick.
+ */
+function useTileVisible(visibility: TileVisibility, permlink: string, enabled: boolean): boolean {
+  return useSyncExternalStore(
+    enabled ? visibility.subscribe : noopSubscribe,
+    () => enabled && visibility.has(permlink)
+  );
 }
 
-/** Poster from the session cache, extracting it on first use. */
-function useVideoFirstFrame(permlink: string, url: string, enabled: boolean): string | null {
+/** Poster from the session cache, extracted once the tile is on screen. */
+function useVideoFirstFrame(permlink: string): string | null {
   const subscribe = useCallback(
     (listener: () => void) => subscribeVideoFirstFrame(permlink, listener),
     [permlink]
   );
-  const uri = useSyncExternalStore(subscribe, () => getVideoFirstFrame(permlink));
-  useEffect(() => {
-    if (enabled && !uri) requestVideoFirstFrame(permlink, url);
-  }, [enabled, uri, permlink, url]);
-  return uri;
+  return useSyncExternalStore(subscribe, () => getVideoFirstFrame(permlink));
 }
 
 interface GridVideoTileProps {
@@ -88,8 +94,16 @@ interface GridVideoTileProps {
 export const GridVideoTile = React.memo(
   ({ permlink, videoUrl, thumbnailUrl, size, index, onPress, autoplay, visibility }: GridVideoTileProps) => {
     const isFocused = useIsFocused();
-    const isVisible = useTileVisible(visibility, permlink);
-    const generated = useVideoFirstFrame(permlink, videoUrl, !autoplay && !thumbnailUrl);
+    const wantsFrame = !autoplay && !thumbnailUrl;
+    const generated = useVideoFirstFrame(permlink);
+    // A tile still waiting for its frame listens too, so extraction is only
+    // queued for clips the user can actually see (off-screen tiles would
+    // otherwise download ahead of the ones on screen).
+    const needsFrame = wantsFrame && !generated;
+    const isVisible = useTileVisible(visibility, permlink, autoplay || needsFrame);
+    useEffect(() => {
+      if (needsFrame && isVisible) requestVideoFirstFrame(permlink, videoUrl);
+    }, [needsFrame, isVisible, permlink, videoUrl]);
     const [hasFrames, setHasFrames] = useState(false);
     const handlePress = useCallback(() => onPress(index), [onPress, index]);
     const onPlaybackStarted = useCallback(() => setHasFrames(true), []);

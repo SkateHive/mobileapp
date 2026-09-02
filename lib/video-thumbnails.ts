@@ -1,5 +1,11 @@
-import { createVideoPlayer } from 'expo-video';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { Platform } from 'react-native';
+import { createVideoPlayer, type VideoPlayer, type VideoThumbnail } from 'expo-video';
+import {
+  ImageManipulator,
+  SaveFormat,
+  type ImageManipulatorContext,
+  type ImageRef,
+} from 'expo-image-manipulator';
 
 /**
  * First-frame posters for clips that were posted before the transcoder started
@@ -13,7 +19,10 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
  * lives for the session, so a tile that scrolls out and back costs nothing.
  *
  * Extraction is serialized: it still downloads the clip's moov atom and first
- * GOP, and running a dozen at once is exactly the pile-up this replaces.
+ * GOP, and running a dozen at once is exactly the pile-up this replaces. The
+ * queue is last-in-first-out, and tiles only ask once they are on screen, so
+ * whatever the user is looking at now is extracted before what they scrolled
+ * past.
  */
 
 // permlink -> file uri, or null once extraction failed (no retry this session:
@@ -32,7 +41,8 @@ const queue: Array<() => void> = [];
 function runNext() {
   while (running < CONCURRENCY && queue.length > 0) {
     running += 1;
-    queue.shift()!();
+    // LIFO: the most recently requested tile is the one on screen.
+    queue.pop()!();
   }
 }
 
@@ -59,37 +69,57 @@ async function extractFirstFrame(url: string): Promise<string | null> {
   // loads died with "Operation Stopped"; a plain source opens all of them.
   const player = createVideoPlayer(url);
   player.muted = true;
+  let thumb: VideoThumbnail | undefined;
+  let context: ImageManipulatorContext | undefined;
+  let rendered: ImageRef | undefined;
   try {
-    await new Promise<void>((resolve, reject) => {
-      if (player.status === 'readyToPlay') return resolve();
-      const timer = setTimeout(() => {
-        sub.remove();
-        reject(new Error('timeout'));
-      }, LOAD_TIMEOUT_MS);
-      const sub = player.addListener('statusChange', ({ status, error }) => {
-        if (status === 'readyToPlay') {
-          clearTimeout(timer);
-          sub.remove();
-          resolve();
-        } else if (status === 'error') {
-          clearTimeout(timer);
-          sub.remove();
-          reject(new Error(error?.message ?? 'player error'));
-        }
-      });
-    });
+    // On Android generateThumbnailsAsync goes through MediaMetadataRetriever,
+    // which fetches the file itself, so there is nothing to wait for. On iOS
+    // the thumbnail comes from the player's asset, which has to be loaded.
+    if (Platform.OS !== 'android') await waitUntilReady(player);
     // Must be an array: the native side casts a bare number to [Double] and
     // aborts the process (SIGABRT in DynamicArrayType.cast) instead of throwing.
-    const [thumb] = await player.generateThumbnailsAsync([0], { maxWidth: MAX_WIDTH });
+    [thumb] = await player.generateThumbnailsAsync([0], { maxWidth: MAX_WIDTH });
     if (!thumb) return null;
-    const rendered = await ImageManipulator.manipulate(thumb).renderAsync();
+    context = ImageManipulator.manipulate(thumb);
+    rendered = await context.renderAsync();
     const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 });
     return saved.uri;
   } finally {
+    // The frame, the manipulator context and the rendered image are native
+    // shared objects; release them now rather than waiting for GC.
+    for (const ref of [rendered, context, thumb]) {
+      try {
+        ref?.release();
+      } catch {}
+    }
     try {
       player.release();
     } catch {}
   }
+}
+
+function waitUntilReady(player: VideoPlayer): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (player.status === 'readyToPlay') return resolve();
+    // Already failed before we got here: don't sit out the timeout for it.
+    if (player.status === 'error') return reject(new Error('player error'));
+    const timer = setTimeout(() => {
+      sub.remove();
+      reject(new Error('timeout'));
+    }, LOAD_TIMEOUT_MS);
+    const sub = player.addListener('statusChange', ({ status, error }) => {
+      if (status === 'readyToPlay') {
+        clearTimeout(timer);
+        sub.remove();
+        resolve();
+      } else if (status === 'error') {
+        clearTimeout(timer);
+        sub.remove();
+        reject(new Error(error?.message ?? 'player error'));
+      }
+    });
+  });
 }
 
 /** The cached poster for this clip, if one has been extracted this session. */

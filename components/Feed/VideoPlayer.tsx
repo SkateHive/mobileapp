@@ -45,12 +45,9 @@ export const VideoPlayer = React.memo(
       player.muted = initialMuted;
     }, [player, initialMuted]);
 
-    // Cleanup: pause player on unmount to free resources
-    useEffect(() => {
-      return () => {
-        try { player.pause(); } catch {}
-      };
-    }, [player]);
+    // No pause-on-unmount: useVideoPlayer releases the native player in its
+    // own cleanup, which runs first and already stops playback; a pause after
+    // it only logged a "native shared object not found" warning.
 
     // Notify parent when video starts playing
     useEffect(() => {
