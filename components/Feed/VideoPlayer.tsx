@@ -31,6 +31,11 @@ export const VideoPlayer = React.memo(
     const onPlaybackStartedRef = useRef(onPlaybackStarted);
     onPlaybackStartedRef.current = onPlaybackStarted;
 
+    // Deliberately not `useCaching`: expo-video's cache proxy failed to open
+    // roughly half of the IPFS clips it was pointed at ("Failed to load the
+    // player item: Operation Stopped"), where a plain source loads them all.
+    // Not refetching on scroll-back is handled by keeping the player mounted
+    // and paused instead (see GridVideoTile).
     const player = useVideoPlayer(url, (player) => {
       player.loop = loop;
     });
