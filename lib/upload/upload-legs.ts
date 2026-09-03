@@ -7,6 +7,7 @@ import { COMMUNITY_TAG, HiveClient, SNAPS_CONTAINER_AUTHOR, getLastSnapsContaine
 import { crossPostToInstagram } from "~/lib/instagram";
 import { WEB_BASE_URL } from "~/lib/constants";
 import { uploadImageToHive, uploadImageViaUserbase } from "./image-upload";
+import { isHiveNotFoundError } from "./hive-errors";
 import { uploadVideoToWorker } from "./video-upload";
 import { UploadRunError, type RunnerDeps } from "./upload-runner";
 
@@ -48,14 +49,31 @@ export function makeRunnerDeps(session: AuthSession): RunnerDeps {
 
     // Deliberately not hive-utils.getContent: that helper swallows RPC errors
     // and returns null, which would read as "post does not exist" and let a
-    // retry double-post. Here an RPC error throws and the runner fails closed.
+    // retry double-post. Here an RPC error throws and the runner fails closed
+    // — with one narrow exception (see below).
     async getContent(author, permlink) {
-      const content = (await HiveClient.database.call("get_content", [author, permlink])) as {
-        author?: unknown;
-      } | null;
-      return content && typeof content.author === "string" && content.author.length > 0
-        ? { author: content.author }
-        : null;
+      try {
+        const content = (await HiveClient.database.call("get_content", [author, permlink])) as {
+          author?: unknown;
+        } | null;
+        return content && typeof content.author === "string" && content.author.length > 0
+          ? { author: content.author }
+          : null;
+      } catch (err) {
+        // Current Hive nodes (api.hive.blog, deathwing, openhive) answer
+        // get_content for a non-existent author/permlink with a JSON-RPC
+        // error (assert_exception, "Post <author>/<permlink> does not
+        // exist") instead of the old empty-object response. Every new post
+        // is, by definition, non-existent before its first broadcast, so
+        // without this the double-post guard would fail closed on every
+        // single upload. isHiveNotFoundError matches only that exact assert
+        // — any other rejection (network failure, a different assert,
+        // malformed payload) is rethrown unchanged and still fails closed.
+        if (isHiveNotFoundError(err)) {
+          return null;
+        }
+        throw err;
+      }
     },
 
     async broadcast(args) {

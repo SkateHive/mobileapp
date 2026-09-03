@@ -15,7 +15,7 @@
     "prebuild:ios": "expo prebuild --clean -p ios && node scripts/sync-widget-version.js",
     "start": "expo start --dev-client",
     "logs:ios": "xcrun simctl spawn booted log stream --level error --predicate 'process == \"SkateHive\"'",
-    "test": "tsx lib/upload/__tests__/upload-job.test.ts && tsx lib/upload/__tests__/upload-runner.test.ts && tsx lib/upload/__tests__/post-assembly.test.ts"
+    "test": "tsx lib/upload/__tests__/upload-job.test.ts && tsx lib/upload/__tests__/upload-runner.test.ts && tsx lib/upload/__tests__/post-assembly.test.ts && tsx lib/upload/__tests__/hive-errors.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/fira-code": "^0.4.0",
