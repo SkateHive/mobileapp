@@ -110,6 +110,7 @@ function makeDeps(overrides: Partial<RunnerDeps> = {}): FakeDeps {
     },
     communityTag: "hive-173115",
     snapsContainerAuthor: "peak.snaps",
+    sharedPostingAuthor: null,
     now: () => NOW + 1,
     ...overrides,
   };
@@ -200,6 +201,57 @@ test("getContent throwing fails closed as network and does not broadcast", async
   const deps = makeDeps({
     getContent: async () => {
       throw new Error("RPC timeout");
+    },
+  });
+  const rec = recorder(job);
+  await runUploadJob(job, deps, rec.emit);
+  assert.deepEqual(rec.types(), ["started", "parent_done", "failed"]);
+  const failed = rec.events[2] as Extract<UploadEvent, { type: "failed" }>;
+  assert.equal(failed.error.kind, "network");
+  assert.equal(deps.broadcasts.length, 0);
+});
+
+test("double-post guard finds the post under the shared posting account: no broadcast, still publishes", async () => {
+  const job = textJob();
+  const getContentCalls: string[] = [];
+  const deps = makeDeps({
+    sharedPostingAuthor: "skateuser",
+    getContent: async (author) => {
+      getContentCalls.push(author);
+      return author === "skateuser" ? { author: "skateuser" } : null;
+    },
+  });
+  const rec = recorder(job);
+  await runUploadJob(job, deps, rec.emit);
+  assert.deepEqual(getContentCalls, ["skater", "skateuser"]);
+  assert.deepEqual(rec.types(), ["started", "parent_done", "published"]);
+  assert.equal(deps.broadcasts.length, 0);
+});
+
+test("double-post guard: neither the author nor the shared account has the post, so it broadcasts", async () => {
+  const job = textJob();
+  const getContentCalls: string[] = [];
+  const deps = makeDeps({
+    sharedPostingAuthor: "skateuser",
+    getContent: async (author) => {
+      getContentCalls.push(author);
+      return null;
+    },
+  });
+  const rec = recorder(job);
+  await runUploadJob(job, deps, rec.emit);
+  assert.deepEqual(getContentCalls, ["skater", "skateuser"]);
+  assert.deepEqual(rec.types(), ["started", "parent_done", "published"]);
+  assert.equal(deps.broadcasts.length, 1);
+});
+
+test("double-post guard: the shared-account lookup throwing fails closed as network and does not broadcast", async () => {
+  const job = textJob();
+  const deps = makeDeps({
+    sharedPostingAuthor: "skateuser",
+    getContent: async (author) => {
+      if (author === "skateuser") throw new Error("RPC timeout");
+      return null;
     },
   });
   const rec = recorder(job);

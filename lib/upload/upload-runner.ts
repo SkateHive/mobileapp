@@ -34,6 +34,13 @@ export interface RunnerDeps {
   getParent(): Promise<{ author: string; permlink: string }>;
   /** Must THROW on RPC error (fail closed) and return null only when the post does not exist. */
   getContent(author: string, permlink: string): Promise<{ author: string } | null>;
+  /**
+   * The shared Hive account the server broadcasts under for a userbase
+   * (email/lite) session with no local key — null otherwise. The double-post
+   * guard also checks here because such posts land on-chain under this
+   * account, not `job.author`.
+   */
+  sharedPostingAuthor: string | null;
   broadcast(args: BroadcastArgs): Promise<void>;
   crossPost?(args: RunnerCrossPostArgs): Promise<void>;
   communityTag: string;
@@ -157,6 +164,11 @@ export async function runUploadJob(job: UploadJob, deps: RunnerDeps, emit: Emit)
     let existing: { author: string } | null;
     try {
       existing = await deps.getContent(job.author, job.permlink);
+      if (!existing && deps.sharedPostingAuthor) {
+        // Userbase (email/lite) posts broadcast under the shared account
+        // server-side, so a resume must also check there before re-posting.
+        existing = await deps.getContent(deps.sharedPostingAuthor, job.permlink);
+      }
     } catch (guardError) {
       throw new UploadRunError(
         "network",

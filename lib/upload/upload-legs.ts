@@ -10,6 +10,11 @@ import { uploadImageToHive, uploadImageViaUserbase } from "./image-upload";
 import { uploadVideoToWorker } from "./video-upload";
 import { UploadRunError, type RunnerDeps } from "./upload-runner";
 
+// Mirrors DEFAULT_HIVE_POSTING_ACCOUNT in the skatehive-api comment route: the
+// server signs and broadcasts email/lite (userbase) posts under this shared
+// Hive account, so the double-post guard must also check there.
+const SHARED_POSTING_ACCOUNT = "skateuser";
+
 function assertOnDevice(uri: string, what: "video" | "image"): void {
   if (!new File(uri).exists) {
     throw new UploadRunError("unknown", `The ${what} is no longer on this device`);
@@ -71,6 +76,7 @@ export function makeRunnerDeps(session: AuthSession): RunnerDeps {
 
     communityTag: COMMUNITY_TAG,
     snapsContainerAuthor: SNAPS_CONTAINER_AUTHOR,
+    sharedPostingAuthor: isUserbaseSession(session) && !session.decryptedKey ? SHARED_POSTING_ACCOUNT : null,
     now: () => Date.now(),
   };
 }
