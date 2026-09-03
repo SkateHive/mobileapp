@@ -187,8 +187,9 @@ function makeJobId(): string {
 /**
  * Copies the media and cover into Paths.document/uploads/<id>/ (the pickers
  * write to the cache dir, which iOS may purge), builds the job and dispatches
- * `enqueued`. Throws UploadBusyError while a job is active or failed, and
- * rethrows copy failures after removing the half-made directory.
+ * `enqueued`. Throws UploadBusyError only while a job is active or failed —
+ * a lingering `published` job must not block (or silently swallow, see
+ * below) a new post, so it is cleared first instead of rejected.
  *
  * Ruling (b): `createJob` only keeps `coverUri` when `mediaKind === "video"`,
  * regardless of whether media is present, so a video job with no `mediaUri`
@@ -199,13 +200,26 @@ function makeJobId(): string {
 export async function enqueue(input: EnqueueInput, session: AuthSession): Promise<UploadJob> {
   const existing = job;
   if (existing !== null) {
-    // Read status before the isJobActive() guard: TS's type-predicate
+    // Read status/id before the isJobActive() guard: TS's type-predicate
     // narrowing removes `UploadJob` entirely from `existing`'s type in the
-    // false branch (it doesn't know "not active" can still mean "failed"),
-    // so `existing.status` would be an error on the next line otherwise.
+    // false branch (it doesn't know "not active" can still mean "failed" or
+    // "published"), so `existing.status`/`existing.id` would be errors on
+    // later lines otherwise.
     const status = existing.status;
+    const existingId = existing.id;
     if (isJobActive(existing)) throw new UploadBusyError("Wait for the current upload to finish");
     if (status === "failed") throw new UploadBusyError("Retry or discard the failed upload first");
+    // A finished job isn't "busy": `reduce`'s "enqueued" handler only accepts
+    // a new job when the store is empty, so a `published` job left behind
+    // (the user never reopened it, or the provider hasn't run its 4s
+    // auto-clear yet) would otherwise cause the new `enqueued` dispatch below
+    // to be silently ignored — the caller believes a new job started while
+    // the store keeps showing the old, already-published one. Clear it
+    // (deletes its dir and job.json) before building the new job.
+    if (status === "published") {
+      dispatch({ type: "cleared" });
+      deleteJobFiles(existingId);
+    }
   }
   if (input.mediaKind === "video" && !input.mediaUri) {
     throw new Error("A video upload requires media");
