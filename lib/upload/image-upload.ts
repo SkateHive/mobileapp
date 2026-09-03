@@ -185,12 +185,4 @@ export async function uploadImageViaUserbase(
   }
 }
 
-/**
- * Create markdown image markup for Hive post
- * @param imageUrl - URL of the uploaded image
- * @param altText - Alt text for the image
- * @returns Markdown image string
- */
-export function createImageMarkdown(imageUrl: string, altText: string = 'image'): string {
-  return `![${altText}](${imageUrl})`;
-}
+export { createImageMarkdown } from './post-assembly';
