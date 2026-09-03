@@ -64,7 +64,10 @@ export function classifyError(error: unknown): UploadError {
   const name = error instanceof Error ? error.name : "";
   if (
     name === "AbortError" ||
-    (error instanceof TypeError && /network request failed/i.test(message)) ||
+    // image-upload.ts wraps fetch failures in a plain Error (not a
+    // TypeError); matching on the message alone, regardless of error type,
+    // keeps foreground auto-retry working for image posts too.
+    /network request failed/i.test(message) ||
     /All video upload services failed/i.test(message)
   ) {
     return { kind: "network", message: message.slice(0, MAX_MESSAGE) };

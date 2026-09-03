@@ -78,15 +78,17 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       return dispatch(event);
     };
 
-    runUploadJob(job, makeRunnerDeps(s), emit).finally(() => {
-      if (runningJobId.current === job.id) runningJobId.current = null;
-      // A run ends in published or failed. If the job is still active, the
-      // reducer armed the one-shot foreground retry; run it now.
-      const current = getJob();
-      if (current && current.id === job.id && isJobActive(current) && current.pendingResume === "foreground") {
-        startRunner(current);
-      }
-    });
+    runUploadJob(job, makeRunnerDeps(s), emit)
+      .catch((err) => console.warn("[upload] runner threw", err))
+      .finally(() => {
+        if (runningJobId.current === job.id) runningJobId.current = null;
+        // A run ends in published or failed. If the job is still active, the
+        // reducer armed the one-shot foreground retry; run it now.
+        const current = getJob();
+        if (current && current.id === job.id && isJobActive(current) && current.pendingResume === "foreground") {
+          startRunner(current);
+        }
+      });
   }, []);
 
   // Reacts to every store change: start the runner when a job becomes active
@@ -126,21 +128,13 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       const persisted = await loadPersistedJob();
       if (cancelled) return;
       if (persisted) {
-        // Read status/id/publishedAt before the isJobActive() guard: TS's
-        // type-predicate narrowing removes UploadJob entirely from
-        // `persisted`'s type in the false branch (same gotcha noted in
-        // upload-store.ts's enqueue), so `persisted.*` would be errors below
-        // otherwise.
-        const status = persisted.status;
-        const persistedId = persisted.id;
-        const publishedAt = persisted.timestamps.publishedAt;
         if (isJobActive(persisted)) {
           dispatch({ type: "resume", kind: "launch", at: Date.now() });
-        } else if (status === "published") {
-          const age = Date.now() - (publishedAt ?? 0);
+        } else if (persisted.status === "published") {
+          const age = Date.now() - (persisted.timestamps.publishedAt ?? 0);
           if (age > PUBLISHED_CLEAR_MS) discard();
-          else scheduleClear(persistedId, PUBLISHED_CLEAR_MS - age);
-          invalidatedForId.current = persistedId; // already invalidated in the previous session
+          else scheduleClear(persisted.id, PUBLISHED_CLEAR_MS - age);
+          invalidatedForId.current = persisted.id; // already invalidated in the previous session
         }
         // `failed` is simply shown in the pill with Retry / Discard.
       }

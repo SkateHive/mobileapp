@@ -47,14 +47,10 @@ export default function CreatePost() {
   // The job lives in the upload store; the screen only needs to know whether
   // Share is allowed. A failed job blocks too: there is no second slot.
   const uploadJob = useUploadJob();
-  // Read once: TS cannot narrow `uploadJob` past a custom type-predicate
-  // inside `||`/ternary when the union includes `null`, so the status is
-  // pulled into its own variable rather than re-accessed after the guard.
-  const uploadJobStatus = uploadJob?.status;
-  const jobBlocksShare = isJobActive(uploadJob) || uploadJobStatus === "failed";
+  const jobBlocksShare = isJobActive(uploadJob) || uploadJob?.status === "failed";
   const shareHint = isJobActive(uploadJob)
     ? "Wait for the current upload to finish"
-    : uploadJobStatus === "failed"
+    : uploadJob?.status === "failed"
       ? "Retry or discard the failed upload first"
       : null;
   // Ref-based lock: a second tap during the ~1s media copy must not enqueue

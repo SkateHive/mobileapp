@@ -88,10 +88,13 @@ export const UPLOAD_STATUSES: readonly UploadStatus[] = [
   "failed",
 ];
 
-const ACTIVE_STATUSES: readonly UploadStatus[] = ["uploading", "transcoding", "publishing"];
+export type ActiveStatus = "uploading" | "transcoding" | "publishing";
+export type ActiveUploadJob = UploadJob & { status: ActiveStatus };
 
-export function isJobActive(job: UploadJob | null | undefined): job is UploadJob {
-  return !!job && ACTIVE_STATUSES.includes(job.status);
+const ACTIVE_STATUSES: readonly ActiveStatus[] = ["uploading", "transcoding", "publishing"];
+
+export function isJobActive(job: UploadJob | null): job is ActiveUploadJob {
+  return !!job && ACTIVE_STATUSES.includes(job.status as ActiveStatus);
 }
 
 export interface CreateJobInput {
@@ -310,7 +313,14 @@ export function reduce(job: UploadJob | null, event: UploadEvent): UploadJob | n
         };
       }
       if (!active) return ignored(job, event);
-      return { ...job, pendingResume: "launch", timestamps: { ...job.timestamps, updatedAt: event.at } };
+      // Same restart target as `retry`: a job killed mid-transcode must not
+      // resume showing stale progress from the leg it is about to re-run.
+      return {
+        ...job,
+        ...restartTarget(job),
+        pendingResume: "launch",
+        timestamps: { ...job.timestamps, updatedAt: event.at },
+      };
     }
     default:
       return ignored(job, event);

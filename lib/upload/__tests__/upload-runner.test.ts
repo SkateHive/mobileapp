@@ -300,6 +300,11 @@ test("classifyError maps the worker aggregate error to network and tagged errors
   assert.equal(classifyError(new UploadRunError("unknown", "The video is no longer on this device")).message, "The video is no longer on this device");
   assert.equal(classifyError("weird").kind, "unknown");
   assert.equal(classifyError(Object.assign(new Error("Aborted"), { name: "AbortError" })).kind, "network");
+  assert.equal(
+    classifyError(new Error("Network request failed")).kind,
+    "network",
+    "image-upload.ts wraps fetch failures in a plain Error, not a TypeError",
+  );
 });
 
 test("getParent throwing broadcasts to the community tag with an empty parent author", async () => {

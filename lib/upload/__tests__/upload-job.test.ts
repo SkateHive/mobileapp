@@ -305,6 +305,15 @@ test("resume launch marks an active job and is ignored on failed", () => {
   assert.equal(reduce(failed, { type: "resume", kind: "launch", at: NOW + 5 }), failed);
 });
 
+test("resume launch from transcoding with no media result restarts the media leg at 0", () => {
+  const job = reduce(activeVideo(), { type: "progress", progress: 62, stage: "transcoding" }) as UploadJob;
+  const next = reduce(job, { type: "resume", kind: "launch", at: NOW + 5 }) as UploadJob;
+  assert.equal(next.status, "uploading");
+  assert.equal(next.progress, 0);
+  assert.equal(next.stage, "receiving");
+  assert.equal(next.pendingResume, "launch");
+});
+
 test("invariant: result survives failed, retry and resume", () => {
   let job = run(activeVideo(), { type: "started", at: NOW + 10 }, { type: "cover_done", coverUrl: "c" }) as UploadJob;
   job = reduce(job, { type: "failed", error: NET_ERROR, appActive: false, at: NOW + 60 }) as UploadJob;

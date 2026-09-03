@@ -115,6 +115,10 @@ function clampProgress(value: unknown): number {
  * so `progress` is re-clamped into 0..100 here before the job is re-hydrated.
  */
 export async function loadPersistedJob(): Promise<UploadJob | null> {
+  // Never clobber an in-memory job that arrived while this read was in
+  // flight (a user enqueue racing auth hydration, or a dev remount): the
+  // caller only wants the persisted job when the store is still empty.
+  if (job !== null) return job;
   const file = jobFile();
   let rawId: string | null = null;
   try {
@@ -151,8 +155,13 @@ export function dispatch(event: UploadEvent): UploadJob | null {
   const next = reduce(job, event);
   if (next === job) return job; // no-op transition, nothing to notify or persist
   job = next;
-  notify();
+  // Persist before notify: a listener (the runner's onStoreChange) may
+  // dispatch again synchronously, which reassigns the module-level `job`
+  // and persists its own newer value. If notify() ran first, this frame's
+  // persist(next) below would run after that nested persist and overwrite
+  // disk with this stale `next`, even though `job` in memory had moved on.
   persist(next);
+  notify();
   return next;
 }
 
@@ -206,16 +215,9 @@ export async function enqueue(input: EnqueueInput, session: AuthSession): Promis
   // job is guaranteed to be created — see below.
   let publishedIdToClear: string | null = null;
   if (existing !== null) {
-    // Read status/id before the isJobActive() guard: TS's type-predicate
-    // narrowing removes `UploadJob` entirely from `existing`'s type in the
-    // false branch (it doesn't know "not active" can still mean "failed" or
-    // "published"), so `existing.status`/`existing.id` would be errors on
-    // later lines otherwise.
-    const status = existing.status;
-    const existingId = existing.id;
     if (isJobActive(existing)) throw new UploadBusyError("Wait for the current upload to finish");
-    if (status === "failed") throw new UploadBusyError("Retry or discard the failed upload first");
-    if (status === "published") publishedIdToClear = existingId;
+    if (existing.status === "failed") throw new UploadBusyError("Retry or discard the failed upload first");
+    if (existing.status === "published") publishedIdToClear = existing.id;
   }
   if (input.mediaKind === "video" && !input.mediaUri) {
     throw new Error("A video upload requires media");
