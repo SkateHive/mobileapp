@@ -23,13 +23,20 @@ import {
   requestOtp,
   verifyOtp,
   completeSignup,
+  claimAccount,
   checkUsername,
   type UserbaseUser,
 } from "~/lib/userbase/api";
 import { useAuth } from "~/lib/auth-provider";
 import { useOnboardingStep } from "~/lib/onboarding";
+import {
+  validate_posting_key,
+  InvalidKeyFormatError,
+  AccountNotFoundError,
+  InvalidKeyError,
+} from "~/lib/hive-utils";
 
-type Step = "email" | "otp" | "username" | "done";
+type Step = "email" | "otp" | "username" | "claim" | "done";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -38,6 +45,23 @@ function maskEmail(address: string): string {
   const [name, domain] = address.split("@");
   if (!domain) return address;
   return `${name.slice(0, 1)}•••@${domain}`;
+}
+
+/** Copy for a `signup/claim` failure, keyed by its machine-readable `code`. */
+function claimErrorMessage(handle: string, code?: string): string {
+  switch (code) {
+    case "invalid_key":
+      return `That key doesn't match @${handle}`;
+    case "expired_token":
+      return "Session expired, request a new code";
+    case "merge_required":
+      return "This email is already used by another SkateHive account";
+    case "rate_limited":
+      return "Too many tries, wait a few minutes";
+    default:
+      // chain_unavailable and anything unrecognized.
+      return "Couldn't reach Hive, try again";
+  }
 }
 
 const RESEND_SECONDS = 60;
@@ -59,6 +83,13 @@ export default function EmailLoginScreen() {
   const [signupToken, setSignupToken] = useState("");
   const [handle, setHandle] = useState("");
   const [user, setUser] = useState<UserbaseUser | null>(null);
+  const usernameInputRef = useRef<TextInput>(null);
+
+  // Claim step: posting key for an existing Hive account. Lives only in this
+  // component's state while the step is mounted and is cleared in `finally`
+  // after submit and on Back — nothing is written to SecureStore.
+  const [postingKey, setPostingKey] = useState("");
+  const [claimCode, setClaimCode] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,13 +223,86 @@ export default function EmailLoginScreen() {
     setError(null);
     try {
       const r = await completeSignup(signupToken, name);
-      if (!r.success || !r.token || !r.user) throw new Error(r.error || "Could not create account");
+      if (!r.success || !r.token || !r.user) {
+        // A race with check-username: the name became taken between the debounced
+        // check and submit. Fall back to the same two branches the live check drives.
+        if (r.code === "hive_taken" || r.code === "userbase_taken") {
+          setAvail({
+            available: false,
+            reason: r.code === "hive_taken" ? "Already taken on Hive" : "Already reserved",
+          });
+          return;
+        }
+        throw new Error(r.error || "Could not create account");
+      }
       await loginWithUserbase(r.token, r.user, email);
       setUser(r.user);
       setStep("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create account");
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickAnotherName = () => {
+    usernameInputRef.current?.focus();
+  };
+
+  const startClaim = () => {
+    setError(null);
+    setStep("claim");
+  };
+
+  const backToUsername = () => {
+    setPostingKey("");
+    setClaimCode(null);
+    setError(null);
+    setStep("username");
+  };
+
+  // Session expired mid-claim: the only way forward is a fresh code.
+  const restartFromEmail = () => {
+    setPostingKey("");
+    setClaimCode(null);
+    setError(null);
+    setSignupToken("");
+    setCode("");
+    setStep("email");
+  };
+
+  const claimHandleAccount = async () => {
+    const name = handle.trim().toLowerCase();
+    const key = postingKey.trim();
+    setBusy(true);
+    setError(null);
+    setClaimCode(null);
+    try {
+      // On-device check first: catches a typo'd key without a network call.
+      await validate_posting_key(name, key);
+      const r = await claimAccount(signupToken, name, key);
+      if (!r.success || !r.token || !r.user) {
+        setClaimCode(r.code ?? null);
+        setError(claimErrorMessage(name, r.code));
+        return;
+      }
+      await loginWithUserbase(r.token, r.user, email);
+      setUser(r.user);
+      setError(null);
+      setStep("done");
+    } catch (e) {
+      if (
+        e instanceof InvalidKeyFormatError ||
+        e instanceof AccountNotFoundError ||
+        e instanceof InvalidKeyError
+      ) {
+        setError(e.message);
+      } else {
+        setError(e instanceof Error ? e.message : "Could not claim account");
+      }
+    } finally {
+      // Never persisted; drop it whether the claim succeeded, failed, or threw.
+      setPostingKey("");
       setBusy(false);
     }
   };
@@ -291,6 +395,7 @@ export default function EmailLoginScreen() {
             <>
               <Text style={styles.label}>Choose your SkateHive username</Text>
               <TextInput
+                ref={usernameInputRef}
                 style={styles.input}
                 placeholder="e.g. tonyhawk"
                 placeholderTextColor={theme.colors.muted}
@@ -306,18 +411,71 @@ export default function EmailLoginScreen() {
                   <Text style={styles.hint}>Checking…</Text>
                 ) : avail ? (
                   <Text style={[styles.hint, { color: avail.available ? theme.colors.primary : theme.colors.danger }]}>
-                    {avail.available ? "✓ Available on Hive" : avail.reason || "Not available"}
+                    {avail.available
+                      ? "✓ Available on Hive"
+                      : avail.reason === "Already reserved"
+                        ? "Already reserved by another email user"
+                        : avail.reason || "Not available"}
                   </Text>
                 ) : (
                   <Text style={styles.hint}>3–16 chars, lowercase. Must be free on Hive so you can claim it later.</Text>
                 )}
               </View>
-              <PrimaryButton
-                label="Create account"
-                onPress={createAccount}
-                busy={busy}
-                disabled={!avail?.available}
+              {avail?.reason === "Already taken on Hive" ? (
+                <>
+                  <PrimaryButton label="This account is mine" onPress={startClaim} busy={false} disabled={busy} />
+                  <Pressable onPress={pickAnotherName} disabled={busy} hitSlop={12}>
+                    <Text style={styles.linkText}>Pick another name</Text>
+                  </Pressable>
+                </>
+              ) : avail?.reason === "Already reserved" ? (
+                <Pressable onPress={pickAnotherName} disabled={busy} hitSlop={12}>
+                  <Text style={styles.linkText}>Pick another name</Text>
+                </Pressable>
+              ) : (
+                <PrimaryButton
+                  label="Create account"
+                  onPress={createAccount}
+                  busy={busy}
+                  disabled={!avail?.available}
+                />
+              )}
+            </>
+          )}
+
+          {step === "claim" && (
+            <>
+              <Text style={styles.otpTitle}>Prove it's yours</Text>
+              <Text style={styles.emailEcho}>@{handle}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="posting key"
+                placeholderTextColor={theme.colors.muted}
+                value={postingKey}
+                onChangeText={setPostingKey}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!busy}
               />
+              <Text style={styles.hint}>
+                Your Hive posting key. It is stored encrypted on SkateHive's server, never on this
+                phone.
+              </Text>
+              <PrimaryButton
+                label="Claim account"
+                onPress={claimHandleAccount}
+                busy={busy}
+                disabled={!postingKey.trim()}
+              />
+              {claimCode === "expired_token" && (
+                <Pressable onPress={restartFromEmail} disabled={busy} hitSlop={12}>
+                  <Text style={styles.linkText}>Request a new code</Text>
+                </Pressable>
+              )}
+              <Pressable onPress={backToUsername} disabled={busy} hitSlop={12}>
+                <Text style={styles.linkText}>Back</Text>
+              </Pressable>
             </>
           )}
 
