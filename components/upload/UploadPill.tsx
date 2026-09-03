@@ -9,7 +9,6 @@ import { theme } from "~/lib/theme";
 import { isJobActive, pillDetail, pillLabel, type UploadJob } from "~/lib/upload/upload-job";
 import { discard, dispatch, useUploadJob } from "~/lib/upload/upload-store";
 
-const TAB_BAR_HEIGHT = 60; // tabBarStyle.height in app/(tabs)/_layout.tsx
 const RING_SIZE = 44;
 const RING_STROKE = 3;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
@@ -185,7 +184,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: theme.spacing.md,
     right: theme.spacing.md,
-    bottom: TAB_BAR_HEIGHT + theme.spacing.sm,
+    bottom: theme.layout.tabBarHeight + theme.spacing.sm,
     pointerEvents: "box-none",
   },
   pill: {

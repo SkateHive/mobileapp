@@ -104,6 +104,10 @@ export const theme = {
     mobile: 450,
     tablet: 850,
   },
+  layout: {
+    // app/(tabs)/_layout.tsx's tabBarStyle.height; UploadPill sits just above it.
+    tabBarHeight: 60,
+  },
 };
 
 export type Theme = typeof theme;
