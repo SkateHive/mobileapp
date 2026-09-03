@@ -187,9 +187,11 @@ function makeJobId(): string {
 /**
  * Copies the media and cover into Paths.document/uploads/<id>/ (the pickers
  * write to the cache dir, which iOS may purge), builds the job and dispatches
- * `enqueued`. Throws UploadBusyError only while a job is active or failed —
- * a lingering `published` job must not block (or silently swallow, see
- * below) a new post, so it is cleared first instead of rejected.
+ * `enqueued`. Throws UploadBusyError only while a job is active or failed.
+ * A lingering `published` job is not "busy" and must not block a new post,
+ * but it is only cleared once the new job's media copy has succeeded —
+ * see the comment above the `dispatch({ type: "enqueued" })` call below for
+ * why the clear happens there and not up front.
  *
  * Ruling (b): `createJob` only keeps `coverUri` when `mediaKind === "video"`,
  * regardless of whether media is present, so a video job with no `mediaUri`
@@ -199,6 +201,10 @@ function makeJobId(): string {
  */
 export async function enqueue(input: EnqueueInput, session: AuthSession): Promise<UploadJob> {
   const existing = job;
+  // Set only when the current job is `published`: it isn't "busy" (only
+  // active/failed throw below), but it must not be cleared until the new
+  // job is guaranteed to be created — see below.
+  let publishedIdToClear: string | null = null;
   if (existing !== null) {
     // Read status/id before the isJobActive() guard: TS's type-predicate
     // narrowing removes `UploadJob` entirely from `existing`'s type in the
@@ -209,17 +215,7 @@ export async function enqueue(input: EnqueueInput, session: AuthSession): Promis
     const existingId = existing.id;
     if (isJobActive(existing)) throw new UploadBusyError("Wait for the current upload to finish");
     if (status === "failed") throw new UploadBusyError("Retry or discard the failed upload first");
-    // A finished job isn't "busy": `reduce`'s "enqueued" handler only accepts
-    // a new job when the store is empty, so a `published` job left behind
-    // (the user never reopened it, or the provider hasn't run its 4s
-    // auto-clear yet) would otherwise cause the new `enqueued` dispatch below
-    // to be silently ignored — the caller believes a new job started while
-    // the store keeps showing the old, already-published one. Clear it
-    // (deletes its dir and job.json) before building the new job.
-    if (status === "published") {
-      dispatch({ type: "cleared" });
-      deleteJobFiles(existingId);
-    }
+    if (status === "published") publishedIdToClear = existingId;
   }
   if (input.mediaKind === "video" && !input.mediaUri) {
     throw new Error("A video upload requires media");
@@ -247,6 +243,10 @@ export async function enqueue(input: EnqueueInput, session: AuthSession): Promis
       coverUri = target.uri;
     }
   } catch (error) {
+    // Only the half-made NEW job dir is removed here. The lingering
+    // published job (if any) has not been touched yet, so a validation or
+    // copy failure never leaves the user's completed post disappeared with
+    // no replacement job created.
     deleteJobFiles(id);
     throw error instanceof Error ? error : new Error("Could not copy the media for upload");
   }
@@ -266,6 +266,17 @@ export async function enqueue(input: EnqueueInput, session: AuthSession): Promis
     communityTag: input.communityTag,
     now: Date.now(),
   });
+  // Only now — after the new job's media copy has succeeded and `created`
+  // is ready to dispatch — clear a lingering published job. `reduce`'s
+  // "enqueued" handler only accepts a new job when the store is empty, so
+  // the clear must be atomic with (immediately before) the `enqueued`
+  // dispatch: doing it any earlier risks deleting the finished post's
+  // dir/json and then failing validation or the copy, leaving neither job
+  // in the store.
+  if (publishedIdToClear !== null) {
+    dispatch({ type: "cleared" });
+    deleteJobFiles(publishedIdToClear);
+  }
   dispatch({ type: "enqueued", job: created });
   return created;
 }
