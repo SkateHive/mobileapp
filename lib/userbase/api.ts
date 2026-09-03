@@ -51,6 +51,7 @@ export interface CompleteSignupResult {
   token?: string;
   user?: UserbaseUser;
   error?: string;
+  code?: string;
 }
 export function completeSignup(
   signupToken: string,
@@ -61,6 +62,19 @@ export function completeSignup(
     signupToken,
     handle,
     display_name: displayName,
+  });
+}
+
+/** Claim an existing Hive account with its posting key during email signup. */
+export function claimAccount(
+  signupToken: string,
+  handle: string,
+  postingKey: string
+): Promise<CompleteSignupResult> {
+  return postJson("/auth/signup/claim", {
+    signupToken,
+    handle,
+    postingKey,
   });
 }
 
