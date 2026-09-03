@@ -10,6 +10,7 @@ import { useAuth } from "~/lib/auth-provider";
 import { canPost } from "~/lib/posting";
 import { useNotificationContext } from "~/lib/notifications-context";
 import { ActionSheet } from "~/components/ui/ActionSheet";
+import { UploadPill } from "~/components/upload/UploadPill";
 
 interface TabItem {
   name: string;
@@ -224,6 +225,10 @@ export default function TabLayout() {
               }}
             />
           </Tabs>
+
+          {/* Background upload progress. A sibling of <Tabs> so it survives
+              tab switches and sits above the bar; absent on stack screens. */}
+          <UploadPill />
         </View>
 
         {/* Variant-C action sheet shown when the center "+" is tapped */}
