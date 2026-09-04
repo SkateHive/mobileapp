@@ -152,16 +152,36 @@ struct Provider: TimelineProvider {
     }
   }
 
-  /// Download spot photos in parallel, preserving order.
+  /// Download spot photos with limited concurrency (max 2 in flight at once),
+  /// preserving order. Each downsampled thumbnail is ~400px, but capping
+  /// concurrency keeps peak memory well under the WidgetKit extension's
+  /// ~30 MB limit even while a download/decode is briefly in progress.
   private func loadThumbnails(_ spots: [NearbySpot]) async -> [UIImage?] {
+    let maxConcurrent = 2
+    var result = [UIImage?](repeating: nil, count: spots.count)
+
     await withTaskGroup(of: (Int, UIImage?).self) { group in
-      for (i, spot) in spots.enumerated() {
-        group.addTask { (i, await loadImage(spot.thumbnail)) }
+      var nextIndex = 0
+
+      // Prime the group with the first batch.
+      while nextIndex < spots.count && nextIndex < maxConcurrent {
+        let i = nextIndex
+        group.addTask { (i, await loadImage(spots[i].thumbnail)) }
+        nextIndex += 1
       }
-      var result = [UIImage?](repeating: nil, count: spots.count)
-      for await (i, img) in group { result[i] = img }
-      return result
+
+      // As each task finishes, record its result and start the next one.
+      while let (i, img) = await group.next() {
+        result[i] = img
+        if nextIndex < spots.count {
+          let next = nextIndex
+          group.addTask { (next, await loadImage(spots[next].thumbnail)) }
+          nextIndex += 1
+        }
+      }
     }
+
+    return result
   }
 }
 
