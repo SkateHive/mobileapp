@@ -1,6 +1,6 @@
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   Keyboard,
@@ -21,28 +21,13 @@ import { Button } from "~/components/ui/button";
 import { Text } from "~/components/ui/text";
 import { RecentMediaGallery } from "~/components/ui/RecentMediaGallery";
 import { useAuth } from "~/lib/auth-provider";
-import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "~/lib/toast-provider";
 import { CreateSpectatorInfo } from "~/components/SpectatorMode/CreateSpectatorInfo";
-import {
-  uploadVideoToWorker,
-  createVideoIframe,
-} from "~/lib/upload/video-upload";
-import {
-  uploadImageToHive,
-  uploadImageViaUserbase,
-  createImageMarkdown,
-} from "~/lib/upload/image-upload";
-import { canPost, isUserbaseSession, postComment } from "~/lib/posting";
-import {
-  SNAPS_CONTAINER_AUTHOR,
-  COMMUNITY_TAG,
-  getLastSnapsContainer,
-} from "~/lib/hive-utils";
+import { canPost } from "~/lib/posting";
+import { COMMUNITY_TAG } from "~/lib/hive-utils";
 import { theme } from "~/lib/theme";
 import * as SecureStore from "expo-secure-store";
 import {
-  crossPostToInstagram,
   getIgHandle,
   setIgHandle,
   getHivePower,
@@ -53,24 +38,33 @@ import {
 } from "~/lib/instagram";
 import { InstagramHandleModal } from "~/components/Instagram/InstagramHandleModal";
 import { VideoCoverPicker } from "~/components/create/VideoCoverPicker";
-import { WEB_BASE_URL } from "~/lib/constants";
+import { isJobActive } from "~/lib/upload/upload-job";
+import { enqueue, UploadBusyError, useUploadJob } from "~/lib/upload/upload-store";
 
 export default function CreatePost() {
   const { username, session } = useAuth();
-  const queryClient = useQueryClient();
   const { showToast } = useToast();
+  // The job lives in the upload store; the screen only needs to know whether
+  // Share is allowed. A failed job blocks too: there is no second slot.
+  const uploadJob = useUploadJob();
+  const jobBlocksShare = isJobActive(uploadJob) || uploadJob?.status === "failed";
+  const shareHint = isJobActive(uploadJob)
+    ? "Wait for the current upload to finish"
+    : uploadJob?.status === "failed"
+      ? "Retry or discard the failed upload first"
+      : null;
+  // Ref-based lock: a second tap during the ~1s media copy must not enqueue
+  // twice, and state updates are too slow to prevent it.
+  const submitLock = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [content, setContent] = useState("");
   const [media, setMedia] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [mediaMimeType, setMediaMimeType] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [isSelectingMedia, setIsSelectingMedia] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [hasVideoInteraction, setHasVideoInteraction] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<string>("");
-  const [videoProgress, setVideoProgress] = useState<number>(0);
-  const [videoStage, setVideoStage] = useState<string>("");
   // Local file of the frame the author picked as the video's cover.
   const [coverUri, setCoverUri] = useState<string | null>(null);
   // Instagram caption, editable and separate from the Hive body. Only offered to
@@ -118,68 +112,6 @@ export default function CreatePost() {
       closeIgModal();
     }
   };
-
-  // Fire-and-forget cross-post to @skatehive on Instagram for eligible posts:
-  // classic Hive-key account, >=100 HP, posting to the main snaps feed, with
-  // media. The server re-checks HP/limits authoritatively; this only avoids a
-  // doomed request and drives the first-time handle prompt.
-  const maybeCrossPostToInstagram = async (args: {
-    author: string;
-    permlink: string;
-    parentAuthor: string;
-    body: string;
-    tags: string[];
-    imageUrl?: string;
-    videoUrl?: string;
-    caption?: string;
-  }) => {
-    try {
-      // Read the account-wide setting again at the last moment. The state below
-      // can be one screen out of date — the user may have turned it off in
-      // Profile after this composer already had its media — and publishing to
-      // Instagram against an explicit "no" is not a mistake worth risking.
-      if (!igCrossPost || !(await isCrossPostEnabled())) return;
-      if (!session || !eligibleForCrosspost(session)) return; // classic-key only
-      if (args.parentAuthor !== SNAPS_CONTAINER_AUTHOR) return; // main feed only
-      if (!args.imageUrl && !args.videoUrl) return; // needs media
-      if ((await getHivePower(args.author)) < MIN_HP_TO_CROSSPOST) return;
-
-      // First-time prompt: if no handle is stored and we haven't asked before.
-      const { source } = await getIgHandle(session);
-      if (source === null) {
-        const alreadyPrompted = await SecureStore.getItemAsync(IG_PROMPTED_KEY);
-        if (!alreadyPrompted) {
-          await SecureStore.setItemAsync(IG_PROMPTED_KEY, "1");
-          await promptForIgHandle();
-        }
-      }
-
-      // Best-effort, fire-and-forget. The snap already posted successfully, so
-      // we only celebrate a CONFIRMED Instagram publish and stay quiet
-      // otherwise: a Reel can take longer than this request waits (it may still
-      // publish server-side after we'd have timed out), so a failure/timeout
-      // here is NOT a reliable signal and must never show the user a red error.
-      crossPostToInstagram(session, {
-        permlink: args.permlink,
-        body: args.body,
-        tags: args.tags,
-        imageUrl: args.imageUrl,
-        videoUrl: args.videoUrl,
-        caption: args.caption,
-        permalinkUrl: `${WEB_BASE_URL}/post/${args.author}/${args.permlink}`,
-      })
-        .then(() => showToast("Shared to Instagram", "success"))
-        .catch((e) => {
-          console.warn(
-            "[instagram] cross-post unconfirmed:",
-            e instanceof Error ? e.message : e
-          );
-        });
-    } catch {
-      // Never block the post flow on cross-post setup.
-    }
-  };
-
 
   const pickMedia = async () => {
     try {
@@ -343,214 +275,71 @@ export default function CreatePost() {
   };
 
   const handlePost = async () => {
+    if (submitLock.current) return;
+
     if (!content.trim() && !media) {
-      Alert.alert(
-        "Validation Error",
-        "Please add some content or media to your post"
-      );
+      Alert.alert("Validation Error", "Please add some content or media to your post");
       return;
     }
 
-    // Check if user is authenticated. Email (userbase) accounts are
-    // server-custody and have no local decryptedKey, so gate on canPost()
-    // rather than the presence of a local key.
+    // Email (userbase) accounts are server-custody and have no local
+    // decryptedKey, so gate on canPost() rather than the presence of a key.
     if (!username || username === "SPECTATOR" || !session || !canPost(session)) {
       Alert.alert("Authentication Required", "Please log in to create a post");
       return;
     }
 
-    setIsUploading(true);
+    // The button is disabled in this state; this guards a stale press.
+    if (jobBlocksShare) return;
+
+    submitLock.current = true;
+    setIsSubmitting(true);
     setErrorMessage(null);
-    setUploadProgress("");
-    setVideoProgress(0);
-    setVideoStage("");
 
     try {
-      let postBody = content;
-      // Uploaded photos plus any video poster frame — becomes json_metadata.images.
-      let imageUrls: string[] = [];
-      // Public media URLs for an optional Instagram cross-post.
-      let igImageUrl: string | undefined;
-      let igVideoUrl: string | undefined;
+      const hasMedia = !!(media && mediaType && mediaMimeType);
 
-      // Handle media upload
-      if (media && mediaType && mediaMimeType) {
-        const fileName =
-          media.split("/").pop() ||
-          `${Date.now()}.${mediaType === "image" ? "jpg" : "mp4"}`;
-
-        if (mediaType === "image") {
-          setUploadProgress("Uploading image...");
-
-          try {
-            // Email (userbase) accounts have no local key to sign the Hive
-            // image challenge, so the server signs + uploads on their behalf.
-            const imageResult = isUserbaseSession(session)
-              ? await uploadImageViaUserbase(
-                  media,
-                  fileName,
-                  mediaMimeType,
-                  session.userbaseToken!
-                )
-              : await uploadImageToHive(media, fileName, mediaMimeType, {
-                  username,
-                  privateKey: session.decryptedKey,
-                });
-
-            imageUrls.push(imageResult.url);
-            igImageUrl = imageResult.url;
-
-            // Add image to post body
-            const imageMarkdown = createImageMarkdown(
-              imageResult.url,
-              "Uploaded image"
-            );
-            postBody += postBody ? `\n\n${imageMarkdown}` : imageMarkdown;
-          } catch (imageError) {
-            console.error("Image upload failed:", imageError);
-            throw new Error("Failed to upload image. Please try again.");
-          }
-        } else if (mediaType === "video") {
-          setUploadProgress("Uploading video...");
-          setVideoProgress(0);
-          setVideoStage('receiving');
-
-          try {
-            // Upload the author's chosen frame first: the worker prefers a
-            // supplied cover over extracting its own, so the choice sticks and
-            // the server skips an ffmpeg pass. Best-effort — if it fails we fall
-            // back to the frame the worker picks.
-            let coverUrl: string | undefined;
-            if (coverUri) {
-              setUploadProgress("Uploading cover...");
-              try {
-                const cover = isUserbaseSession(session)
-                  ? await uploadImageViaUserbase(
-                      coverUri,
-                      "cover.jpg",
-                      "image/jpeg",
-                      session.userbaseToken!
-                    )
-                  : await uploadImageToHive(coverUri, "cover.jpg", "image/jpeg", {
-                      username,
-                      privateKey: session.decryptedKey,
-                    });
-                coverUrl = cover.url;
-              } catch (coverError) {
-                console.warn("Cover upload failed, using the worker's frame:", coverError);
-              }
-              setUploadProgress("Uploading video...");
+      // Instagram decision, resolved here because the prompt is UI and the
+      // runner has none. The parent-author check happens in the runner.
+      let crossPost = false;
+      if (hasMedia && igCrossPost) {
+        try {
+          crossPost =
+            (await isCrossPostEnabled()) &&
+            eligibleForCrosspost(session) &&
+            (await getHivePower(username)) >= MIN_HP_TO_CROSSPOST;
+        } catch {
+          crossPost = false; // never block the post on cross-post setup
+        }
+      }
+      if (crossPost) {
+        try {
+          const { source } = await getIgHandle(session);
+          if (source === null) {
+            const alreadyPrompted = await SecureStore.getItemAsync(IG_PROMPTED_KEY);
+            if (!alreadyPrompted) {
+              await SecureStore.setItemAsync(IG_PROMPTED_KEY, "1");
+              await promptForIgHandle();
             }
-
-            const videoResult = await uploadVideoToWorker(
-              media,
-              fileName,
-              mediaMimeType,
-              {
-                creator: username,
-                thumbnailUrl: coverUrl,
-                onProgress: (progress, stage) => {
-                  setVideoProgress(progress);
-                  setVideoStage(stage);
-                  const stageLabels: Record<string, string> = {
-                    receiving: 'Sending to server...',
-                    transcoding: 'Transcoding video...',
-                    optimized: 'Video already optimized!',
-                    uploading: 'Uploading to IPFS...',
-                    complete: 'Done!',
-                    error: 'Error',
-                  };
-                  setUploadProgress(stageLabels[stage] || `Processing... ${progress}%`);
-                },
-              }
-            );
-
-            igVideoUrl = videoResult.gatewayUrl;
-
-            // The poster is what the profile grid renders before the ~5MB clip
-            // downloads, and what Instagram uses as the Reel cover. The author's
-            // frame wins; the worker's own extraction is the fallback.
-            const poster = coverUrl ?? videoResult.thumbnailUrl;
-            if (poster) {
-              imageUrls.push(poster);
-              igImageUrl = poster;
-            }
-
-            // Add video iframe to post body
-            const videoIframe = createVideoIframe(
-              videoResult.gatewayUrl,
-              "Video"
-            );
-            postBody += postBody ? `\n\n${videoIframe}` : videoIframe;
-          } catch (videoError) {
-            console.error("Video upload failed:", videoError);
-            throw new Error("Failed to upload video. Please try again.");
           }
+        } catch {
+          // The handle is optional; the server builds a caption without it.
         }
       }
 
-      setUploadProgress("Preparing post for blockchain...");
-
-      // Get the latest snaps container for microblog posting
-      let parentAuthor = "";
-      let parentPermlink = COMMUNITY_TAG; // Default fallback
-
-      try {
-        setUploadProgress("Fetching snaps container...");
-        const snapsContainer = await getLastSnapsContainer();
-        parentAuthor = snapsContainer.author;
-        parentPermlink = snapsContainer.permlink;
-      } catch (error) {
-        console.warn(
-          "Failed to get snaps container, using community fallback:",
-          error
-        );
-        // Keep default values
-      }
-
-      // Build tags + metadata (community tag plus any hashtags in the body).
-      const bodyHashtags = (postBody.match(/#(\w+)/g) || []).map((h) =>
-        h.slice(1)
-      );
-      const tags = [COMMUNITY_TAG, ...bodyHashtags].filter(
-        (tag, index, array) => array.indexOf(tag) === index
-      );
-      const permlink = `sh-${new Date()
-        .toISOString()
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .toLowerCase()
-        .substring(0, 15)}`;
-
-      // Post to blockchain via the unified seam: userbase (email) accounts are
-      // signed server-side via bearer token; classic key accounts sign locally.
-      await postComment(session, {
-        parentAuthor,
-        parentPermlink,
-        body: postBody,
-        permlink,
-        jsonMetadata: {
-          app: "mycommunity-mobile",
-          tags,
-          ...(imageUrls.length > 0 && { images: imageUrls }),
+      await enqueue(
+        {
+          caption: content,
+          mediaKind: hasMedia ? mediaType : null,
+          mediaUri: hasMedia ? media : null,
+          mime: hasMedia ? mediaMimeType : null,
+          coverUri: mediaType === "video" ? coverUri : null,
+          igCaption: igCaption.trim(),
+          crossPostToInstagram: crossPost,
+          communityTag: COMMUNITY_TAG,
         },
-      });
-
-      // Success
-      showToast("Posted Successfully", "success");
-
-      // Optional Instagram cross-post (eligible classic-key accounts). Does its
-      // own eligibility checks; publish runs in the background. May show the
-      // first-time handle prompt before navigating away.
-      await maybeCrossPostToInstagram({
-        author: username,
-        permlink,
-        parentAuthor,
-        body: postBody,
-        tags,
-        imageUrl: igImageUrl,
-        videoUrl: igVideoUrl,
-        caption: igCaption.trim() || undefined,
-      });
+        session,
+      );
 
       // Clear form
       setContent("");
@@ -560,21 +349,20 @@ export default function CreatePost() {
       setMediaType(null);
       setMediaMimeType(null);
 
-      // Invalidate queries to refresh feed data
-      queryClient.invalidateQueries({ queryKey: ["feed"] });
-      queryClient.invalidateQueries({ queryKey: ["userFeed", username] });
-
-      // Navigate to feed
+      // The pill takes it from here.
       router.push("/(tabs)/feed");
     } catch (error) {
       const errorMsg =
-        error instanceof Error ? error.message : "An unknown error occurred";
+        error instanceof UploadBusyError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Could not start the upload";
       setErrorMessage(errorMsg);
-      Alert.alert("Error", errorMsg);
-      console.error("Post error:", error);
+      console.error("Enqueue error:", error);
     } finally {
-      setIsUploading(false);
-      setUploadProgress("");
+      submitLock.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -603,25 +391,12 @@ export default function CreatePost() {
               />
             </View>
 
-            {/* Upload Progress */}
-            {uploadProgress ? (
-              <View style={styles.progressCard}>
-                <Text style={styles.progressText}>{uploadProgress}</Text>
-                {mediaType === 'video' && videoProgress > 0 && (
-                  <View style={styles.progressBarContainer}>
-                    <View style={[styles.progressBarFill, { width: `${Math.min(videoProgress, 100)}%` }]} />
-                    <Text style={styles.progressPercent}>{videoProgress}%</Text>
-                  </View>
-                )}
-              </View>
-            ) : null}
-
             {/* Action Bar */}
             <View style={styles.actionBar}>
               <Pressable
                 onPress={pickMedia}
                 style={styles.mediaButton}
-                disabled={isUploading || isSelectingMedia}
+                disabled={isSubmitting || isSelectingMedia}
               >
                 {isSelectingMedia ? (
                   <>
@@ -677,7 +452,7 @@ export default function CreatePost() {
                   <Pressable
                     onPress={removeMedia}
                     style={styles.removeButton}
-                    disabled={isUploading}
+                    disabled={isSubmitting}
                   >
                     <Ionicons name="close" size={20} color="white" />
                   </Pressable>
@@ -687,7 +462,7 @@ export default function CreatePost() {
                   <VideoCoverPicker
                     videoUri={media}
                     onSelect={setCoverUri}
-                    disabled={isUploading}
+                    disabled={isSubmitting}
                   />
                 )}
 
@@ -710,7 +485,7 @@ export default function CreatePost() {
                       <Switch
                         value={igCrossPost}
                         onValueChange={setIgCrossPost}
-                        disabled={isUploading}
+                        disabled={isSubmitting}
                         trackColor={{
                           false: theme.colors.border,
                           true: theme.colors.primary,
@@ -729,7 +504,7 @@ export default function CreatePost() {
                           placeholderTextColor={theme.colors.muted}
                           multiline
                           maxLength={2200}
-                          editable={!isUploading}
+                          editable={!isSubmitting}
                         />
                       </>
                     )}
@@ -739,15 +514,16 @@ export default function CreatePost() {
             )}
 
             {/* Publishing last, after the cover and caption the author may still
-                be adjusting. */}
+                be adjusting. Disabled while another job holds the single slot. */}
             <Button
               onPress={handlePost}
-              disabled={(!content.trim() && !media) || isUploading}
+              disabled={(!content.trim() && !media) || isSubmitting || jobBlocksShare}
             >
               <Text style={styles.shareButtonText}>
-                {isUploading ? "Publishing..." : "Share"}
+                {isSubmitting ? "Sharing…" : "Share"}
               </Text>
             </Button>
+            {shareHint ? <Text style={styles.shareHint}>{shareHint}</Text> : null}
 
             {/* Error Message */}
             {errorMessage && (
@@ -805,40 +581,13 @@ const styles = StyleSheet.create({
     minHeight: 96,
     textAlignVertical: "top",
   },
-  progressCard: {
-    backgroundColor: theme.colors.card,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.sm,
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.xs,
-  },
-  progressText: {
-    fontSize: theme.fontSizes.sm,
-    color: theme.colors.gray,
+  shareHint: {
+    color: theme.colors.muted,
+    fontSize: theme.fontSizes.xs,
     fontFamily: theme.fonts.default,
-  },
-  progressBarContainer: {
-    height: 6,
-    backgroundColor: theme.colors.border,
-    borderRadius: 3,
+    textAlign: "center",
     marginTop: theme.spacing.xs,
-    overflow: 'hidden' as const,
-    position: 'relative' as const,
-  },
-  progressBarFill: {
-    height: '100%' as any,
-    backgroundColor: theme.colors.primary,
-    borderRadius: 3,
-  },
-  progressPercent: {
-    position: 'absolute' as const,
-    right: 0,
-    top: -16,
-    fontSize: 10,
-    color: theme.colors.primary,
-    fontFamily: theme.fonts.default,
+    marginHorizontal: theme.spacing.md,
   },
   actionBar: {
     flexDirection: "row",

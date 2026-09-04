@@ -11,6 +11,7 @@ import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
 import { NotificationProvider } from '~/lib/notifications-context';
 import { SoftPostProvider } from '~/lib/userbase/soft-post-context';
+import { UploadProvider } from '~/lib/upload/upload-provider';
 import { useSpotWidgetSync } from '~/lib/hooks/useSpotWidgetSync';
 import { theme } from '~/lib/theme';
 
@@ -110,6 +111,7 @@ export default function RootLayout() {
         <NavigationGuard>
           <NotificationProvider>
             <ToastProvider>
+              <UploadProvider>
               <SoftPostProvider>
               <SafeAreaProvider>
                   <ActivityWrapper>
@@ -215,6 +217,7 @@ export default function RootLayout() {
                   </ActivityWrapper>
                 </SafeAreaProvider>
               </SoftPostProvider>
+              </UploadProvider>
             </ToastProvider>
           </NotificationProvider>
         </NavigationGuard>
