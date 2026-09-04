@@ -42,10 +42,9 @@ import { canPost } from "~/lib/posting";
 import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
-import { GridVideoTile } from "~/components/Profile/GridVideoTile";
+import { GridVideoTile, createTileVisibility } from "~/components/Profile/GridVideoTile";
 import { ProfileHeader } from "~/components/Profile/ProfileHeader";
 import { setViewerPayload, updateViewerPosts } from "~/lib/viewer-store";
-import { useIsFocused } from "@react-navigation/native";
 import { ActionSheet, type ActionSheetItem } from "~/components/ui/ActionSheet";
 
 const GRID_COLS = 3;
@@ -91,7 +90,6 @@ export default function ProfileScreen() {
     useAuth();
   const { showToast } = useToast();
   const params = useLocalSearchParams();
-  const isFocused = useIsFocused();
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
@@ -121,9 +119,12 @@ export default function ProfileScreen() {
   // A lite account's picture comes from SkateHive's own server: it has no Hive
   // account, so images.hive.blog 404s for its handle.
   const [liteAvatar, setLiteAvatar] = useState<string | null>(null);
-  // Only needed by poster-less video tiles, which fall back to a real player —
-  // gating on visibility keeps offscreen clips from decoding.
-  const [visibleGridItems, setVisibleGridItems] = useState<Set<string>>(new Set());
+  // Which tiles are on screen, for the one clip that plays inline. Kept out of
+  // state on purpose: as state it re-created renderGridItem on every scroll
+  // tick, which re-rendered every tile in the window (see GridVideoTile).
+  const tileVisibility = useRef(createTileVisibility()).current;
+  // Measured height of the profile header above the grid, for getItemLayout.
+  const gridHeaderHeightRef = useRef(0);
   // Budget for automatic page fetches that fill the grid (see auto-fill effect)
   const autoFillPagesRef = useRef(0);
 
@@ -132,7 +133,7 @@ export default function ProfileScreen() {
       const permlinks = viewableItems
         .filter(item => item.isViewable && item.item)
         .map(item => item.item.permlink);
-      setVisibleGridItems(new Set(permlinks));
+      tileVisibility.update(permlinks);
     }
   ).current;
 
@@ -299,25 +300,50 @@ export default function ProfileScreen() {
   // Render grid item
   const tileSize = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
+  // Every row is a square tile plus the row gap, so the list never has to
+  // measure cells and can place the render window exactly. The header sits in
+  // the same content container, so offsets start after it (and its gap).
+  const getGridItemLayout = useCallback(
+    (_: any, rowIndex: number) => ({
+      length: tileSize,
+      offset: gridHeaderHeightRef.current + GRID_GAP + rowIndex * (tileSize + GRID_GAP),
+      index: rowIndex,
+    }),
+    [tileSize]
+  );
+
+  // The one clip that plays inline in the grid; every other video is a still.
+  const firstVideoPermlink = useMemo(() => {
+    const first = gridPosts.find(
+      (p: any) => p?.body && extractMediaFromBody(p.body).some((m: any) => m.type === 'video')
+    );
+    return first?.permlink ?? null;
+  }, [gridPosts]);
+
+  // Tapping any tile opens the immersive post viewer at that post. The list
+  // goes through the store because route params can only carry strings, and
+  // this is a loaded page of posts plus the callback that fetches the next.
+  // Read through a ref so the handler stays the same function across pages
+  // and the memoized tiles don't re-render every time one loads.
+  const gridStateRef = useRef({ gridPosts, hasMore, loadNextPage });
+  gridStateRef.current = { gridPosts, hasMore, loadNextPage };
+  const openViewerAt = useCallback((index: number) => {
+    const { gridPosts, hasMore, loadNextPage } = gridStateRef.current;
+    setViewerPayload({
+      posts: gridPosts,
+      initialIndex: index,
+      hasMore,
+      onLoadMore: loadNextPage,
+    });
+    router.push('/post-viewer');
+  }, []);
+
   const renderGridItem = useCallback(({ item, index }: { item: any; index: number }) => {
     if (!item?.body) {
       return <View style={[styles.gridTile, { width: tileSize, height: tileSize }]} />;
     }
     const media = extractMediaFromBody(item.body);
     const videoMedia = media.find((m: any) => m.type === 'video');
-
-    // Tapping any tile opens the immersive post viewer at that post. The list
-    // goes through the store because route params can only carry strings, and
-    // this is a loaded page of posts plus the callback that fetches the next.
-    const openViewer = () => {
-      setViewerPayload({
-        posts: gridPosts,
-        initialIndex: index,
-        hasMore,
-        onLoadMore: loadNextPage,
-      });
-      router.push('/post-viewer');
-    };
 
     // Earnings, bottom-left: the video badge already owns the other corner.
     // Hidden at zero — a grid of $0.00 makes a profile look dead. Bare text,
@@ -339,20 +365,20 @@ export default function ProfileScreen() {
         </View>
       ) : null;
 
-    // Video posts show their poster frame; the clip plays in the viewer. Clips
-    // without a poster keep the old inline player (see GridVideoTile).
+    // Video posts show a still (their poster, or a frame extracted locally);
+    // only the first video in the grid plays inline (see GridVideoTile).
     if (videoMedia) {
       return (
         <View>
           <GridVideoTile
+            permlink={item.permlink}
             videoUrl={videoMedia.url}
             thumbnailUrl={getPostThumbnail(item)}
             size={tileSize}
-            // Poster-less tiles fall back to a real player. Stop them whenever
-            // this screen isn't the one in front — the viewer covers it now,
-            // and a tab switch used to leave them decoding too.
-            isVisible={isFocused && visibleGridItems.has(item.permlink)}
-            onPress={openViewer}
+            index={index}
+            onPress={openViewerAt}
+            autoplay={item.permlink === firstVideoPermlink}
+            visibility={tileVisibility}
           />
           {earnings}
         </View>
@@ -364,13 +390,14 @@ export default function ProfileScreen() {
     return (
       <Pressable
         style={[styles.gridTile, { width: tileSize, height: tileSize }]}
-        onPress={openViewer}
+        onPress={() => openViewerAt(index)}
       >
         {thumb ? (
           <Image
             source={{ uri: thumb }}
             style={styles.gridImage}
             contentFit="cover"
+            recyclingKey={item.permlink}
           />
         ) : (
           <View style={styles.gridPlaceholder}>
@@ -380,7 +407,7 @@ export default function ProfileScreen() {
         {earnings}
       </Pressable>
     );
-  }, [tileSize, getPostThumbnail, visibleGridItems, isFocused, gridPosts, hasMore, loadNextPage]);
+  }, [tileSize, getPostThumbnail, firstVideoPermlink, tileVisibility, openViewerAt]);
 
   const handleLogout = async () => {
     try {
@@ -826,7 +853,12 @@ export default function ProfileScreen() {
           keyExtractor={(item) => item.permlink}
           numColumns={GRID_COLS}
           columnWrapperStyle={{ gap: GRID_GAP }}
-          ListHeaderComponent={renderProfileHeader}
+          ListHeaderComponent={
+            <View onLayout={(e) => { gridHeaderHeightRef.current = e.nativeEvent.layout.height; }}>
+              {renderProfileHeader()}
+            </View>
+          }
+          getItemLayout={getGridItemLayout}
           ListFooterComponent={
             isLoadingPosts ? (
               <GridSkeleton tileSize={tileSize} />
