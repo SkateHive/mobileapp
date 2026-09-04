@@ -52,7 +52,10 @@ export function syncSpotWidget(userLoc: UserLoc, spots: SpotmapRow[]): void {
       // Only surface a real Hive author; curated KML spots render as "Curated".
       author: s.source === "hive" ? s.hive_author ?? null : null,
       source: s.source,
-      thumbnail: s.thumbnail ?? null,
+      // Prefer the pre-resized thumbnail when the API provides one — the
+      // widget downsamples anyway, but starting from a smaller download
+      // saves bandwidth and decode time under the extension's memory limit.
+      thumbnail: s.thumbnail_small ?? s.thumbnail ?? null,
       href: spotHref(s),
     })),
   };

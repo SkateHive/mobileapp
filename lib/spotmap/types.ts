@@ -20,6 +20,10 @@ export interface SpotmapRow {
   lng: number;
   address?: string | null;
   thumbnail?: string | null;
+  /** Pre-resized thumbnail variant, when the API provides one — preferred over
+   * `thumbnail` (the full-size image) wherever a small preview is needed, e.g.
+   * the widget's downsampled spot photos. */
+  thumbnail_small?: string | null;
   images?: SpotImage[] | null;
   hive_author?: string | null; // 'skatehive-map' for KML
   hive_permlink?: string | null; // row uuid for KML
