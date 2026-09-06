@@ -142,11 +142,19 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
       if (userbase && session?.userbaseToken) {
         const unreadIds = crosspostNotifications.filter(n => n.read_at === null).map(n => n.id);
         if (unreadIds.length > 0) {
-          await markUserbaseNotificationsRead(session.userbaseToken, unreadIds);
-          const now = new Date().toISOString();
-          setCrosspostNotifications(prev =>
-            prev.map(n => (n.read_at === null ? { ...n, read_at: now } : n))
-          );
+          // Own try/catch: a 404 (route not deployed yet) or network error here
+          // must not stop the Hive mark-read above from having completed, and
+          // must not surface as a failure toast for something the user didn't
+          // even see fail.
+          try {
+            await markUserbaseNotificationsRead(session.userbaseToken, unreadIds);
+            const now = new Date().toISOString();
+            setCrosspostNotifications(prev =>
+              prev.map(n => (n.read_at === null ? { ...n, read_at: now } : n))
+            );
+          } catch (err) {
+            console.warn('Error marking curation-queue notifications as read:', err);
+          }
         }
       }
     } catch (err) {

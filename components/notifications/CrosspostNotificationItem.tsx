@@ -79,12 +79,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#333",
+    borderBottomColor: theme.colors.border,
     alignItems: "flex-start",
     position: "relative",
   },
   pressed: {
-    backgroundColor: "#111",
+    backgroundColor: theme.colors.secondaryCard,
   },
   unreadIndicator: {
     position: "absolute",
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#ff0000",
+    backgroundColor: theme.colors.danger,
     zIndex: 1,
   },
   iconContainer: {

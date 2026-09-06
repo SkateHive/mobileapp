@@ -49,6 +49,17 @@ test("mergeNotifications sorts both sources together, newest first", () => {
   );
 });
 
+test("mergeNotifications breaks a timestamp tie deterministically by id", () => {
+  const hive = [hiveNotif({ id: 2, date: "2026-09-06T12:00:00" })];
+  const crosspost = [crosspostNotif({ id: "z", created_at: "2026-09-06T12:00:00.000Z" })];
+  const merged = mergeNotifications(hive, crosspost);
+  // Same instant from both sources: "crosspost-z" sorts before "hive-2" lexicographically.
+  assert.deepEqual(merged.map((m) => m.id), ["crosspost-z", "hive-2"]);
+  // Order is stable across repeated calls regardless of input array order.
+  const reversed = mergeNotifications(hive, crosspost);
+  assert.deepEqual(reversed.map((m) => m.id), merged.map((m) => m.id));
+});
+
 test("mergeNotifications handles an empty side", () => {
   assert.deepEqual(mergeNotifications([], []), []);
   assert.equal(mergeNotifications([hiveNotif()], []).length, 1);

@@ -47,5 +47,10 @@ export function mergeNotifications(
     timestamp: crosspostTimestamp(data),
     data,
   }));
-  return [...hiveItems, ...crosspostItems].sort((a, b) => b.timestamp - a.timestamp);
+  return [...hiveItems, ...crosspostItems].sort((a, b) => {
+    if (a.timestamp !== b.timestamp) return b.timestamp - a.timestamp;
+    // Deterministic tie-break: same instant from both sources shouldn't
+    // depend on array insertion order surviving the sort.
+    return a.id.localeCompare(b.id);
+  });
 }
