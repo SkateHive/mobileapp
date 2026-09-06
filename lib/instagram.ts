@@ -112,11 +112,53 @@ export interface CrossPostArgs {
   permalinkUrl: string;
 }
 
-/** Cross-post an already-broadcast snap to @skatehive on Instagram. Throws on failure. */
+export interface CrossPostResult {
+  /** "pending_review" once the portal queue is live; absent for an old-style direct publish. */
+  status?: string;
+  queue_id?: string;
+  ig_permalink?: string;
+  deduped?: boolean;
+}
+
+/** Thrown by crossPostToInstagram on a non-2xx response; `status` is the HTTP code. */
+export class CrossPostError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "CrossPostError";
+    this.status = status;
+  }
+}
+
+/**
+ * Copy for a failed cross-post request, keyed by HTTP status. Shown as a toast —
+ * the Hive post itself already succeeded, this only reports the Instagram side.
+ */
+export function crossPostErrorMessage(status: number): string {
+  switch (status) {
+    case 403:
+      return "Needs 100 HP to cross-post";
+    case 429:
+      return "Daily Instagram limit reached";
+    case 409:
+      return "Already sent to curation";
+    case 503:
+      return "Media not reachable yet";
+    default:
+      return "Instagram curation request failed";
+  }
+}
+
+/**
+ * Cross-post an already-broadcast snap to @skatehive on Instagram. The server
+ * enqueues it for the portal's review queue rather than publishing directly —
+ * a 202 with status "pending_review" is the normal success response,
+ * indistinguishable in shape from a 200. Throws CrossPostError on 4xx/5xx.
+ */
 export async function crossPostToInstagram(
   session: AuthSession,
   args: CrossPostArgs
-): Promise<{ ig_permalink?: string; deduped?: boolean }> {
+): Promise<CrossPostResult> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const payload: Record<string, unknown> = {
     hive_author: session.username,
@@ -145,8 +187,10 @@ export async function crossPostToInstagram(
     headers,
     body: JSON.stringify(payload),
   });
-  const data = (await res.json().catch(() => ({}))) as { error?: string; ig_permalink?: string; deduped?: boolean };
-  if (!res.ok) throw new Error(data?.error || `Cross-post failed (${res.status})`);
+  const data = (await res.json().catch(() => ({}))) as CrossPostResult & { error?: string };
+  // res.ok covers the whole 2xx range, so a 202 pending_review is handled the
+  // same as an old-style 200 direct publish — both are success.
+  if (!res.ok) throw new CrossPostError(data?.error || crossPostErrorMessage(res.status), res.status);
   return data;
 }
 

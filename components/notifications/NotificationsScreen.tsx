@@ -3,12 +3,13 @@ import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'r
 import { useNotifications } from '~/lib/hooks/useNotifications';
 import { useNotificationContext } from '~/lib/notifications-context';
 import { NotificationItem } from './NotificationItem';
+import { CrosspostNotificationItem } from './CrosspostNotificationItem';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { theme } from '~/lib/theme';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
-import type { HiveNotification } from '~/lib/types';
+import type { UnifiedNotification } from '~/lib/notifications/merge';
 
 export const NotificationsScreen = React.memo(() => {
   const { username } = useAuth();
@@ -120,12 +121,19 @@ export const NotificationsScreen = React.memo(() => {
     );
   };
 
+  const renderUnifiedItem = ({ item }: { item: UnifiedNotification }) =>
+    item.kind === 'hive' ? (
+      <NotificationItem notification={item.data} />
+    ) : (
+      <CrosspostNotificationItem notification={item.data} />
+    );
+
   return (
     <View style={styles.container}>
       <FlatList
         data={notifications}
-        keyExtractor={(item, index) => `notification-${item.id}-${index}`}
-        renderItem={({ item }) => <NotificationItem notification={item} />}
+        keyExtractor={(item) => item.id}
+        renderItem={renderUnifiedItem}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyState}
         ListFooterComponent={renderFooter}

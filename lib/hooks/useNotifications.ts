@@ -1,10 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchAllNotifications, fetchNewNotifications, markNotificationsAsRead, HiveNotification } from '../hive-utils';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { fetchAllNotifications, markNotificationsAsRead } from '../hive-utils';
 import { useAuth } from '../auth-provider';
+import { isUserbaseSession } from '../posting';
+import {
+  getUserbaseNotifications,
+  markUserbaseNotificationsRead,
+  type UserbaseNotification,
+} from '../userbase/api';
+import { isUnreadNotification, mergeNotifications } from '../notifications/merge';
+import type { HiveNotification } from '../types';
 
 export function useNotifications(disableAutoRefresh: boolean = false) {
   const { session, username } = useAuth();
-  const [notifications, setNotifications] = useState<HiveNotification[]>([]);
+  const userbase = isUserbaseSession(session);
+  const [hiveNotifications, setHiveNotifications] = useState<HiveNotification[]>([]);
+  // Instagram curation-queue notifications (crosspost_queued/_rejected/_published/_failed).
+  // Fetched once per refresh, not paginated — see loadMoreNotifications.
+  const [crosspostNotifications, setCrosspostNotifications] = useState<UserbaseNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   // Ref so the interval callback always reads the latest value without causing interval recreation
@@ -16,13 +28,16 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
   const requestIdRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(0);
+  // Only the Hive side paginates by last_id today; a userbase account has far
+  // fewer curation-queue rows than a busy Hive account has votes/comments, so
+  // one page of 50 covers it and "load more" only extends the Hive list.
   const [hasMore, setHasMore] = useState(true);
 
   const fetchNotifications = useCallback(async (refresh: boolean = false) => {
     const requestId = ++requestIdRef.current;
-    // Email (userbase) accounts may have no on-chain Hive account yet → skip.
-    if (!username || username === 'SPECTATOR' || session?.kind === 'userbase') {
-      setNotifications([]);
+    if (!username || username === 'SPECTATOR') {
+      setHiveNotifications([]);
+      setCrosspostNotifications([]);
       // Say so, or the list stays armed for a next page that cannot exist and
       // the first scroll asks Hive about a handle it has never heard of (#61).
       setHasMore(false);
@@ -32,18 +47,33 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
     try {
       if (refresh) {
         setIsLoading(true);
-        setNotifications([]);
+        setHiveNotifications([]);
+        setCrosspostNotifications([]);
         setHasMore(true);
       }
-      
+
       setError(null);
-      const allNotifications = await fetchAllNotifications(username, 50); // Start with 50 notifications
+
+      // Email (userbase) accounts may have no on-chain Hive account yet, so
+      // the Hive side stays skipped for them, same as before (#61) — they get
+      // the curation-queue notifications instead. A key-only session has no
+      // bearer token, so it skips the curation-queue side.
+      const [hiveResult, crosspostResult] = await Promise.all([
+        userbase ? Promise.resolve<HiveNotification[]>([]) : fetchAllNotifications(username, 50),
+        userbase && session?.userbaseToken
+          ? getUserbaseNotifications(session.userbaseToken, { limit: 50 })
+              .then((r) => r.notifications ?? [])
+              .catch(() => [] as UserbaseNotification[])
+          : Promise.resolve<UserbaseNotification[]>([]),
+      ]);
       if (requestId !== requestIdRef.current) return;
-      setNotifications(allNotifications);
+      setHiveNotifications(hiveResult);
+      setCrosspostNotifications(crosspostResult);
       setLastRefresh(Date.now());
-      
-      // If we got less than 50, there might not be more
-      if (allNotifications.length < 50) {
+
+      // If Hive gave us less than a full page, there might not be more (the
+      // curation-queue side never paginates further regardless).
+      if (hiveResult.length < 50) {
         setHasMore(false);
       }
     } catch (err) {
@@ -53,16 +83,10 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, [username, session?.kind]);
+  }, [username, userbase, session?.userbaseToken]);
 
   const loadMoreNotifications = useCallback(async () => {
-    if (
-      !username ||
-      username === 'SPECTATOR' ||
-      session?.kind === 'userbase' ||
-      isLoadingMore ||
-      !hasMore
-    ) {
+    if (!username || username === 'SPECTATOR' || userbase || isLoadingMore || !hasMore) {
       return;
     }
 
@@ -71,9 +95,9 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
       isLoadingMoreRef.current = true;
       setIsLoadingMore(true);
       setError(null);
-      
+
       // Get the last notification ID for pagination
-      const lastId = notifications.length > 0 ? notifications[notifications.length - 1].id : undefined;
+      const lastId = hiveNotifications.length > 0 ? hiveNotifications[hiveNotifications.length - 1].id : undefined;
       const moreNotifications = await fetchAllNotifications(username, 50, lastId);
       if (requestId !== requestIdRef.current) return;
 
@@ -81,10 +105,10 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
         setHasMore(false);
       } else {
         // Filter out duplicates (in case of overlap)
-        const existingIds = new Set(notifications.map(n => n.id));
+        const existingIds = new Set(hiveNotifications.map(n => n.id));
         const newNotifications = moreNotifications.filter(n => !existingIds.has(n.id));
-        
-        setNotifications(prev => {
+
+        setHiveNotifications(prev => {
           const updated = [...prev, ...newNotifications];
           // Cap to 200 items to prevent unbounded memory growth on mobile
           return updated.length > 200 ? updated.slice(-200) : updated;
@@ -104,26 +128,32 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
         setIsLoadingMore(false);
       }
     }
-  }, [username, session?.kind, notifications, isLoadingMore, hasMore]);
+  }, [username, userbase, hiveNotifications, isLoadingMore, hasMore]);
 
   const markAsRead = useCallback(async () => {
-    if (!session || !session.decryptedKey || username === 'SPECTATOR') {
-      return;
-    }
+    if (username === 'SPECTATOR') return;
 
     try {
-      await markNotificationsAsRead(session.decryptedKey, username!);
-      
-      // Update all notifications to be marked as read
-      setNotifications(prev => prev.map(notification => ({
-        ...notification,
-        isRead: true
-      })));
+      if (session?.decryptedKey) {
+        await markNotificationsAsRead(session.decryptedKey, username!);
+        setHiveNotifications(prev => prev.map(notification => ({ ...notification, isRead: true })));
+      }
+
+      if (userbase && session?.userbaseToken) {
+        const unreadIds = crosspostNotifications.filter(n => n.read_at === null).map(n => n.id);
+        if (unreadIds.length > 0) {
+          await markUserbaseNotificationsRead(session.userbaseToken, unreadIds);
+          const now = new Date().toISOString();
+          setCrosspostNotifications(prev =>
+            prev.map(n => (n.read_at === null ? { ...n, read_at: now } : n))
+          );
+        }
+      }
     } catch (err) {
       console.error('Error marking notifications as read:', err);
       throw new Error('Failed to mark notifications as read');
     }
-  }, [session, username]);
+  }, [session, username, userbase, crosspostNotifications]);
 
   // Fetch notifications on mount and when username changes
   useEffect(() => {
@@ -145,8 +175,13 @@ export function useNotifications(disableAutoRefresh: boolean = false) {
     return () => clearInterval(interval);
   }, [fetchNotifications, username, disableAutoRefresh]);
 
+  const notifications = useMemo(
+    () => mergeNotifications(hiveNotifications, crosspostNotifications),
+    [hiveNotifications, crosspostNotifications]
+  );
+
   // Calculate unread count
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter(isUnreadNotification).length;
 
   return {
     notifications,

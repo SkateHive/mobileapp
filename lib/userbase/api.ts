@@ -96,6 +96,47 @@ export function logout(token: string): Promise<{ success: boolean }> {
   return postJson("/auth/logout", {}, token);
 }
 
+// Instagram curation-queue notifications (crosspost_queued / crosspost_rejected
+// / crosspost_published / crosspost_failed), merged client-side with Hive
+// notifications. Userbase-session accounts only — see useNotifications.
+
+export interface UserbaseNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  link: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface UserbaseNotificationsResult {
+  success: boolean;
+  notifications?: UserbaseNotification[];
+  error?: string;
+}
+export async function getUserbaseNotifications(
+  token: string,
+  opts?: { limit?: number; before?: string }
+): Promise<UserbaseNotificationsResult> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.before) params.set("before", opts.before);
+  const qs = params.toString();
+  const res = await fetch(`${BASE}/notifications${qs ? `?${qs}` : ""}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return (await res.json().catch(() => ({ success: false }))) as UserbaseNotificationsResult;
+}
+
+export function markUserbaseNotificationsRead(
+  token: string,
+  ids: string[]
+): Promise<{ success: boolean; error?: string }> {
+  return postJson("/notifications/read", { ids }, token);
+}
+
 export interface SoftPostOverlay {
   id: string;
   handle: string;

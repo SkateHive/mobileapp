@@ -479,7 +479,7 @@ export default function CreatePost() {
                           color={theme.colors.primary}
                         />
                         <Text style={styles.captionLabel}>
-                          ALSO POST TO INSTAGRAM
+                          Send to Instagram curation
                         </Text>
                       </View>
                       <Switch
@@ -493,6 +493,9 @@ export default function CreatePost() {
                         thumbColor={theme.colors.white}
                       />
                     </View>
+                    <Text style={styles.captionSubLabel}>
+                      A curator reviews it before it goes live
+                    </Text>
                     {igCrossPost && (
                       <>
                         <Text style={styles.captionSubLabel}>Caption</Text>

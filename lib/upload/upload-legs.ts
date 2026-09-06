@@ -4,7 +4,7 @@ import { File } from "expo-file-system";
 import type { AuthSession } from "~/lib/types";
 import { isUserbaseSession, postComment } from "~/lib/posting";
 import { COMMUNITY_TAG, HiveClient, SNAPS_CONTAINER_AUTHOR, getLastSnapsContainer } from "~/lib/hive-utils";
-import { crossPostToInstagram } from "~/lib/instagram";
+import { crossPostToInstagram, CrossPostError, crossPostErrorMessage } from "~/lib/instagram";
 import { WEB_BASE_URL } from "~/lib/constants";
 import { uploadImageToHive, uploadImageViaUserbase } from "./image-upload";
 import { isHiveNotFoundError } from "./hive-errors";
@@ -22,7 +22,10 @@ function assertOnDevice(uri: string, what: "video" | "image"): void {
   }
 }
 
-export function makeRunnerDeps(session: AuthSession): RunnerDeps {
+export function makeRunnerDeps(
+  session: AuthSession,
+  onCrossPostResult?: (ok: boolean, message: string) => void,
+): RunnerDeps {
   return {
     async uploadImage(uri, name, mime) {
       assertOnDevice(uri, "image");
@@ -80,16 +83,25 @@ export function makeRunnerDeps(session: AuthSession): RunnerDeps {
       await postComment(session, args);
     },
 
+    // Fire-and-forget from the runner's side (leg 4 never affects job state), but
+    // the user still needs to know: the Hive post is done either way, this only
+    // reports whether the Instagram side made it into the curation queue.
     async crossPost(args) {
-      await crossPostToInstagram(session, {
-        permlink: args.permlink,
-        body: args.body,
-        tags: args.tags,
-        imageUrl: args.imageUrl,
-        videoUrl: args.videoUrl,
-        caption: args.caption,
-        permalinkUrl: `${WEB_BASE_URL}/post/${session.username}/${args.permlink}`,
-      });
+      try {
+        await crossPostToInstagram(session, {
+          permlink: args.permlink,
+          body: args.body,
+          tags: args.tags,
+          imageUrl: args.imageUrl,
+          videoUrl: args.videoUrl,
+          caption: args.caption,
+          permalinkUrl: `${WEB_BASE_URL}/post/${session.username}/${args.permlink}`,
+        });
+        onCrossPostResult?.(true, "Sent to Instagram curation");
+      } catch (e) {
+        const message = e instanceof CrossPostError ? crossPostErrorMessage(e.status) : crossPostErrorMessage(0);
+        onCrossPostResult?.(false, message);
+      }
     },
 
     communityTag: COMMUNITY_TAG,

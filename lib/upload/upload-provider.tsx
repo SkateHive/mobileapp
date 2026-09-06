@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "~/lib/auth-provider";
+import { useToast } from "~/lib/toast-provider";
 import { canPost } from "~/lib/posting";
 import { isJobActive, type UploadEvent, type UploadJob } from "./upload-job";
 import { discard, dispatch, getJob, loadPersistedJob, subscribe } from "./upload-store";
@@ -28,6 +29,7 @@ function shouldAutoRetry(job: UploadJob): boolean {
 export function UploadProvider({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -78,7 +80,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       return dispatch(event);
     };
 
-    runUploadJob(job, makeRunnerDeps(s), emit)
+    const onCrossPostResult = (ok: boolean, message: string) => showToast(message, ok ? "success" : "error");
+
+    runUploadJob(job, makeRunnerDeps(s, onCrossPostResult), emit)
       .catch((err) => console.warn("[upload] runner threw", err))
       .finally(() => {
         if (runningJobId.current === job.id) runningJobId.current = null;
@@ -89,7 +93,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           startRunner(current);
         }
       });
-  }, []);
+  }, [showToast]);
 
   // Reacts to every store change: start the runner when a job becomes active
   // (enqueue, retry, resume), invalidate + schedule the clear on published.
