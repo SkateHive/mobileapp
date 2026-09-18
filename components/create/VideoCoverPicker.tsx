@@ -7,27 +7,17 @@ import { useVideoPlayer, type VideoThumbnail } from "expo-video";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { coverTimeAt, stripTimeAt } from "~/lib/video-cover";
 
 // Frames behind the cursor. They are a ruler, not the choice — the cover is
 // whatever instant the cursor lands on, extracted when the finger lifts.
 const STRIP_FRAMES = 10;
-// Skip the first and last tenth: those tend to be black frames or the rider
-// still setting up. The cursor's resting position is the 10% mark, where the
-// transcoder used to take the poster, so not dragging gives the old result.
-const EDGE_MARGIN = 0.1;
 // Big enough to stay sharp as a profile-grid tile, small enough to upload fast.
 const MAX_FRAME_WIDTH = 720;
 const STRIP_HEIGHT = 56;
 const CURSOR_WIDTH = 40;
 // One screen-reader arrow press, as a share of the scrubbable range.
 const STEP = 0.05;
-
-/** Video time under a cursor sitting `x` px into a `travel` px range. */
-export function coverTimeAt(x: number, travel: number, duration: number) {
-  "worklet";
-  const fraction = travel > 0 ? Math.min(1, Math.max(0, x / travel)) : 0;
-  return duration * (EDGE_MARGIN + (1 - 2 * EDGE_MARGIN) * fraction);
-}
 
 interface VideoCoverPickerProps {
   videoUri: string;
@@ -105,10 +95,8 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
         // One frame per tile, sampled at the tile's centre so the strip lines up
         // with what sits under the cursor. The extra time is the cursor's
         // resting position, which is the cover until the author drags.
-        const times = Array.from(
-          { length: STRIP_FRAMES },
-          (_, i) =>
-            duration * (EDGE_MARGIN + (1 - 2 * EDGE_MARGIN) * ((i + 0.5) / STRIP_FRAMES))
+        const times = Array.from({ length: STRIP_FRAMES }, (_, i) =>
+          stripTimeAt(i, STRIP_FRAMES, duration)
         );
         times.push(coverTimeAt(0, 1, duration));
         const thumbs = await player.generateThumbnailsAsync(times, {
