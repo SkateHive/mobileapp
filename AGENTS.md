@@ -121,25 +121,18 @@ QueryClientProvider
    source of truth — `ios/` is regenerated from it by prebuild, so do not edit the
    Podfile value directly.
 
-4. **Test account in auth-provider:** Hardcoded credentials in `lib/auth-provider.tsx`
-   let Apple reviewers log in with a simple password instead of a HIVE posting key.
-   Remove immediately after Apple approves the app:
-   - Delete the "APPLE REVIEW TEST ACCOUNT CONFIGURATION" block (`TEST_USERNAME`,
-     `TEST_POSTING_KEY`, `TEST_SIMPLE_PASSWORD` constants).
-   - Delete the "APPLE REVIEW TEST ACCOUNT LOGIC" block inside the login function.
+4. **HIVE RPC nodes:** Multiple fallback nodes configured in `hive-utils.ts`. If one fails, the client retries on the next. Don't hardcode a single node.
 
-5. **HIVE RPC nodes:** Multiple fallback nodes configured in `hive-utils.ts`. If one fails, the client retries on the next. Don't hardcode a single node.
+5. **Video autoplay:** Uses viewport tracking (`lib/ViewportTracker.tsx`). Videos auto-play when 60%+ visible, pause when scrolled away.
 
-6. **Video autoplay:** Uses viewport tracking (`lib/ViewportTracker.tsx`). Videos auto-play when 60%+ visible, pause when scrolled away.
-
-7. **Double padding on PostCard:** `components/Feed/PostCard.tsx` has its own
+6. **Double padding on PostCard:** `components/Feed/PostCard.tsx` has its own
    `paddingHorizontal: theme.spacing.md`, and the screens rendering it add
    theirs: feed, profile and conversation each apply 16, while the conversation
    drawer applies none. The card is therefore not inset the same everywhere.
    When changing card padding, check all four call sites instead of assuming
    the value is global.
 
-8. **No test suite:** There are no automated tests in the project currently. The `scripts/` directory is empty.
+7. **No test suite:** There are no automated tests in the project currently. The `scripts/` directory is empty.
 
 ## Environment Setup
 
