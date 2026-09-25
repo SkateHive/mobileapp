@@ -32,6 +32,7 @@ import {
 } from "~/lib/instagram";
 import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import useHiveAccount from "~/lib/hooks/useHiveAccount";
 import { useUserComments } from "~/lib/hooks/useUserComments";
@@ -177,7 +178,7 @@ export default function ProfileScreen() {
     autoFillPagesRef.current = 0;
   }, [profileUsername]);
 
-  const { hiveAccount, isLoading: isLoadingProfile, error, refetch: refetchAccount } =
+  const { hiveAccount, isLoading: isLoadingProfile, error, errorText, refetch: refetchAccount } =
     useHiveAccount(profileUsername);
   // A lite account with nothing on chain yet: its handle would only make the
   // node answer "account does not exist" (#61). The `!hiveAccount` half matters
@@ -434,9 +435,9 @@ export default function ProfileScreen() {
       setIgSaving(true);
       await setIgHandleApi(handle, session);
       setIgHandleState(handle);
-      showToast("Instagram handle saved", "success");
+      showToast(t("profile.ig.handle_saved"), "success");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Could not save handle", "error");
+      showToast(e instanceof Error ? e.message : t("profile.ig.save_error"), "error");
     } finally {
       setIgSaving(false);
       setIgModalVisible(false);
@@ -477,20 +478,9 @@ export default function ProfileScreen() {
   const explainHivePower = () => {
     const isOwnProfile = profileUsername === currentUsername;
     Alert.alert(
-      "Hive Power",
-      isOwnProfile
-        ? "Hive Power is how much influence your account has on Hive.\n\n" +
-            "The more you hold, the more your votes are worth, so the posts you " +
-            "vote on earn more, and so do you when others vote on yours.\n\n" +
-            "You build it by earning rewards on your clips and keeping them as " +
-            "Hive Power instead of cashing out."
-        : "Hive Power is how much influence an account has on Hive.\n\n" +
-            "The more someone holds, the more their votes are worth, so the " +
-            "posts they vote on earn more, and they earn more when others vote " +
-            "on theirs.\n\n" +
-            "It grows by earning rewards on clips and keeping them as Hive Power " +
-            "instead of cashing out.",
-      [{ text: "Got it" }]
+      t("profile.hp.title"),
+      isOwnProfile ? t("profile.hp.explain_own") : t("profile.hp.explain_other"),
+      [{ text: t("common.got_it") }]
     );
   };
 
@@ -515,7 +505,7 @@ export default function ProfileScreen() {
       await updateUserRelationship(profileUsername, wasFollowing ? '' : 'blog');
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : 'Could not update follow',
+        error instanceof Error ? error.message : t('profile.follow.error'),
         'error'
       );
     } finally {
@@ -639,12 +629,12 @@ export default function ProfileScreen() {
           displayName={currentUsername ?? ""}
           handle={currentUsername ?? ""}
           hpLabel="0 HP"
-          hpAccessibilityLabel="0 Hive Power"
+          hpAccessibilityLabel={t("profile.hp.a11y_zero")}
           onHpPress={explainHivePower}
           stats={[
-            { value: 0, label: "Clips" },
-            { value: 0, label: "Following" },
-            { value: 0, label: "Followers" },
+            { value: 0, label: t("profile.stats.clips") },
+            { value: 0, label: t("profile.stats.following") },
+            { value: 0, label: t("profile.stats.followers") },
           ]}
         />
 
@@ -655,24 +645,23 @@ export default function ProfileScreen() {
             nothing: the crew sponsors an account on the first post, so telling
             people to go and create one themselves would only burn the name the
             sponsorship is going to register (#63). */}
-        <Text style={styles.liteTitle}>Lite account</Text>
+        <Text style={styles.liteTitle}>{t("profile.lite.title")}</Text>
         <Text style={styles.liteBody}>
-          You can post, comment and vote. Your posts go out through @skatehive
-          until @{currentUsername} exists on Hive.
+          {t("profile.lite.body", { username: currentUsername ?? "" })}
         </Text>
         <Text style={styles.liteAvailable}>
-          Post your first clip and the crew sponsors @{currentUsername} for you.
+          {t("profile.lite.sponsor", { username: currentUsername ?? "" })}
         </Text>
 
         <Pressable onPress={() => router.push("/about")} style={styles.liteLearnMore}>
-          <Text style={styles.liteLearnMoreText}>How this works ›</Text>
+          <Text style={styles.liteLearnMoreText}>{t("profile.lite.learn_more")}</Text>
         </Pressable>
 
           {/* handleLogout, not logout: it catches a failed sign-out and leaves
               for "/" afterwards. Calling the raw one left you on a profile you
               were no longer signed into. */}
           <Pressable onPress={handleLogout} style={styles.liteLogout}>
-            <Text style={styles.liteLogoutText}>Log out</Text>
+            <Text style={styles.liteLogoutText}>{t("profile.lite.logout")}</Text>
           </Pressable>
         </View>
       </View>
@@ -684,7 +673,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>
-          {error || "Error loading profile"}
+          {errorText || t("profile.error.load")}
         </Text>
       </View>
     );
@@ -707,7 +696,7 @@ export default function ProfileScreen() {
           hivePower !== null && hivePower > 0 ? `${Math.round(hivePower)} HP` : null
         }
         hpAccessibilityLabel={
-          hivePower !== null ? `${Math.round(hivePower)} Hive Power` : undefined
+          hivePower !== null ? t("profile.hp.a11y", { n: Math.round(hivePower) }) : undefined
         }
         onHpPress={explainHivePower}
         trailingAction={
@@ -722,16 +711,16 @@ export default function ProfileScreen() {
           )
         }
         stats={[
-          { value: gridPosts.length, label: "Clips" },
+          { value: gridPosts.length, label: t("profile.stats.clips") },
           {
             value: hiveAccount?.profile?.stats?.following || "0",
-            label: "Following",
+            label: t("profile.stats.following"),
             // A spectator has nobody to list, so the cell stays flat.
             onPress: isSpectator ? undefined : handleFollowingPress,
           },
           {
             value: hiveAccount?.profile?.stats?.followers || "0",
-            label: "Followers",
+            label: t("profile.stats.followers"),
             onPress: isSpectator ? undefined : handleFollowersPress,
           },
         ]}
@@ -748,7 +737,7 @@ export default function ProfileScreen() {
                 { opacity: isFollowLoading ? 0.5 : pressed ? 0.85 : 1 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={isFollowingProfile ? `Unfollow ${profileUsername}` : `Follow ${profileUsername}`}
+              accessibilityLabel={t(isFollowingProfile ? "profile.follow.a11y_unfollow" : "profile.follow.a11y_follow", { username: profileUsername ?? "" })}
               accessibilityState={{ selected: isFollowingProfile, disabled: isFollowLoading }}
             >
               <Text
@@ -757,7 +746,7 @@ export default function ProfileScreen() {
                   isFollowingProfile ? styles.followButtonTextActive : styles.followButtonTextIdle,
                 ]}
               >
-                {isFollowingProfile ? "Following" : "Follow"}
+                {isFollowingProfile ? t("profile.follow.following") : t("profile.follow.follow")}
               </Text>
             </Pressable>
           )
@@ -867,7 +856,7 @@ export default function ProfileScreen() {
           ListEmptyComponent={
             !isLoadingPosts ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.noPostsText}>No posts yet</Text>
+                <Text style={styles.noPostsText}>{t("profile.empty.no_posts")}</Text>
               </View>
             ) : null
           }
@@ -897,7 +886,7 @@ export default function ProfileScreen() {
           ListEmptyComponent={
             !isLoadingPosts ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.noPostsText}>No posts yet</Text>
+                <Text style={styles.noPostsText}>{t("profile.empty.no_posts")}</Text>
               </View>
             ) : null
           }
@@ -939,14 +928,14 @@ export default function ProfileScreen() {
       <ActionSheet
         visible={settingsMenuVisible}
         onClose={() => setSettingsMenuVisible(false)}
-        title="Settings"
+        title={t("profile.settings.title")}
         subtitle={currentUsername ? `@${currentUsername}` : undefined}
         items={[
           {
             key: "edit",
             icon: "create-outline",
-            title: "Edit Profile",
-            subtitle: "Name, bio & avatar",
+            title: t("profile.settings.edit_title"),
+            subtitle: t("profile.settings.edit_subtitle"),
             variant: "primary",
             onPress: () => {
               setEditProfileVisible(true);
@@ -958,7 +947,7 @@ export default function ProfileScreen() {
                   key: "instagram",
                   icon: "logo-instagram",
                   title: "Instagram",
-                  subtitle: "Cross-post your clips",
+                  subtitle: t("profile.settings.ig_subtitle"),
                   variant: "secondary",
                   onPress: () => {
                     openInstagramSettings();
@@ -969,8 +958,8 @@ export default function ProfileScreen() {
           {
             key: "logout",
             icon: "log-out-outline",
-            title: "Logout",
-            subtitle: currentUsername ? `Sign out @${currentUsername}` : "Sign out",
+            title: t("profile.settings.logout_title"),
+            subtitle: currentUsername ? t("profile.settings.logout_subtitle", { username: currentUsername }) : t("profile.settings.logout_subtitle_anon"),
             variant: "danger",
             onPress: () => {
               handleLogout();

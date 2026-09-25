@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ExtendedAccount } from "@hiveio/dhive";
-import { HiveClient, getProfile, isMissingAccountError } from "~/lib/hive-utils";
+import { HiveClient, HiveError, describeHiveError, getProfile, isMissingAccountError } from "~/lib/hive-utils";
 
 interface HiveAccountMetadataProps {
   [key: string]: any;
@@ -24,7 +24,7 @@ async function fetchHiveAccount(username: string): Promise<HiveAccount> {
   ]);
 
   if (!userData || userData.length === 0) {
-    throw new Error("Account not found");
+    throw new HiveError("Account not found", "profile_not_found");
   }
 
   const userAccount: HiveAccount = {
@@ -61,6 +61,8 @@ export default function useHiveAccount(username: string | null) {
     // Callers match on the text (isMissingAccountError), so hand them the
     // message rather than the Error, the way this hook always has.
     error: error ? error.message : null,
+    // The same error in the reader's language, for showing on screen.
+    errorText: error ? describeHiveError(error) : null,
     refetch,
   };
 }

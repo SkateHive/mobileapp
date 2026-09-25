@@ -16,6 +16,7 @@ import { useSnaps } from "~/lib/hooks/useSnaps";
 import { isDeletedPost } from "~/lib/utils";
 import { isHiddenByModeration } from "~/lib/moderation";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import {
   ViewportTrackerProvider,
   useViewportTracker,
@@ -130,13 +131,13 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
   const ListHeaderComponent = React.useCallback(
     () => (
       <View style={styles.header}>
-        <Text style={styles.headerText}>Feed</Text>
+        <Text style={styles.headerText}>{t("feed.nav.screen.feed")}</Text>
         <View style={styles.headerActions}>
           <Pressable
             onPress={handleLeaderboardPress}
             style={styles.headerButton}
             accessibilityRole="button"
-            accessibilityLabel="Leaderboard"
+            accessibilityLabel={t("feed.feed.a11y.leaderboard")}
             hitSlop={8}
           >
             <Ionicons name="podium-outline" size={24} color={theme.colors.text} />
@@ -174,7 +175,7 @@ function FeedContent({ refreshTrigger, onRefresh }: FeedProps) {
             onRefresh={handleRefresh}
             tintColor={theme.colors.primary}
             colors={[theme.colors.primary]}
-            title="Pull to refresh..."
+            title={t("feed.feed.pull_to_refresh")}
             titleColor={theme.colors.text}
           />
         }

@@ -1,0 +1,13 @@
+{
+  "ios": {
+    "NSFaceIDUsageDescription": "Usa Face ID para desbloquear tu cuenta.",
+    "NSCameraUsageDescription": "SkateHive necesita acceder a tu cámara para capturar fotos y videos de tus trucos y momentos de skate. Estos archivos se enviarán al archivo inmortal de skateboard interplanetario.",
+    "NSPhotoLibraryUsageDescription": "SkateHive necesita acceder a tu biblioteca de fotos para que elijas fotos y videos que ya tengas para tus publicaciones de skate. Los archivos seleccionados se subirán a IPFS y se compartirán en la blockchain Hive.",
+    "NSPhotoLibraryAddUsageDescription": "SkateHive necesita permiso para guardar fotos en tu biblioteca.",
+    "NSLocationWhenInUseUsageDescription": "SkateHive usa tu ubicación para mostrar en el mapa los spots de skate cerca de ti.",
+    "NSLocationAlwaysAndWhenInUseUsageDescription": "Permite que SkateHive acceda a tu ubicación",
+    "NSLocationAlwaysUsageDescription": "Permite que SkateHive acceda a tu ubicación",
+    "NSMicrophoneUsageDescription": "Permite que SkateHive acceda a tu micrófono",
+    "NSMotionUsageDescription": "Permite que SkateHive acceda al movimiento de tu dispositivo"
+  }
+}

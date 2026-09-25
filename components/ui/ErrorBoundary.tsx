@@ -3,6 +3,7 @@ import { View, StyleSheet, Pressable } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Text } from "./text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -39,7 +40,7 @@ export class ErrorBoundary extends React.Component<
         <View style={styles.container}>
           <Text style={styles.emoji}>⚠️</Text>
           <Text style={styles.title}>
-            {this.props.fallbackLabel ?? "Something went wrong"}
+            {this.props.fallbackLabel ?? t("feed.error_boundary.title")}
           </Text>
           {this.state.error && (
             <Text style={styles.message} numberOfLines={3}>
@@ -47,7 +48,7 @@ export class ErrorBoundary extends React.Component<
             </Text>
           )}
           <Pressable style={styles.button} onPress={this.handleRetry}>
-            <Text style={styles.buttonText}>Try Again</Text>
+            <Text style={styles.buttonText}>{t("common.try_again")}</Text>
           </Pressable>
         </View>
       );

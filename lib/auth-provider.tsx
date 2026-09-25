@@ -27,6 +27,7 @@ import {
   getUserRelationshipList,
 } from './hive-utils';
 import { canPost, setRelationship } from './posting';
+import { t } from './i18n';
 import type { UserbaseUser } from './userbase/api';
 import { logout as userbaseLogout } from './userbase/api';
 import {
@@ -65,11 +66,27 @@ const TEST_SIMPLE_PASSWORD: string = '8wGKukim';
 
 // ============================================================================
 
-// Custom error types for authentication
+// Custom error types for authentication. `message` stays English for logs; screens
+// show the text for `code` (see lib/auth-error-text.ts).
+export type AuthErrorCode =
+  | 'login_first'
+  | 'credentials_required'
+  | 'pin_length'
+  | 'biometric_cancelled'
+  | 'biometric_failed'
+  | 'unsupported_method'
+  | 'no_stored_credentials'
+  | 'incompatible'
+  | 'decrypt_failed'
+  | 'auth_failed'
+  | 'stored_login_failed';
+
 export class AuthError extends Error {
-  constructor(message: string) {
+  code: AuthErrorCode;
+  constructor(code: AuthErrorCode, message: string) {
     super(message);
     this.name = 'AuthError';
+    this.code = code;
   }
 }
 
@@ -205,7 +222,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     relationship: 'blog' | 'ignore' | 'blacklist' | ''
   ): Promise<void> => {
     if (!session || !canPost(session)) {
-      throw new Error('Please log in first');
+      // Shown as-is by the follow/mute callers, so it carries the localized text.
+      throw new AuthError('login_first', t('auth.provider.err_login_first'));
     }
 
     // Routes to the server for email (userbase) accounts, signs locally for
@@ -329,7 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const normalizedUsername = username.toLowerCase().trim();
       if (!normalizedUsername || !postingKey) {
-        throw new AuthError('Username and posting key are required');
+        throw new AuthError('credentials_required', 'Username and posting key are required');
       }
 
       // ============================================================================
@@ -353,7 +371,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let salt = '';
       let iv = '';
       if (method === 'pin') {
-        if (!pin || pin.length !== 6) throw new AuthError('PIN must be 6 digits');
+        if (!pin || pin.length !== 6) throw new AuthError('pin_length', 'PIN must be 6 digits');
         salt = await generateSalt();
         iv = await generateSalt();
         
@@ -364,7 +382,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         encrypted = encryptKey(postingKey, secret, iv);
       } else if (method === 'biometric') {
         const ok = await authenticateBiometric();
-        if (!ok) throw new AuthError('Biometric authentication was cancelled or failed');
+        if (!ok) throw new AuthError('biometric_cancelled', 'Biometric authentication was cancelled or failed');
         
         salt = await generateSalt();
         iv = await generateSalt();
@@ -372,7 +390,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const secret = salt;
         encrypted = encryptKey(postingKey, secret, iv);
       } else {
-        throw new AuthError('Invalid encryption method');
+        throw new AuthError('unsupported_method', 'Invalid encryption method');
       }
 
       const encryptedKey: EncryptedKey = {
@@ -411,7 +429,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       } else {
         console.error('Error during login:', error);
-        throw new AuthError('Failed to authenticate: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        throw new AuthError('auth_failed', 'Failed to authenticate: ' + (error instanceof Error ? error.message : 'Unknown error'));
       }
     }
   };
@@ -420,11 +438,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginStoredUser = async (selectedUsername: string, pin?: string) => {
     try {
       const encryptedKey = await getEncryptedKey(selectedUsername);
-      if (!encryptedKey) throw new AuthError('No stored credentials found');
+      if (!encryptedKey) throw new AuthError('no_stored_credentials', 'No stored credentials found');
       
       let decryptedKey = '';
       if (encryptedKey.method === 'pin') {
-        if (!pin || pin.length !== 6) throw new AuthError('PIN must be 6 digits');
+        if (!pin || pin.length !== 6) throw new AuthError('pin_length', 'PIN must be 6 digits');
         
         // Small delay to allow UI to update with loading state before expensive operation
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -434,25 +452,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (encryptedKey.method === 'biometric') {
         try {
           const ok = await authenticateBiometric();
-          if (!ok) throw new AuthError('Biometric authentication was cancelled or failed');
+          if (!ok) throw new AuthError('biometric_cancelled', 'Biometric authentication was cancelled or failed');
         } catch (bioError) {
-          throw new AuthError('Biometric authentication failed: ' + (bioError instanceof Error ? bioError.message : 'Unknown error'));
+          throw new AuthError('biometric_failed', 'Biometric authentication failed: ' + (bioError instanceof Error ? bioError.message : 'Unknown error'));
         }
         
         try {
           const secret = encryptedKey.salt;
           decryptedKey = decryptKey(encryptedKey.encrypted, secret, encryptedKey.iv);
         } catch (decryptError) {
-          throw new AuthError('Failed to decrypt stored key: ' + (decryptError instanceof Error ? decryptError.message : 'Unknown error'));
+          throw new AuthError('decrypt_failed', 'Failed to decrypt stored key: ' + (decryptError instanceof Error ? decryptError.message : 'Unknown error'));
         }
       } else {
-        throw new AuthError('Invalid encryption method');
+        throw new AuthError('unsupported_method', 'Invalid encryption method');
       }
       if (!decryptedKey) {
         // If decryption fails, it might be due to dev/prod encryption mismatch
         // Clear the stored user to force re-login
         await deleteEncryptedKey(selectedUsername);
-        throw new AuthError('Stored credentials are incompatible. Please log in again.');
+        throw new AuthError('incompatible', 'Stored credentials are incompatible. Please log in again.');
       }
       const loginTime = Date.now();
       setUsername(selectedUsername);
@@ -474,7 +492,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       } else {
         console.error('Error with stored user login:', error);
-        throw new AuthError('Failed to authenticate with stored credentials: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        throw new AuthError('stored_login_failed', 'Failed to authenticate with stored credentials: ' + (error instanceof Error ? error.message : 'Unknown error'));
       }
     }
   };

@@ -20,6 +20,7 @@ import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
 import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { uploadImageToHive, uploadImageViaUserbase, createImageMarkdown } from "~/lib/upload/image-upload";
 import { canPost, isUserbaseSession } from "~/lib/posting";
 import { uploadVideoToWorker, createVideoIframe } from "~/lib/upload/video-upload";
@@ -28,6 +29,21 @@ import { syncOneSpot, fetchAllSpots } from "~/lib/spotmap/api";
 import { syncSpotWidget } from "~/lib/widgets/spotWidget";
 import { persistUserLoc } from "~/lib/hooks/useSpotWidgetSync";
 import type { SpotmapRow } from "~/lib/spotmap/types";
+
+// The worker reports its own stage ids; unknown ones fall back to showing the id itself.
+const VIDEO_STAGE_KEYS: Record<string, string> = {
+  receiving: "map.create.progress.video_receiving",
+  transcoding: "map.create.progress.video_transcoding",
+  uploading: "map.create.progress.video_uploading",
+  optimized: "map.create.progress.video_optimized",
+  complete: "map.create.progress.video_complete",
+  error: "map.create.progress.video_error",
+};
+
+function videoStageLabel(stage: string, p: number): string {
+  const key = VIDEO_STAGE_KEYS[stage];
+  return key ? t(key, { p }) : t("map.create.progress.video_stage", { stage, p });
+}
 
 interface MediaAsset {
   uri: string;
@@ -151,7 +167,7 @@ export default function SpotCreateScreen() {
         setMedia((prev) => [...prev, ...result.assets.map(assetToMedia)].slice(0, 6));
       }
     } catch {
-      Alert.alert("Error", "Failed to pick media.");
+      Alert.alert(t("common.error"), t("map.create.error.pick_media"));
     }
   };
 
@@ -159,7 +175,7 @@ export default function SpotCreateScreen() {
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert("Camera access needed", "Enable camera access to capture a spot.");
+        Alert.alert(t("map.create.camera_needed.title"), t("map.create.camera_needed.body"));
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -171,7 +187,7 @@ export default function SpotCreateScreen() {
         setMedia((prev) => [...prev, assetToMedia(result.assets[0])].slice(0, 6));
       }
     } catch {
-      Alert.alert("Error", "Failed to open camera.");
+      Alert.alert(t("common.error"), t("map.create.error.open_camera"));
     }
   };
 
@@ -190,15 +206,15 @@ export default function SpotCreateScreen() {
 
   const handleSubmit = async () => {
     if (!username || !canPost(session)) {
-      Alert.alert("Login required", "You need to be logged in to add a spot.");
+      Alert.alert(t("map.create.login_required.title"), t("map.create.login_required.body"));
       return;
     }
     if (!coords) {
-      Alert.alert("Location needed", "Place the pin on the spot's location first.");
+      Alert.alert(t("map.create.location_needed.title"), t("map.create.location_needed.body"));
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Name needed", "Give the spot a name.");
+      Alert.alert(t("map.create.name_needed.title"), t("map.create.name_needed.body"));
       return;
     }
 
@@ -211,7 +227,7 @@ export default function SpotCreateScreen() {
         const m = media[i];
         const fileName = m.uri.split("/").pop() || `spot-${i}`;
         if (m.type === "image") {
-          setProgress(`Uploading photo ${i + 1}/${media.length}…`);
+          setProgress(t("map.create.progress.photo", { current: i + 1, total: media.length }));
           const res = isUserbaseSession(session)
             ? await uploadImageViaUserbase(m.uri, fileName, m.mimeType, session!.userbaseToken!)
             : await uploadImageToHive(m.uri, fileName, m.mimeType, {
@@ -220,16 +236,16 @@ export default function SpotCreateScreen() {
               });
           imageUrls.push(createImageMarkdown(res.url, "spot"));
         } else {
-          setProgress(`Uploading video ${i + 1}/${media.length}…`);
+          setProgress(t("map.create.progress.video", { current: i + 1, total: media.length }));
           const res = await uploadVideoToWorker(m.uri, fileName, m.mimeType, {
             creator: username,
-            onProgress: (p, stage) => setProgress(`Video ${stage} ${p}%`),
+            onProgress: (p, stage) => setProgress(videoStageLabel(stage, p)),
           });
           videoIframes.push(createVideoIframe(res.gatewayUrl, "Spot"));
         }
       }
 
-      setProgress("Posting spot to Hive…");
+      setProgress(t("map.create.progress.posting"));
       const { author, permlink } = await submitSpot(session!, {
         name: name.trim(),
         lat: coords.lat,
@@ -280,7 +296,7 @@ export default function SpotCreateScreen() {
       // Targeted server ingestion so it appears for everyone within seconds,
       // then refetch the canonical list. Best-effort — the optimistic pin and
       // daily reconciliation cover the case where the RPC hasn't propagated yet.
-      setProgress("Adding to the map…");
+      setProgress(t("map.create.progress.adding"));
       const synced = await syncOneSpot(author, permlink);
       if (synced) {
         queryClient.invalidateQueries({ queryKey: ["spotmap", "all"] });
@@ -289,8 +305,8 @@ export default function SpotCreateScreen() {
       // to be told. Saying "added" when it wasn't told is how two spots sat
       // invisible for weeks with their authors believing otherwise (#39).
       const doneMessage = synced
-        ? "Spot added!"
-        : "Spot published — it can take a day to show on the map";
+        ? t("map.create.toast.added")
+        : t("map.create.toast.published_delayed");
 
       // Keep the widget fresh with the new spot included.
       persistUserLoc({ lat: coords.lat, lng: coords.lng });
@@ -300,8 +316,8 @@ export default function SpotCreateScreen() {
       showToast(doneMessage, synced ? "success" : "info");
       router.replace("/(tabs)/map");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to add spot.";
-      Alert.alert("Error", msg);
+      const msg = err instanceof Error ? err.message : t("map.create.error.add_failed");
+      Alert.alert(t("common.error"), msg);
     } finally {
       setSubmitting(false);
       setProgress("");
@@ -320,7 +336,7 @@ export default function SpotCreateScreen() {
         >
           <Ionicons name="close" size={26} color={submitting ? theme.colors.muted : theme.colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Add Spot</Text>
+        <Text style={styles.headerTitle}>{t("map.create.title")}</Text>
         <View style={styles.headerBtn} />
       </View>
 
@@ -333,7 +349,7 @@ export default function SpotCreateScreen() {
       >
         {/* Media — up to 6 photos/videos */}
         <Text style={styles.label}>
-          Photos & videos{"  "}
+          {t("map.create.media.label")}{"  "}
           <Text style={styles.labelCount}>{media.length}/6</Text>
         </Text>
         <View style={styles.mediaRow}>
@@ -343,7 +359,7 @@ export default function SpotCreateScreen() {
             disabled={submitting || atMediaLimit}
           >
             <Ionicons name="camera-outline" size={22} color={theme.colors.primary} />
-            <Text style={styles.mediaBtnText}>Camera</Text>
+            <Text style={styles.mediaBtnText}>{t("map.create.media.camera")}</Text>
           </Pressable>
           <Pressable
             style={[styles.mediaBtn, (submitting || atMediaLimit) && styles.controlDisabled]}
@@ -351,11 +367,11 @@ export default function SpotCreateScreen() {
             disabled={submitting || atMediaLimit}
           >
             <Ionicons name="images-outline" size={22} color={theme.colors.primary} />
-            <Text style={styles.mediaBtnText}>Add photos</Text>
+            <Text style={styles.mediaBtnText}>{t("map.create.media.add_photos")}</Text>
           </Pressable>
         </View>
         {atMediaLimit && (
-          <Text style={styles.hint}>Maximum of 6 reached — remove one to add another.</Text>
+          <Text style={styles.hint}>{t("map.create.media.limit")}</Text>
         )}
 
         {media.length > 0 && (
@@ -387,12 +403,12 @@ export default function SpotCreateScreen() {
         )}
 
         {/* Location */}
-        <Text style={styles.label}>📍 Location</Text>
+        <Text style={styles.label}>{t("map.create.location.label")}</Text>
         <View style={styles.mapWrap}>
           {locating ? (
             <View style={styles.mapPlaceholder}>
               <ActivityIndicator color={theme.colors.primary} />
-              <Text style={styles.hint}>Finding your location…</Text>
+              <Text style={styles.hint}>{t("map.create.location.finding")}</Text>
             </View>
           ) : (
             <MapView
@@ -422,17 +438,20 @@ export default function SpotCreateScreen() {
         {coords ? (
           <Text style={styles.coordsText}>
             {address ? `${address}\n` : ""}
-            {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)} · drag the pin to fine-tune
+            {t("map.create.location.coords_hint", {
+              lat: coords.lat.toFixed(5),
+              lng: coords.lng.toFixed(5),
+            })}
           </Text>
         ) : (
-          !locating && <Text style={styles.hint}>Tap the map to place the spot.</Text>
+          !locating && <Text style={styles.hint}>{t("map.create.location.tap_hint")}</Text>
         )}
 
         {/* Name */}
-        <Text style={styles.label}>Spot name *</Text>
+        <Text style={styles.label}>{t("map.create.name.label")}</Text>
         <TextInput
           style={styles.input}
-          placeholder="e.g. Praça XV ledges"
+          placeholder={t("map.create.name.placeholder")}
           placeholderTextColor={theme.colors.muted}
           value={name}
           onChangeText={setName}
@@ -440,10 +459,10 @@ export default function SpotCreateScreen() {
         />
 
         {/* Description */}
-        <Text style={styles.label}>Description (optional)</Text>
+        <Text style={styles.label}>{t("map.create.description.label")}</Text>
         <TextInput
           style={[styles.input, styles.textarea]}
-          placeholder="Surface, obstacles, best time to skate…"
+          placeholder={t("map.create.description.placeholder")}
           placeholderTextColor={theme.colors.muted}
           value={description}
           onChangeText={setDescription}
@@ -459,10 +478,10 @@ export default function SpotCreateScreen() {
           {submitting ? (
             <View style={styles.submitRow}>
               <ActivityIndicator color="#000" />
-              <Text style={styles.submitText}>{progress || "Submitting…"}</Text>
+              <Text style={styles.submitText}>{progress || t("map.create.submitting")}</Text>
             </View>
           ) : (
-            <Text style={styles.submitText}>Submit Spot</Text>
+            <Text style={styles.submitText}>{t("map.create.submit")}</Text>
           )}
         </Pressable>
       </ScrollView>

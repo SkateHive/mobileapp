@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { API_ORIGIN } from "./constants";
 import { HiveClient, convertVestToHive } from "./hive-utils";
 import { isUserbaseSession } from "./posting";
+import { t } from "./i18n";
 import type { AuthSession } from "./types";
 
 // Client for the skatehive-api Instagram cross-post + IG-handle endpoints.
@@ -137,15 +138,15 @@ export class CrossPostError extends Error {
 export function crossPostErrorMessage(status: number): string {
   switch (status) {
     case 403:
-      return "Needs 100 HP to cross-post";
+      return t("ig.crosspost.error_403");
     case 429:
-      return "Daily Instagram limit reached";
+      return t("ig.crosspost.error_429");
     case 409:
-      return "Already sent to curation";
+      return t("ig.crosspost.error_409");
     case 503:
-      return "Media not reachable yet";
+      return t("ig.crosspost.error_503");
     default:
-      return "Instagram curation request failed";
+      return t("ig.crosspost.error_other");
   }
 }
 
@@ -219,7 +220,7 @@ export async function setIgHandle(handle: string, session: AuthSession): Promise
   });
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(data?.error || `Could not save Instagram handle (${res.status})`);
+    throw new Error(data?.error || t("ig.handle.save_failed", { status: res.status }));
   }
 }
 

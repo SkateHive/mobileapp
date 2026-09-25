@@ -26,6 +26,7 @@ import { CreateSpectatorInfo } from "~/components/SpectatorMode/CreateSpectatorI
 import { canPost } from "~/lib/posting";
 import { COMMUNITY_TAG } from "~/lib/hive-utils";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import * as SecureStore from "expo-secure-store";
 import {
   getIgHandle,
@@ -49,9 +50,9 @@ export default function CreatePost() {
   const uploadJob = useUploadJob();
   const jobBlocksShare = isJobActive(uploadJob) || uploadJob?.status === "failed";
   const shareHint = isJobActive(uploadJob)
-    ? "Wait for the current upload to finish"
+    ? t("create.upload.busy")
     : uploadJob?.status === "failed"
-      ? "Retry or discard the failed upload first"
+      ? t("create.upload.failed_blocking")
       : null;
   // Ref-based lock: a second tap during the ~1s media copy must not enqueue
   // twice, and state updates are too slow to prevent it.
@@ -104,9 +105,9 @@ export default function CreatePost() {
     try {
       setIgModalSaving(true);
       await setIgHandle(handle, session);
-      showToast("Instagram handle saved", "success");
+      showToast(t("create.ig.handle_saved"), "success");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Could not save handle", "error");
+      showToast(e instanceof Error ? e.message : t("create.ig.handle_save_failed"), "error");
     } finally {
       setIgModalSaving(false);
       closeIgModal();
@@ -166,7 +167,7 @@ export default function CreatePost() {
       }
     } catch (error) {
       console.error("Error selecting media:", error);
-      Alert.alert("Error", "Failed to select media. Please try again.");
+      Alert.alert(t("create.alert.error_title"), t("create.alert.select_media_failed"));
     } finally {
       setIsSelectingMedia(false);
     }
@@ -206,8 +207,8 @@ export default function CreatePost() {
     } catch (error) {
       console.error("Error selecting media from gallery:", error);
       Alert.alert(
-        "Error",
-        "Failed to select media from gallery. Please try again."
+        t("create.alert.error_title"),
+        t("create.alert.select_gallery_failed")
       );
     }
   };
@@ -278,14 +279,14 @@ export default function CreatePost() {
     if (submitLock.current) return;
 
     if (!content.trim() && !media) {
-      Alert.alert("Validation Error", "Please add some content or media to your post");
+      Alert.alert(t("create.alert.validation_title"), t("create.alert.validation_message"));
       return;
     }
 
     // Email (userbase) accounts are server-custody and have no local
     // decryptedKey, so gate on canPost() rather than the presence of a key.
     if (!username || username === "SPECTATOR" || !session || !canPost(session)) {
-      Alert.alert("Authentication Required", "Please log in to create a post");
+      Alert.alert(t("create.alert.auth_title"), t("create.alert.auth_message"));
       return;
     }
 
@@ -357,7 +358,7 @@ export default function CreatePost() {
           ? error.message
           : error instanceof Error
             ? error.message
-            : "Could not start the upload";
+            : t("create.error.start_failed");
       setErrorMessage(errorMsg);
       console.error("Enqueue error:", error);
     } finally {
@@ -376,13 +377,13 @@ export default function CreatePost() {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView style={styles.container}>
             {/* Header */}
-            <Text style={styles.headerText}>Create</Text>
+            <Text style={styles.headerText}>{t("create.header.title")}</Text>
 
             <View style={styles.card}>
               {/* Content Input */}
               <TextInput
                 multiline
-                placeholder="What's on your mind?"
+                placeholder={t("create.input.placeholder")}
                 value={content}
                 onChangeText={setContent}
                 style={styles.textInput}
@@ -406,7 +407,7 @@ export default function CreatePost() {
                         color={theme.colors.text}
                       />
                     </View>
-                    <Text style={styles.buttonTextSecondary}>Selecting...</Text>
+                    <Text style={styles.buttonTextSecondary}>{t("create.media.selecting")}</Text>
                   </>
                 ) : (
                   <>
@@ -416,7 +417,7 @@ export default function CreatePost() {
                       color={theme.colors.gray}
                     />
                     <Text style={styles.buttonTextSecondary}>
-                      {media ? "Replace media" : "Add media"}
+                      {media ? t("create.media.replace") : t("create.media.add")}
                     </Text>
                   </>
                 )}
@@ -479,7 +480,7 @@ export default function CreatePost() {
                           color={theme.colors.primary}
                         />
                         <Text style={styles.captionLabel}>
-                          Send to Instagram curation
+                          {t("create.ig.toggle_label")}
                         </Text>
                       </View>
                       <Switch
@@ -494,16 +495,16 @@ export default function CreatePost() {
                       />
                     </View>
                     <Text style={styles.captionSubLabel}>
-                      A curator reviews it before it goes live
+                      {t("create.ig.toggle_hint")}
                     </Text>
                     {igCrossPost && (
                       <>
-                        <Text style={styles.captionSubLabel}>Caption</Text>
+                        <Text style={styles.captionSubLabel}>{t("create.ig.caption_label")}</Text>
                         <TextInput
                           style={styles.captionInput}
                           value={igCaption}
                           onChangeText={setIgCaption}
-                          placeholder={content.trim() || "Same as your post"}
+                          placeholder={content.trim() || t("create.ig.caption_placeholder")}
                           placeholderTextColor={theme.colors.muted}
                           multiline
                           maxLength={2200}
@@ -523,7 +524,7 @@ export default function CreatePost() {
               disabled={(!content.trim() && !media) || isSubmitting || jobBlocksShare}
             >
               <Text style={styles.shareButtonText}>
-                {isSubmitting ? "Sharing…" : "Share"}
+                {isSubmitting ? t("create.share.button_busy") : t("create.share.button")}
               </Text>
             </Button>
             {shareHint ? <Text style={styles.shareHint}>{shareHint}</Text> : null}

@@ -1,9 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createJob, type UploadEvent, type UploadJob } from "../upload-job";
+import { enT } from "../../i18n/core";
 import {
   UploadRunError,
   classifyError,
+  codedError,
+  describeError,
+  failWith,
   runUploadJob,
   type BroadcastArgs,
   type RunnerCrossPostArgs,
@@ -208,7 +212,46 @@ test("getContent throwing fails closed as network and does not broadcast", async
   assert.deepEqual(rec.types(), ["started", "parent_done", "failed"]);
   const failed = rec.events[2] as Extract<UploadEvent, { type: "failed" }>;
   assert.equal(failed.error.kind, "network");
+  assert.equal(failed.error.message, "Could not confirm whether the post exists: RPC timeout");
+  assert.equal(failed.error.code, "guard");
+  assert.deepEqual(failed.error.params, { message: "RPC timeout" });
   assert.equal(deps.broadcasts.length, 0);
+});
+
+test("a coded error carries its code and params through classifyError, English message intact", () => {
+  const err = codedError("unknown", "video_gone");
+  assert.equal(err.message, "The video is no longer on this device");
+  assert.deepEqual(classifyError(err), { kind: "unknown", message: "The video is no longer on this device", code: "video_gone" });
+  const withParams = classifyError(codedError("auth", "auth", { author: "fred" }));
+  assert.equal(withParams.message, "Log in as @fred to finish this post");
+  assert.deepEqual(withParams.params, { author: "fred" });
+  const long = classifyError(codedError("network", "guard", { message: "x".repeat(500) }));
+  assert.equal((long.params?.message as string).length, 200, "string params are bounded like the message");
+});
+
+test("failWith keeps the classification the untyped wrapper messages had", () => {
+  // Same kinds the old `new Error("Image upload failed: ...")` strings got from the regexes.
+  assert.equal(failWith("image_failed", { detail: "500 - boom" }).kind, "server");
+  assert.equal(failWith("image_failed", { detail: "Network request failed" }).kind, "network");
+  assert.equal(failWith("image_no_url").kind, "unknown");
+  assert.equal(failWith("image_signature").kind, "unknown");
+  assert.equal(failWith("image_convert", { message: "bad file" }).kind, "unknown");
+  assert.equal(failWith("video_all_failed", { errors: "Mac Mini failed: 500 - x" }).kind, "network");
+  assert.equal(failWith("video_failed", { message: "Network request failed" }).kind, "network");
+  assert.equal(failWith("video_failed", { message: "Mac Mini failed: 502 - bad gateway" }).kind, "server");
+  assert.equal(failWith("service_invalid", { service: "Oracle" }).kind, "unknown");
+  assert.equal(failWith("service_failed", { service: "Oracle", status: 503, detail: "down" }).kind, "server");
+  // Same English text as before.
+  assert.equal(failWith("video_all_failed", { errors: "a | b" }).message, "All video upload services failed: a | b");
+  assert.equal(failWith("image_failed", { detail: "500 - x" }).message, "Image upload failed: 500 - x");
+});
+
+test("failWith takes a typed cause's kind, so translated params never change the classification", () => {
+  const inner = failWith("video_all_failed", { errors: "todos falharam" });
+  const wrapped = failWith("video_failed", { message: describeError(inner, enT) }, inner);
+  assert.equal(wrapped.kind, "network");
+  assert.equal(wrapped.message, "Video upload failed: All video upload services failed: todos falharam");
+  assert.equal(failWith("video_failed", { message: "x" }, new Error("plain")).kind, "unknown");
 });
 
 test("double-post guard finds the post under the shared posting account: no broadcast, still publishes", async () => {

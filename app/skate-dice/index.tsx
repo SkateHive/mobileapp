@@ -21,6 +21,7 @@ import {
   splitTemplate,
 } from '~/lib/skate-sentences';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 
 const TYPE_MS = 26; // per-character typing speed
 
@@ -38,8 +39,8 @@ export default function PracticeDiceScreen() {
   useEffect(() => {
     fredY.value = withTiming(0, { duration: 650, easing: Easing.out(Easing.cubic) });
     balloon.value = withDelay(650, withTiming(1, { duration: 280 }));
-    const t = setTimeout(() => setReady(true), 950);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setReady(true), 950);
+    return () => clearTimeout(timer);
   }, []);
 
   const { before, after } = splitTemplate(template);
@@ -88,7 +89,7 @@ export default function PracticeDiceScreen() {
         <Pressable onPress={goBack} hitSlop={16} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={26} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>COACH FRED</Text>
+        <Text style={styles.headerTitle}>{t('dice.title')}</Text>
         <View style={styles.backBtn} />
       </View>
 
@@ -98,7 +99,7 @@ export default function PracticeDiceScreen() {
 
         <Pressable style={styles.playBtn} onPress={() => rouletteRef.current?.roll()}>
           <Ionicons name="dice" size={26} color={theme.colors.black} />
-          <Text style={styles.playText}>PLAY</Text>
+          <Text style={styles.playText}>{t('dice.play')}</Text>
         </Pressable>
       </View>
 

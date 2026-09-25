@@ -5,6 +5,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { useVideoMuted } from '~/lib/video-mute';
+import { t } from '~/lib/i18n';
 
 interface VideoWithAutoplayProps {
   url: string;
@@ -119,7 +120,7 @@ export function VideoWithAutoplay({
           onPress={() => setMuted(!isMuted)}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={isMuted ? 'Unmute video' : 'Mute video'}
+          accessibilityLabel={isMuted ? t('feed.player.a11y.unmute_video') : t('feed.player.a11y.mute_video')}
           accessibilityState={{ selected: !isMuted }}
         >
           <Ionicons

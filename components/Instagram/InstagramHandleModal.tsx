@@ -3,6 +3,7 @@ import { Modal, View, Pressable, TextInput, ActivityIndicator, StyleSheet, Switc
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 
 interface Props {
   visible: boolean;
@@ -30,8 +31,8 @@ interface Props {
 export function InstagramHandleModal({
   visible,
   initialHandle = "",
-  title = "Tag your Instagram",
-  subtitle = "Cross-posts to @skatehive will credit your @handle and invite you as a collaborator.",
+  title = t("ig.handle_modal.title"),
+  subtitle = t("ig.handle_modal.subtitle"),
   saving = false,
   onSave,
   onRemove,
@@ -63,7 +64,7 @@ export function InstagramHandleModal({
             <Text style={styles.at}>@</Text>
             <TextInput
               style={styles.input}
-              placeholder="yourhandle"
+              placeholder={t("ig.handle_modal.placeholder")}
               placeholderTextColor={theme.colors.muted}
               value={handle}
               onChangeText={(t) => setHandle(t.toLowerCase().replace(/[^a-z0-9._]/g, ""))}
@@ -82,17 +83,17 @@ export function InstagramHandleModal({
             {saving ? (
               <ActivityIndicator size="small" color={theme.colors.black} />
             ) : (
-              <Text style={styles.primaryText}>Save</Text>
+              <Text style={styles.primaryText}>{t("common.save")}</Text>
             )}
           </Pressable>
 
           {initialHandle && onRemove ? (
             <Pressable style={styles.secondaryBtn} disabled={saving} onPress={onRemove}>
-              <Text style={styles.removeText}>Remove</Text>
+              <Text style={styles.removeText}>{t("common.remove")}</Text>
             </Pressable>
           ) : (
             <Pressable style={styles.secondaryBtn} disabled={saving} onPress={onClose}>
-              <Text style={styles.skipText}>Not now</Text>
+              <Text style={styles.skipText}>{t("ig.handle_modal.not_now")}</Text>
             </Pressable>
           )}
 
@@ -101,11 +102,11 @@ export function InstagramHandleModal({
           {showCrossPostToggle ? (
             <View style={styles.toggleRow}>
               <View style={styles.toggleLabel}>
-                <Text style={styles.toggleTitle}>Cross-post to Instagram</Text>
+                <Text style={styles.toggleTitle}>{t("ig.handle_modal.toggle_title")}</Text>
                 <Text style={styles.toggleHint}>
                   {crossPostEnabled
-                    ? "New snaps with media are offered to @skatehive."
-                    : "Snaps stay on Hive only."}
+                    ? t("ig.handle_modal.toggle_on")
+                    : t("ig.handle_modal.toggle_off")}
                 </Text>
               </View>
               <Switch

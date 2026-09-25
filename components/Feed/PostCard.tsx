@@ -35,6 +35,7 @@ const FullConversationDrawer = React.lazy(() =>
 );
 import { useToast } from "~/lib/toast-provider";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import type { Media, NestedDiscussion } from "../../lib/types";
 import type { Discussion } from "@hiveio/dhive";
 import { extractMediaFromBody, removeVideoLinksFromBody, metadataImageUrl, postPayout } from "~/lib/utils";
@@ -43,27 +44,37 @@ import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store
 // Action-bar icons (upvote / comment) — sized to match the web footer.
 const ACTION_ICON_SIZE = 18;
 
+// `value` is what the report API receives and must stay as is; only the label is translated.
+const REPORT_REASONS = [
+  { value: "Spam", labelKey: "feed.post.report_reason.spam" },
+  { value: "Harassment or Abuse", labelKey: "feed.post.report_reason.harassment" },
+  { value: "Inappropriate Content", labelKey: "feed.post.report_reason.inappropriate" },
+  { value: "Copyright Violation", labelKey: "feed.post.report_reason.copyright" },
+  { value: "Misinformation", labelKey: "feed.post.report_reason.misinformation" },
+  { value: "Other", labelKey: "feed.post.report_reason.something_else" },
+] as const;
+
 // Helper function to format time in abbreviated format (2 characters max)
 const formatTimeAbbreviated = (date: Date): string => {
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return "1m"; // Less than a minute, show 1m
+  if (diffInSeconds < 60) return t("feed.time.under_minute"); // Less than a minute, show 1m
 
   const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return `${diffInMinutes}m`;
+  if (diffInMinutes < 60) return t("feed.time.minutes", { n: diffInMinutes });
 
   const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours}h`;
+  if (diffInHours < 24) return t("feed.time.hours", { n: diffInHours });
 
   const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 30) return `${diffInDays}d`;
+  if (diffInDays < 30) return t("feed.time.days", { n: diffInDays });
 
   const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) return `${diffInMonths}mo`;
+  if (diffInMonths < 12) return t("feed.time.months", { count: diffInMonths });
 
   const diffInYears = Math.floor(diffInMonths / 12);
-  return `${diffInYears}y`;
+  return t("feed.time.years", { count: diffInYears });
 };
 
 interface PostCardProps {
@@ -198,12 +209,12 @@ export const PostCard = React.memo(
         setIsVoting(true);
 
         if (!session || !session.username || !canPost(session)) {
-          showToast("Please login first", "error");
+          showToast(t("common.please_login_first"), "error");
           return;
         }
 
         if (session.username === "SPECTATOR") {
-          showToast("Please login first", "error");
+          showToast(t("common.please_login_first"), "error");
           return;
         }
 
@@ -244,7 +255,7 @@ export const PostCard = React.memo(
           recordVote(post.author, post.permlink, weight);
 
           // Show simple success toast
-          showToast("Vote submitted!", "success");
+          showToast(t("feed.post.vote_submitted"), "success");
         } catch (err) {
           // Revert the optimistic updates if the request failed
           setIsLiked(previousLikedState);
@@ -253,7 +264,7 @@ export const PostCard = React.memo(
           throw err;
         }
       } catch (error) {
-        let errorMessage = "Failed to vote";
+        let errorMessage = t("common.error.vote_failed");
         if (error instanceof Error) {
           errorMessage = error.message;
         }
@@ -302,7 +313,7 @@ export const PostCard = React.memo(
 
     const handleUserAction = async (action: "follow" | "unfollow" | "mute") => {
       if (!session || session.username === "SPECTATOR") {
-        showToast("Please login first", "error");
+        showToast(t("common.please_login_first"), "error");
         return;
       }
 
@@ -313,15 +324,15 @@ export const PostCard = React.memo(
         switch (action) {
           case "follow":
             relationship = "blog";
-            successMessage = `Following ${post.author}`;
+            successMessage = t("feed.post.following_toast", { author: post.author });
             break;
           case "unfollow":
             relationship = "";
-            successMessage = `Unfollowed ${post.author}`;
+            successMessage = t("feed.post.unfollowed_toast", { author: post.author });
             break;
           case "mute":
             relationship = "ignore";
-            successMessage = `Muted ${post.author}`;
+            successMessage = t("feed.post.muted_toast", { author: post.author });
             break;
         }
 
@@ -329,7 +340,7 @@ export const PostCard = React.memo(
         showToast(successMessage, "success");
       } catch (error) {
         showToast(
-          error instanceof Error ? error.message : "Failed to update relationship",
+          error instanceof Error ? error.message : t("feed.post.relationship_failed"),
           "error",
         );
       } finally {
@@ -344,12 +355,12 @@ export const PostCard = React.memo(
 
     const handleSubmitReport = async () => {
       if (!selectedReportReason) {
-        showToast("Please select a reason for reporting", "error");
+        showToast(t("feed.post.report_reason_required"), "error");
         return;
       }
 
       if (!session || !canPost(session)) {
-        showToast("Please login first", "error");
+        showToast(t("common.please_login_first"), "error");
         return;
       }
 
@@ -365,12 +376,12 @@ export const PostCard = React.memo(
           additionalInfo: reportAdditionalInfo,
         });
 
-        showToast("Report submitted successfully", "success");
+        showToast(t("feed.post.report_submitted"), "success");
         setShowReportModal(false);
         setSelectedReportReason("");
         setReportAdditionalInfo("");
       } catch (error) {
-        let errorMessage = "Failed to submit report";
+        let errorMessage = t("feed.post.report_failed");
         if (error instanceof Error) {
           errorMessage = error.message;
         }
@@ -473,7 +484,7 @@ export const PostCard = React.memo(
                     the one thing a newcomer can't guess (#68). */}
                 <CoachTip
                   step="vote"
-                  text="That bar is real money. Slide it and part of your voting power goes to this skater. The further right, the bigger the cut. Rewards come from other skaters, not from us."
+                  text={t("feed.post.vote_coach_tip")}
                 />
               </View>
             ) : (
@@ -498,15 +509,15 @@ export const PostCard = React.memo(
                     // icon-only control would otherwise announce nothing.
                     accessibilityLabel={
                       isLiked
-                        ? `Voted, ${voteCount} votes`
-                        : `Upvote, ${voteCount} votes`
+                        ? t("feed.post.a11y.voted", { count: voteCount })
+                        : t("feed.post.a11y.upvote", { count: voteCount })
                     }
                     accessibilityState={{
                       selected: isLiked,
                       disabled: isVoting || isLiked,
                     }}
                     accessibilityHint={
-                      isLiked ? undefined : "Double tap to choose a vote weight"
+                      isLiked ? undefined : t("feed.post.a11y.vote_hint")
                     }
                   >
                     <View style={styles.iconBox}>
@@ -544,8 +555,8 @@ export const PostCard = React.memo(
                     ]}
                     hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     accessibilityRole="button"
-                    accessibilityLabel={`${post.children} replies`}
-                    accessibilityHint="Double tap to open the conversation"
+                    accessibilityLabel={t("feed.post.a11y.replies", { count: post.children })}
+                    accessibilityHint={t("feed.post.a11y.replies_hint")}
                   >
                     <View style={styles.iconBox}>
                       <FontAwesome
@@ -565,7 +576,7 @@ export const PostCard = React.memo(
                 <View
                   style={styles.payoutContainer}
                   accessible
-                  accessibilityLabel={`Payout ${calculateTotalValue()} dollars`}
+                  accessibilityLabel={t("feed.post.a11y.payout", { amount: calculateTotalValue() })}
                 >
                   <Text style={[styles.payoutText, { color: rowColor }]}>$</Text>
                   <Text style={[styles.payoutText, { color: rowColor }]}>
@@ -608,14 +619,14 @@ export const PostCard = React.memo(
                   style={styles.userMenuButton}
                   onPress={() => handleUserAction("unfollow")}
                 >
-                  <Text style={styles.userMenuButtonText}>Unfollow</Text>
+                  <Text style={styles.userMenuButtonText}>{t("feed.post.menu.unfollow")}</Text>
                 </Pressable>
               ) : (
                 <Pressable
                   style={styles.userMenuButton}
                   onPress={() => handleUserAction("follow")}
                 >
-                  <Text style={styles.userMenuButtonText}>Follow</Text>
+                  <Text style={styles.userMenuButtonText}>{t("feed.post.menu.follow")}</Text>
                 </Pressable>
               )}
 
@@ -623,14 +634,14 @@ export const PostCard = React.memo(
                 style={styles.userMenuButton}
                 onPress={() => handleUserAction("mute")}
               >
-                <Text style={styles.userMenuButtonText}>Mute/Block</Text>
+                <Text style={styles.userMenuButtonText}>{t("feed.post.menu.mute_block")}</Text>
               </Pressable>
 
               <Pressable
                 style={styles.userMenuButton}
                 onPress={() => handleReportPost()}
               >
-                <Text style={styles.userMenuButtonText}>Report Post</Text>
+                <Text style={styles.userMenuButtonText}>{t("feed.post.report_post")}</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -646,50 +657,43 @@ export const PostCard = React.memo(
           <View style={styles.modalOverlay}>
             <View style={styles.reportModalContainer}>
               <ScrollView style={styles.reportModalContent}>
-                <Text style={styles.reportModalTitle}>Report Post</Text>
+                <Text style={styles.reportModalTitle}>{t("feed.post.report_post")}</Text>
                 <Text style={styles.reportModalSubtitle}>@{post.author}</Text>
 
                 <Text style={styles.reportSectionTitle}>
-                  Reason for reporting:
+                  {t("feed.post.report_reason_label")}
                 </Text>
 
-                {[
-                  "Spam",
-                  "Harassment or Abuse",
-                  "Inappropriate Content",
-                  "Copyright Violation",
-                  "Misinformation",
-                  "Other",
-                ].map((reason) => (
+                {REPORT_REASONS.map(({ value, labelKey }) => (
                   <Pressable
-                    key={reason}
+                    key={value}
                     style={[
                       styles.reportReasonButton,
-                      selectedReportReason === reason &&
+                      selectedReportReason === value &&
                         styles.reportReasonButtonSelected,
                     ]}
-                    onPress={() => setSelectedReportReason(reason)}
+                    onPress={() => setSelectedReportReason(value)}
                   >
                     <Text
                       style={[
                         styles.reportReasonText,
-                        selectedReportReason === reason &&
+                        selectedReportReason === value &&
                           styles.reportReasonTextSelected,
                       ]}
                     >
-                      {reason}
+                      {t(labelKey)}
                     </Text>
                   </Pressable>
                 ))}
 
                 <Text style={styles.reportSectionTitle}>
-                  Additional Information (Optional):
+                  {t("feed.post.report_info_label")}
                 </Text>
                 <TextInput
                   style={styles.reportTextInput}
                   multiline
                   numberOfLines={4}
-                  placeholder="Provide additional details about this report..."
+                  placeholder={t("feed.post.report_info_placeholder")}
                   placeholderTextColor={theme.colors.gray}
                   value={reportAdditionalInfo}
                   onChangeText={setReportAdditionalInfo}
@@ -705,7 +709,7 @@ export const PostCard = React.memo(
                     onPress={() => setShowReportModal(false)}
                     disabled={isSubmittingReport}
                   >
-                    <Text style={styles.reportCancelButtonText}>Cancel</Text>
+                    <Text style={styles.reportCancelButtonText}>{t("common.cancel")}</Text>
                   </Pressable>
 
                   <Pressable
@@ -722,7 +726,7 @@ export const PostCard = React.memo(
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <Text style={styles.reportSubmitButtonText}>
-                        Submit Report
+                        {t("feed.post.report_submit")}
                       </Text>
                     )}
                   </Pressable>

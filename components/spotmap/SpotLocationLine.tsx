@@ -3,6 +3,7 @@ import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { googleMapsUrl } from "~/lib/spotmap/parseSpotBody";
 
 interface Props {
@@ -24,7 +25,7 @@ export function SpotLocationLine({ name, lat, lng, address }: Props) {
       onPress={open}
       style={styles.row}
       accessibilityRole="link"
-      accessibilityLabel={`Open ${name} in Google Maps`}
+      accessibilityLabel={t("map.location_line.a11y", { name })}
     >
       <Text style={styles.globe}>🌐</Text>
       <View style={styles.body}>

@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Text } from "~/components/ui/text";
 import { useAuth } from "~/lib/auth-provider";
+import { t } from "~/lib/i18n";
 import { theme } from "~/lib/theme";
 
 /**
@@ -32,30 +33,27 @@ export function ProfileSpectatorInfo() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>SPECTATOR MODE</Text>
-      <Text style={styles.subtitle}>
-        You're browsing read-only. Log in to vote, post and earn — or keep
-        cruising the feed.
-      </Text>
+      <Text style={styles.title}>{t("auth.spectator.profile_title")}</Text>
+      <Text style={styles.subtitle}>{t("auth.spectator.profile_subtitle")}</Text>
 
       <Pressable
         style={styles.primaryBtn}
         onPress={goToLogin}
         accessibilityRole="button"
-        accessibilityLabel="Log in"
+        accessibilityLabel={t("auth.spectator.profile_login_a11y")}
       >
         <Ionicons name="log-in-outline" size={18} color={theme.colors.black} />
-        <Text style={styles.primaryText}>LOG IN</Text>
+        <Text style={styles.primaryText}>{t("auth.spectator.profile_login")}</Text>
       </Pressable>
 
       <Pressable
         style={styles.secondaryBtn}
         onPress={backToFeed}
         accessibilityRole="button"
-        accessibilityLabel="Back to feed"
+        accessibilityLabel={t("auth.spectator.profile_back_a11y")}
       >
         <Ionicons name="arrow-back" size={18} color={theme.colors.primary} />
-        <Text style={styles.secondaryText}>BACK TO FEED</Text>
+        <Text style={styles.secondaryText}>{t("auth.spectator.profile_back")}</Text>
       </Pressable>
     </View>
   );

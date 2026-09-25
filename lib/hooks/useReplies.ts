@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getContentReplies, type ExtendedComment } from '../hive-utils';
 import type { NestedDiscussion } from '../types';
+import { t } from '~/lib/i18n';
 
 interface UseRepliesResult {
   comments: NestedDiscussion[];
@@ -94,7 +95,7 @@ export function useReplies(
 
       setComments(discussionReplies);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch comments';
+      const errorMessage = err instanceof Error ? err.message : t('feed.hook.replies_fetch_failed');
       setError(errorMessage);
       console.error('Error fetching comments:', err);
     } finally {

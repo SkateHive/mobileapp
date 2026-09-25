@@ -16,6 +16,11 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "locales": {
+      "pt-BR": "./locales/pt-BR.json",
+      "pt-PT": "./locales/pt-PT.json",
+      "es": "./locales/es.json"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
@@ -32,7 +37,14 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication to protect your private keys."
+        "NSFaceIDUsageDescription": "Use Face ID to unlock your account.",
+        "CFBundleLocalizations": [
+          "en",
+          "pt-BR",
+          "pt-PT",
+          "es"
+        ],
+        "CFBundleAllowMixedLocalizations": true
       }
     },
     "android": {

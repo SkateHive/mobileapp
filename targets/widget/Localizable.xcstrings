@@ -1,0 +1,458 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "›" : {
+
+    },
+    "@%@" : {
+
+    },
+    "// CURATED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// CURADO"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// CURADO"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// CURADO"
+          }
+        }
+      }
+    },
+    "// OPEN SKATEHIVE TO\nLOCATE NEARBY SPOTS" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// ABRE SKATEHIVE PARA\nENCONTRAR SPOTS CERCA"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// ABRA O SKATEHIVE PARA\nENCONTRAR PICOS PERTO"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// ABRE O SKATEHIVE PARA\nENCONTRAR SPOTS PERTO"
+          }
+        }
+      }
+    },
+    "// TAP TO CAPTURE\nA NEW SKATE SPOT" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// TOCA PARA REGISTRAR\nUN NUEVO SPOT"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// TOQUE PARA REGISTRAR\nUM PICO NOVO"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "// TOCA PARA REGISTAR\nUM NOVO SPOT"
+          }
+        }
+      }
+    },
+    "▸ %@" : {
+
+    },
+    "◉" : {
+
+    },
+    "◉ NEAREST" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ CERCANO"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ PRÓXIMO"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ PRÓXIMO"
+          }
+        }
+      }
+    },
+    "◉ NEAREST SPOT" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ MÁS CERCANO"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ MAIS PRÓXIMO"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ MAIS PRÓXIMO"
+          }
+        }
+      }
+    },
+    "◉ SPOT MAP" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ MAPA DE SPOTS"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ MAPA DE PICOS"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ MAPA DE SPOTS"
+          }
+        }
+      }
+    },
+    "🛹" : {
+
+    },
+    "A map of skate spots near you." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un mapa de los spots de skate cerca de ti."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um mapa dos picos de skate perto de você."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um mapa dos spots de skate perto de ti."
+          }
+        }
+      }
+    },
+    "Add Spot" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevo spot"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo pico"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo spot"
+          }
+        }
+      }
+    },
+    "ADD SPOT" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AÑADIR SPOT"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ADICIONAR PICO"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ADICIONAR SPOT"
+          }
+        }
+      }
+    },
+    "Nearest Spot" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spot Más Cercano"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pico Mais Próximo"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spot Mais Próximo"
+          }
+        }
+      }
+    },
+    "Next nearby spot" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siguiente spot cercano"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo pico por perto"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo spot por perto"
+          }
+        }
+      }
+    },
+    "NO SIGNAL" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SIN SEÑAL"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEM SINAL"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEM SINAL"
+          }
+        }
+      }
+    },
+    "Photos of the closest spots — tap one to open it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos de los spots más cercanos — toca una para abrirla."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos dos picos mais próximos — toque em uma para abrir."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotografias dos spots mais próximos — toca numa para abrir."
+          }
+        }
+      }
+    },
+    "Spot Map" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa de Spots"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa de Picos"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa de Spots"
+          }
+        }
+      }
+    },
+    "SYNC //--:--" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SYNC //--:--"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SYNC //--:--"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SYNC //--:--"
+          }
+        }
+      }
+    },
+    "SYNC //%@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SYNC //%@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SYNC //%@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SYNC //%@"
+          }
+        }
+      }
+    },
+    "Tap to open SkateHive's camera and add a new skate spot." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca para abrir la cámara de SkateHive y añadir un nuevo spot de skate."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque para abrir a câmera do SkateHive e adicionar um novo pico de skate."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca para abrir a câmara do SkateHive e adicionar um novo spot de skate."
+          }
+        }
+      }
+    },
+    "The skate spot closest to you — tap › to cycle through nearby spots." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El spot de skate más cercano a ti — toca › para ver los siguientes."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O pico de skate mais perto de você — toque em › para ver os próximos."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O spot de skate mais próximo de ti — toca em › para ver os seguintes."
+          }
+        }
+      }
+    },
+    "Top Spots" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top Spots"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top Picos"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top Spots"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -13,6 +13,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { HIVE_AVATAR_URL } from '~/lib/constants';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 import { getFollowing, getFollowers, getMuted } from '~/lib/hive-utils';
 import { canPost, setRelationship } from '~/lib/posting';
 import { useAuth } from '~/lib/auth-provider';
@@ -53,7 +54,7 @@ const UserItem: React.FC<UserItemProps> = ({ username, onPress, showUnmuteButton
             onUnmute(username);
           }}
         >
-          <Text style={styles.unmuteText}>Unmute</Text>
+          <Text style={styles.unmuteText}>{t('profile.followers.unmute')}</Text>
         </Pressable>
       ) : (
         <FontAwesome 
@@ -151,7 +152,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     } catch (error) {
       console.error('Error unmuting user:', error);
       showToast(
-        error instanceof Error ? error.message : 'Failed to unmute user',
+        error instanceof Error ? error.message : t('profile.followers.unmute_error'),
         'error',
       );
     }
@@ -180,7 +181,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          No {type} found
+          {t(`profile.followers.empty_${type}`)}
         </Text>
       </View>
     );
@@ -198,7 +199,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {type === 'followers' ? 'Followers' : type === 'following' ? 'Following' : 'Muted'}
+              {t(`profile.followers.title_${type}`)}
             </Text>
             <Pressable onPress={onClose} style={styles.closeButton}>
               <FontAwesome name="times" size={20} color={theme.colors.text} />
@@ -209,7 +210,7 @@ export const FollowersModal: React.FC<FollowersModalProps> = ({
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.green} />
-              <Text style={styles.loadingText}>Loading {type === 'muted' ? 'muted users' : type}...</Text>
+              <Text style={styles.loadingText}>{t(`profile.followers.loading_${type}`)}</Text>
             </View>
           ) : (
             <FlatList

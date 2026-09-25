@@ -6,6 +6,7 @@ import AES from 'crypto-js/aes';
 import PBKDF2 from 'crypto-js/pbkdf2';
 import * as CryptoJS from 'crypto-js';
 import { Buffer } from 'buffer';
+import { t } from './i18n';
 
 export type EncryptionMethod = 'biometric' | 'pin';
 
@@ -147,8 +148,8 @@ export async function authenticateBiometric(): Promise<boolean> {
     }
     
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Authenticate to unlock your key',
-      fallbackLabel: 'Use PIN',
+      promptMessage: t('auth.securekey.biometric_prompt'),
+      fallbackLabel: t('auth.securekey.use_pin'),
       disableDeviceFallback: false,
     });
     

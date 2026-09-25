@@ -21,6 +21,7 @@ import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { useToast } from "~/lib/toast-provider";
 import { useAuth } from "~/lib/auth-provider";
+import { t } from "~/lib/i18n";
 import { canPost } from "~/lib/posting";
 import { useAllSpots } from "~/lib/hooks/useSpotmap";
 import { CoachTip } from "~/components/onboarding/Coach";
@@ -223,7 +224,9 @@ export default function MapScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== Location.PermissionStatus.GRANTED) {
         showToast(
-          "Enable location in Settings → Privacy → Location Services → Skatehive",
+          Platform.OS === "android"
+            ? t("map.near_me.permission_denied_android")
+            : t("map.near_me.permission_denied"),
           "error",
         );
         return;
@@ -239,7 +242,7 @@ export default function MapScreen() {
       if (spots?.length) syncSpotWidget(loc, spots);
       centerOnLoc(loc, 500);
     } catch {
-      showToast("Couldn't get your location", "error");
+      showToast(t("map.near_me.failed"), "error");
     }
   }, [showToast, spots, centerOnLoc]);
 
@@ -339,7 +342,7 @@ export default function MapScreen() {
         style={[styles.addSpotPill, !loggedIn && styles.addSpotPillMuted]}
         onPress={handleAddSpot}
         accessibilityRole="button"
-        accessibilityLabel={loggedIn ? "Add a skate spot" : "Log in to add a spot"}
+        accessibilityLabel={loggedIn ? t("map.add_spot.a11y") : t("map.add_spot.login")}
       >
         <Ionicons
           name={loggedIn ? "add" : "log-in-outline"}
@@ -347,7 +350,7 @@ export default function MapScreen() {
           color={loggedIn ? theme.colors.black : theme.colors.primary}
         />
         <Text style={[styles.addSpotText, !loggedIn && styles.addSpotTextMuted]}>
-          {loggedIn ? "Add Spot" : "Log in to add a spot"}
+          {loggedIn ? t("map.add_spot.label") : t("map.add_spot.login")}
         </Text>
       </Pressable>
 
@@ -356,7 +359,7 @@ export default function MapScreen() {
         style={styles.fab}
         onPress={handleNearMe}
         accessibilityRole="button"
-        accessibilityLabel="Find spots near me"
+        accessibilityLabel={t("map.near_me.a11y")}
       >
         <Ionicons name="locate" size={22} color={theme.colors.primary} />
       </Pressable>
@@ -369,7 +372,7 @@ export default function MapScreen() {
         handleIndicatorStyle={styles.sheetHandle}
       >
         <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>SPOTS IN THIS VIEW</Text>
+          <Text style={styles.sheetTitle}>{t("map.sheet.title")}</Text>
           <Text style={styles.sheetCount}>
             {visibleSpots.length} / {total}
           </Text>
@@ -381,9 +384,9 @@ export default function MapScreen() {
           </View>
         ) : isError ? (
           <View style={styles.center}>
-            <Text style={styles.emptyText}>Couldn't load spots.</Text>
+            <Text style={styles.emptyText}>{t("map.sheet.load_error")}</Text>
             <Pressable onPress={() => refetch()} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={styles.retryText}>{t("common.retry")}</Text>
             </Pressable>
           </View>
         ) : (
@@ -406,9 +409,7 @@ export default function MapScreen() {
             ItemSeparatorComponent={() => <View style={styles.sep} />}
             ListEmptyComponent={
               <View style={styles.center}>
-                <Text style={styles.emptyText}>
-                  No spots here — pan or zoom out.
-                </Text>
+                <Text style={styles.emptyText}>{t("map.sheet.empty")}</Text>
               </View>
             }
             onScrollToIndexFailed={() => {}}
@@ -423,7 +424,7 @@ export default function MapScreen() {
       <CoachTip
         step="map"
         enabled={!!spots?.length}
-        text="Every pin here is a spot somebody actually skated. Found one that's missing? Hit + and drop it. The map is only as good as what the crew puts on it."
+        text={t("map.coach.tip")}
       />
     </View>
   );

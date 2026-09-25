@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '~/components/ui/text';
 import { Input } from '~/components/ui/input';
 import { theme } from '~/lib/theme';
+import { t, locale } from '~/lib/i18n';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
 import { HiveClient } from '~/lib/hive-utils';
@@ -89,6 +90,11 @@ const COUNTRIES = [
   { code: 'VN', name: 'Vietnam', flag: '🇻🇳' },
 ];
 
+// The English `name` is what gets saved to the Hive profile; only the label on screen is translated.
+function countryLabel(country: { code: string }): string {
+  return t(`profile.country.${country.code.toLowerCase()}`);
+}
+
 function getCountryByName(name: string) {
   if (!name) return null;
   const lower = name.toLowerCase();
@@ -155,9 +161,9 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
       setIgSaving(true);
       await setIgHandleApi(handle, session);
       setInstagramHandle(handle);
-      showToast('Instagram handle saved', 'success');
+      showToast(t('profile.ig.handle_saved'), 'success');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not save handle', 'error');
+      showToast(e instanceof Error ? e.message : t('profile.ig.save_error'), 'error');
     } finally {
       setIgSaving(false);
       setIgModalVisible(false);
@@ -179,10 +185,14 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
   const selectedCountry = useMemo(() => getCountryByName(location), [location]);
 
   const filteredCountries = useMemo(() => {
-    if (!countrySearch) return COUNTRIES;
+    const byLabel = [...COUNTRIES].sort((a, b) => countryLabel(a).localeCompare(countryLabel(b), locale));
+    if (!countrySearch) return byLabel;
     const q = countrySearch.toLowerCase();
-    return COUNTRIES.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    return byLabel.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        countryLabel(c).toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q)
     );
   }, [countrySearch]);
 
@@ -232,7 +242,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('Failed to upload avatar:', err);
-      showToast('Failed to upload avatar', 'error');
+      showToast(t('profile.edit.avatar_error'), 'error');
     } finally {
       setUploadingAvatar(false);
     }
@@ -270,15 +280,16 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
       await updateProfile(session, updatedProfile);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast('Profile updated!', 'success');
+      showToast(t('profile.edit.saved'), 'success');
       onSaved();
       onClose();
     } catch (err: any) {
       console.error('Failed to update profile:', err);
+      // The Hive node reports a lack of resource credits in English, so this match stays on its text.
       if (err.message?.includes('insufficient')) {
-        showToast('Insufficient RC - wait and try again', 'error');
+        showToast(t('profile.edit.rc_error'), 'error');
       } else {
-        showToast(err.message || 'Failed to update profile', 'error');
+        showToast(err.message || t('profile.edit.save_error'), 'error');
       }
     } finally {
       setSaving(false);
@@ -303,7 +314,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
           <Pressable onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={24} color={theme.colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={styles.headerTitle}>{t('profile.edit.title')}</Text>
           <Pressable
             onPress={handleSave}
             disabled={saving || !hasChanges}
@@ -313,7 +324,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
             {saving ? (
               <ActivityIndicator size="small" color={theme.colors.background} />
             ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
+              <Text style={styles.saveButtonText}>{t('common.save')}</Text>
             )}
           </Pressable>
         </View>
@@ -342,21 +353,21 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
           {/* Form Fields */}
           <View style={styles.form}>
             <View style={styles.field}>
-              <Text style={styles.label}>Name</Text>
+              <Text style={styles.label}>{t('profile.edit.label_name')}</Text>
               <Input
                 value={name}
                 onChangeText={setName}
-                placeholder="Display name"
+                placeholder={t('profile.edit.placeholder_name')}
                 maxLength={50}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>About</Text>
+              <Text style={styles.label}>{t('profile.edit.label_about')}</Text>
               <Input
                 value={about}
                 onChangeText={setAbout}
-                placeholder="Tell us about yourself"
+                placeholder={t('profile.edit.placeholder_about')}
                 maxLength={500}
                 multiline
                 numberOfLines={3}
@@ -365,7 +376,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Location</Text>
+              <Text style={styles.label}>{t('profile.edit.label_location')}</Text>
               <Pressable
                 style={styles.countryPicker}
                 onPress={() => {
@@ -376,19 +387,19 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
                 {selectedCountry ? (
                   <>
                     <Text style={styles.countryFlag}>{selectedCountry.flag}</Text>
-                    <Text style={styles.countryName}>{selectedCountry.name}</Text>
+                    <Text style={styles.countryName}>{countryLabel(selectedCountry)}</Text>
                   </>
                 ) : location ? (
                   <Text style={styles.countryName}>{location}</Text>
                 ) : (
-                  <Text style={styles.countryPlaceholder}>Select country</Text>
+                  <Text style={styles.countryPlaceholder}>{t('profile.edit.select_country')}</Text>
                 )}
                 <Ionicons name="chevron-down" size={16} color={theme.colors.muted} />
               </Pressable>
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Website</Text>
+              <Text style={styles.label}>{t('profile.edit.label_website')}</Text>
               <Input
                 value={website}
                 onChangeText={setWebsite}
@@ -407,7 +418,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
                     <Text style={styles.countryName}>@{instagramHandle}</Text>
                   ) : (
                     <Text style={styles.countryPlaceholder}>
-                      Add your handle for Instagram cross-posts
+                      {t('profile.edit.ig_placeholder')}
                     </Text>
                   )}
                   <Ionicons name="logo-instagram" size={16} color={theme.colors.muted} />
@@ -434,7 +445,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
             <Pressable onPress={() => setCountryPickerVisible(false)} hitSlop={12}>
               <Ionicons name="close" size={24} color={theme.colors.text} />
             </Pressable>
-            <Text style={styles.headerTitle}>Select Country</Text>
+            <Text style={styles.headerTitle}>{t('profile.edit.country_title')}</Text>
             <View style={{ width: 24 }} />
           </View>
           <View style={styles.searchBar}>
@@ -442,7 +453,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
             <Input
               value={countrySearch}
               onChangeText={setCountrySearch}
-              placeholder="Search..."
+              placeholder={t('profile.edit.search_placeholder')}
               style={styles.searchInput}
               autoFocus
             />
@@ -456,7 +467,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
               }}
             >
               <Ionicons name="close-circle" size={18} color={theme.colors.danger} />
-              <Text style={styles.clearCountryText}>Clear location</Text>
+              <Text style={styles.clearCountryText}>{t('profile.edit.clear_location')}</Text>
             </Pressable>
           ) : null}
           <FlatList
@@ -476,7 +487,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
                 }}
               >
                 <Text style={styles.countryItemFlag}>{item.flag}</Text>
-                <Text style={styles.countryItemName}>{item.name}</Text>
+                <Text style={styles.countryItemName}>{countryLabel(item)}</Text>
                 {location === item.name && (
                   <Ionicons name="checkmark" size={18} color={theme.colors.primary} />
                 )}
@@ -484,7 +495,7 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
             )}
             ListEmptyComponent={
               <View style={styles.emptySearch}>
-                <Text style={styles.emptySearchText}>No countries found</Text>
+                <Text style={styles.emptySearchText}>{t('profile.edit.no_countries')}</Text>
               </View>
             }
           />

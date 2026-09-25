@@ -19,6 +19,7 @@ import { ReplyComposer } from "~/components/ui/ReplyComposer";
 import { useReplies } from "~/lib/hooks/useReplies";
 import { useAuth } from "~/lib/auth-provider";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import type { Discussion } from "@hiveio/dhive";
 import type { NestedDiscussion } from "~/lib/types";
 
@@ -149,7 +150,7 @@ export function FullConversationDrawer({
                     color={theme.colors.text}
                   />
                 </Pressable>
-                <Text style={styles.headerTitle}>Conversation</Text>
+                <Text style={styles.headerTitle}>{t("feed.conversation.title")}</Text>
                 <View style={styles.headerSpacer} />
               </View>
             </View>
@@ -174,18 +175,18 @@ export function FullConversationDrawer({
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={theme.colors.green} />
                   <Text style={styles.loadingText}>
-                    Loading conversation...
+                    {t("feed.drawer.loading")}
                   </Text>
                 </View>
               ) : error ? (
                 <View style={styles.errorContainer}>
                   <Text style={styles.errorText}>
-                    Error loading conversation
+                    {t("feed.drawer.error")}
                   </Text>
                 </View>
               ) : comments.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No comments yet</Text>
+                  <Text style={styles.emptyText}>{t("feed.drawer.empty")}</Text>
                 </View>
               ) : (
                 <View style={styles.repliesContainer}>
@@ -206,8 +207,8 @@ export function FullConversationDrawer({
                   parentAuthor={author}
                   parentPermlink={permlink}
                   onReplySuccess={() => {}}
-                  placeholder="Write your reply..."
-                  buttonLabel="POST"
+                  placeholder={t("feed.drawer.reply_placeholder")}
+                  buttonLabel={t("feed.drawer.reply_button")}
                 />
               </View>
             )}

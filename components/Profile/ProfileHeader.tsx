@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 
 // Map common country names/codes to flag emojis
 function countryToFlag(location: string): string {
@@ -140,7 +141,7 @@ export function ProfileHeader({
               onPress={onHpPress}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`${hpAccessibilityLabel ?? hpLabel}. What is this?`}
+              accessibilityLabel={t("profile.hp.chip_hint", { label: hpAccessibilityLabel ?? hpLabel })}
             >
               <Text style={styles.hpChipText}>{hpLabel}</Text>
               <Ionicons

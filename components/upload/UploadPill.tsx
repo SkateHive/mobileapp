@@ -6,6 +6,7 @@ import Svg, { Circle } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { isJobActive, pillDetail, pillLabel, type UploadJob } from "~/lib/upload/upload-job";
 import { discard, dispatch, useUploadJob } from "~/lib/upload/upload-store";
 
@@ -111,8 +112,8 @@ export function UploadPill() {
         onPress={onPress}
         style={styles.pill}
         accessibilityRole="button"
-        accessibilityLabel={pillLabel(job)}
-        accessibilityHint={published ? "Opens the post" : "Shows upload details"}
+        accessibilityLabel={pillLabel(job, t)}
+        accessibilityHint={published ? t("upload.pill.hint_published") : t("upload.pill.hint_details")}
       >
         <View style={styles.row}>
           <View style={styles.ringSlot}>
@@ -133,7 +134,7 @@ export function UploadPill() {
               {published ? <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} /> : null}
               {failed ? <Ionicons name="alert-circle" size={16} color={theme.colors.danger} /> : null}
               <Text style={[styles.label, failed && styles.labelFailed]} numberOfLines={1}>
-                {pillLabel(job)}
+                {pillLabel(job, t)}
               </Text>
             </View>
             {!expanded && isJobActive(job) ? (
@@ -158,15 +159,15 @@ export function UploadPill() {
               </Text>
             ) : null}
             <Text style={[styles.detail, failed && styles.detailFailed]} numberOfLines={3}>
-              {pillDetail(job)}
+              {pillDetail(job, t)}
             </Text>
             {failed ? (
               <View style={styles.actions}>
                 <Pressable onPress={onRetry} style={styles.retryButton} accessibilityRole="button">
-                  <Text style={styles.retryText}>Retry</Text>
+                  <Text style={styles.retryText}>{t("common.retry")}</Text>
                 </Pressable>
                 <Pressable onPress={onDiscard} style={styles.discardButton} accessibilityRole="button">
-                  <Text style={styles.discardText}>Discard</Text>
+                  <Text style={styles.discardText}>{t("common.discard")}</Text>
                 </Pressable>
               </View>
             ) : null}

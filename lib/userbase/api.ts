@@ -13,6 +13,16 @@ export interface UserbaseUser {
   onboarding_step?: number;
 }
 
+/** A request the server rejected without a readable error body. `status` is the HTTP code. */
+export class RequestFailedError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`Request failed (${status})`);
+    this.name = "RequestFailedError";
+    this.status = status;
+  }
+}
+
 async function postJson<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
@@ -24,7 +34,7 @@ async function postJson<T>(path: string, body: unknown, token?: string): Promise
   });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok && !(data as any)?.error) {
-    throw new Error(`Request failed (${res.status})`);
+    throw new RequestFailedError(res.status);
   }
   return data as T;
 }
@@ -78,10 +88,62 @@ export function claimAccount(
   });
 }
 
-export interface CheckUsernameResult { valid: boolean; available: boolean; reason?: string }
+// The server answers in English. These are its known check-username reasons, mapped
+// once here to codes so the screens branch on the code and show their own text.
+// An unknown reason has no code and is shown exactly as received.
+export type UsernameReasonCode =
+  | "hive_taken"
+  | "userbase_taken"
+  | "server_check_failed"
+  | "format_length"
+  | "format_start"
+  | "format_end"
+  | "format_chars"
+  | "format_adjacent"
+  | "format_segment";
+
+const USERNAME_REASON_CODES: Record<string, UsernameReasonCode> = {
+  "Already taken on Hive": "hive_taken",
+  "Already reserved": "userbase_taken",
+  "Couldn't check availability \u2014 try again": "server_check_failed",
+  "Must be 3\u201316 characters": "format_length",
+  "Must start with a letter": "format_start",
+  "Must end with a letter or number": "format_end",
+  "Only lowercase letters, numbers, '.' and '-'": "format_chars",
+  "No adjacent '.' or '-'": "format_adjacent",
+  "Each segment must be at least 3 characters": "format_segment",
+};
+
+export function usernameReasonCode(reason?: string): UsernameReasonCode | undefined {
+  return reason ? USERNAME_REASON_CODES[reason] : undefined;
+}
+
+// Same idea for the other error strings these endpoints send, keyed to catalog ids.
+export const SERVER_ERROR_KEYS: Record<string, string> = {
+  "Invalid or expired code": "auth.server.invalid_or_expired_code",
+  "Email and a 6-digit code are required": "auth.server.code_required",
+  "A valid email is required": "auth.server.valid_email_required",
+  "Please wait a moment before requesting another code": "auth.server.wait_before_resend",
+  "Could not send the code, try again": "auth.server.send_code_failed",
+  "Signup session expired \u2014 request a new code": "auth.server.signup_expired",
+  "Couldn't verify username availability \u2014 try again": "auth.server.availability_check_failed",
+  "That Hive username is already taken": "auth.server.hive_taken",
+  "That username is already in use": "auth.server.userbase_taken",
+  "Could not create the account": "auth.server.create_failed",
+  "Could not link the email to the account": "auth.server.link_failed",
+};
+
+export interface CheckUsernameResult {
+  valid: boolean;
+  available: boolean;
+  reason?: string;
+  /** Set when `reason` is one of the server's known strings. */
+  reasonCode?: UsernameReasonCode;
+}
 export async function checkUsername(name: string): Promise<CheckUsernameResult> {
   const res = await fetch(`${BASE}/hive/check-username?name=${encodeURIComponent(name)}`);
-  return (await res.json()) as CheckUsernameResult;
+  const data = (await res.json()) as CheckUsernameResult;
+  return { ...data, reasonCode: usernameReasonCode(data.reason) };
 }
 
 export interface SessionResult { success: boolean; user?: UserbaseUser; error?: string }

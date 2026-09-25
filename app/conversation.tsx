@@ -18,6 +18,7 @@ import { useAuth } from '~/lib/auth-provider';
 import { theme } from '~/lib/theme';
 import type { Discussion } from '@hiveio/dhive';
 import type { NestedDiscussion } from '~/lib/types';
+import { t } from '~/lib/i18n';
 
 export default function ConversationScreen() {
   const { author, permlink, postData } = useLocalSearchParams<{
@@ -66,10 +67,10 @@ export default function ConversationScreen() {
           <Pressable onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Conversation</Text>
+          <Text style={styles.headerTitle}>{t('feed.conversation.title')}</Text>
         </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Invalid conversation parameters</Text>
+          <Text style={styles.errorText}>{t('feed.conversation.invalid_params')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -82,7 +83,7 @@ export default function ConversationScreen() {
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Conversation</Text>
+        <Text style={styles.headerTitle}>{t('feed.conversation.title')}</Text>
       </View>
 
       <View style={styles.contentContainer}>
@@ -99,8 +100,8 @@ export default function ConversationScreen() {
             parentAuthor={author || ''}
             parentPermlink={permlink || ''}
             onReplySuccess={handleReplySuccess}
-            placeholder="Write here"
-            buttonLabel="REPLY"
+            placeholder={t('feed.reply.placeholder_default')}
+            buttonLabel={t('feed.reply.button')}
           />
 
           {/* Divider */}
@@ -111,15 +112,15 @@ export default function ConversationScreen() {
             {isLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={theme.colors.green} />
-                <Text style={styles.loadingText}>Loading comments...</Text>
+                <Text style={styles.loadingText}>{t('feed.conversation.loading')}</Text>
               </View>
             ) : error ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error loading comments: {error}</Text>
+                <Text style={styles.errorText}>{t('feed.conversation.error', { error })}</Text>
               </View>
             ) : allReplies.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
+                <Text style={styles.emptyText}>{t('feed.conversation.empty')}</Text>
               </View>
             ) : (
               <>

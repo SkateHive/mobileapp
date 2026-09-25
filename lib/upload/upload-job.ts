@@ -1,5 +1,6 @@
 // Pure module: no React Native or Expo imports, so the tests run under plain
 // Node (`pnpm test`). The store and provider own all I/O.
+import type { TFunction } from "../i18n/translate";
 
 export type UploadStatus =
   | "uploading"    // media bytes leaving the device (server stage "receiving")
@@ -14,9 +15,15 @@ export type UploadErrorKind = "network" | "server" | "auth" | "broadcast" | "unk
 
 export type ResumeKind = "launch" | "foreground";
 
+export type UploadErrorParams = Record<string, string | number>;
+
 export interface UploadError {
   kind: UploadErrorKind;
+  /** English, for logs and for jobs from older builds; the pill prefers `code`. */
   message: string;
+  /** Stable id of `upload.error.<code>` in the catalogs. Absent on errors from older builds. */
+  code?: string;
+  params?: UploadErrorParams;
 }
 
 export interface UploadDraft {
@@ -327,38 +334,50 @@ export function reduce(job: UploadJob | null, event: UploadEvent): UploadJob | n
   }
 }
 
-export function pillLabel(job: UploadJob): string {
-  if (job.pendingResume !== null) return "Resuming…";
+export function pillLabel(job: UploadJob, t: TFunction): string {
+  if (job.pendingResume !== null) return t("upload.pill.label_resuming");
   const pct = Math.round(job.progress);
   switch (job.status) {
     case "uploading":
-      return `Uploading… ${pct}%`;
+      return t("upload.pill.label_uploading", { pct });
     case "transcoding":
-      return job.stage === "uploading" ? `Pinning… ${pct}%` : `Transcoding… ${pct}%`;
+      return job.stage === "uploading"
+        ? t("upload.pill.label_pinning", { pct })
+        : t("upload.pill.label_transcoding", { pct });
     case "publishing":
-      return "Publishing…";
+      return t("upload.pill.label_publishing");
     case "published":
-      return "Published";
+      return t("upload.pill.label_published");
     case "failed":
-      return "Upload failed";
+      return t("upload.pill.label_failed");
   }
 }
 
-export function pillDetail(job: UploadJob): string {
-  if (job.pendingResume !== null) return "Picking up where it left off";
+/** The failed pill's detail: the translated code when we know it, else the raw message. */
+export function errorText(error: UploadError | null, t: TFunction): string {
+  if (error?.code) {
+    const key = `upload.error.${error.code}`;
+    const text = t(key, error.params);
+    if (text !== key) return text;
+  }
+  return error?.message ?? t("common.something_wrong");
+}
+
+export function pillDetail(job: UploadJob, t: TFunction): string {
+  if (job.pendingResume !== null) return t("upload.pill.detail_resuming");
   switch (job.status) {
     case "uploading":
-      return "Sending to server";
+      return t("upload.pill.detail_uploading");
     case "transcoding":
-      if (job.stage === "uploading") return "Uploading to IPFS";
-      if (job.stage === "optimized") return "Video already optimized";
-      return "Transcoding video";
+      if (job.stage === "uploading") return t("upload.pill.detail_pinning");
+      if (job.stage === "optimized") return t("upload.pill.detail_optimized");
+      return t("upload.pill.detail_transcoding");
     case "publishing":
-      return "Posting to Hive";
+      return t("upload.pill.detail_publishing");
     case "published":
-      return "Tap to open";
+      return t("upload.pill.detail_published");
     case "failed":
-      return job.error?.message ?? "Something went wrong";
+      return errorText(job.error, t);
   }
 }
 

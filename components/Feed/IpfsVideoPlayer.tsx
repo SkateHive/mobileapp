@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../ui/text';
 import { theme } from '../../lib/theme';
+import { t } from '../../lib/i18n';
 
 interface IpfsVideoPlayerProps {
   url: string;
@@ -37,13 +38,13 @@ export function IpfsVideoPlayer({
     return (
       <View style={styles.errorContainer}>
         <Ionicons name="videocam-outline" size={36} color={theme.colors.gray} />
-        <Text style={styles.errorText}>Can't play this video format</Text>
+        <Text style={styles.errorText}>{t('feed.player.cant_play')}</Text>
         <Pressable
           style={styles.openWebButton}
           onPress={() => Linking.openURL(cleanUrl)}
         >
           <Ionicons name="open-outline" size={16} color={theme.colors.green} />
-          <Text style={styles.openWebText}>Open in browser</Text>
+          <Text style={styles.openWebText}>{t('feed.player.open_browser')}</Text>
         </Pressable>
       </View>
     );

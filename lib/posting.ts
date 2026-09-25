@@ -1,4 +1,5 @@
 import type { AuthSession } from "./types";
+import { t } from "./i18n";
 import {
   vote as hiveVote,
   comment as hiveComment,
@@ -37,7 +38,7 @@ export async function castVote(
 ): Promise<void> {
   if (isUserbaseSession(session)) {
     const r = await ubVote(session.userbaseToken!, { author, permlink, weight });
-    if (!r.success) throw new Error(r.error || "Vote failed");
+    if (!r.success) throw new Error(r.error || t("posting.error.vote_failed"));
     return;
   }
   await hiveVote(session.decryptedKey, session.username, author, permlink, weight);
@@ -65,7 +66,7 @@ export async function postComment(
       title: args.title,
       json_metadata: args.jsonMetadata,
     });
-    if (!r.success) throw new Error(r.error || "Comment failed");
+    if (!r.success) throw new Error(r.error || t("posting.error.comment_failed"));
     return { author: r.author || session.username, permlink: r.permlink || args.permlink || "" };
   }
   const permlink = args.permlink || `re-${Date.now().toString(36)}`;
@@ -94,7 +95,7 @@ export async function setRelationship(
 ): Promise<void> {
   if (isUserbaseSession(session)) {
     const r = await ubFollow(session.userbaseToken!, { following, type });
-    if (!r.success) throw new Error(r.error || "Action failed");
+    if (!r.success) throw new Error(r.error || t("posting.error.action_failed"));
     return;
   }
   const ok = await hiveSetRelationship(
@@ -103,7 +104,7 @@ export async function setRelationship(
     following,
     type
   );
-  if (!ok) throw new Error("Action failed");
+  if (!ok) throw new Error(t("posting.error.action_failed"));
 }
 
 export async function updateProfile(
@@ -112,7 +113,7 @@ export async function updateProfile(
 ): Promise<void> {
   if (isUserbaseSession(session)) {
     const r = await ubAccountUpdate(session.userbaseToken!, { profile });
-    if (!r.success) throw new Error(r.error || "Profile update failed");
+    if (!r.success) throw new Error(r.error || t("posting.error.profile_failed"));
     return;
   }
   await hiveUpdateProfile(session.decryptedKey, session.username, profile);
@@ -136,7 +137,7 @@ export async function submitReport(
       args.additionalInfo
     );
     const r = await ubReport(session.userbaseToken!, { payload });
-    if (!r.success) throw new Error(r.error || "Report failed");
+    if (!r.success) throw new Error(r.error || t("posting.error.report_failed"));
     return;
   }
   await hiveSubmitReport(

@@ -1,5 +1,6 @@
 // Pure geo helpers for the spot map — no native deps.
 
+import type { TFunction } from "../i18n/translate";
 import type { SpotmapRow } from "./types";
 
 export interface Region {
@@ -59,8 +60,16 @@ export function regionToZoom(region: Region): number {
   return Math.round(Math.log2(360 / region.longitudeDelta));
 }
 
-export function formatDistance(km: number): string {
-  if (km < 1) return `${Math.round(km * 1000)} m`;
-  if (km < 10) return `${km.toFixed(1)} km`;
-  return `${Math.round(km)} km`;
+/**
+ * `t` and `decimal` are passed in so this module stays free of React Native imports;
+ * `decimal` writes the locale's separator ("1,2" in Portuguese and Spanish).
+ */
+export function formatDistance(
+  km: number,
+  t: TFunction,
+  decimal: (value: number, digits: number) => string,
+): string {
+  if (km < 1) return t("map.distance.m", { n: Math.round(km * 1000) });
+  if (km < 10) return t("map.distance.km", { n: decimal(km, 1) });
+  return t("map.distance.km", { n: Math.round(km) });
 }

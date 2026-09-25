@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../ui/text';
 import { theme } from '~/lib/theme';
 import { HIVE_AVATAR_URL } from '~/lib/constants';
+import { t } from '~/lib/i18n';
 import type { StoredUser } from '../../lib/types';
 
 interface StoredUsersViewProps {
@@ -24,11 +25,11 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
   const confirmDelete = (username: string) => {
     if (!onDeleteUser) return;
     Alert.alert(
-      `Remove @${username}?`,
-      'The key stored on this device is deleted. Your Hive account is not affected.',
+      t('auth.stored.remove_title', { username }),
+      t('auth.stored.remove_message'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => onDeleteUser(username) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('auth.stored.remove_confirm'), style: 'destructive', onPress: () => onDeleteUser(username) },
       ]
     );
   };
@@ -43,7 +44,7 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             onPress={() => onQuickLogin(user)}
             accessibilityRole="button"
-            accessibilityLabel={`Sign in as ${user.username}`}
+            accessibilityLabel={t('auth.stored.sign_in_as', { username: user.username })}
           >
             <Image
               source={{ uri: `${HIVE_AVATAR_URL}/${user.username}/avatar` }}
@@ -55,14 +56,14 @@ export function StoredUsersView({ users, onQuickLogin, onDeleteUser }: StoredUse
                 the modality, and this same value covers Touch ID and device
                 authentication. */}
             <Text style={styles.method}>
-              {user.method === 'pin' ? 'PIN' : 'Biometrics'}
+              {user.method === 'pin' ? t('auth.stored.method_pin') : t('auth.stored.method_biometrics')}
             </Text>
             {onDeleteUser && (
               <Pressable
                 onPress={() => confirmDelete(user.username)}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel={`Remove ${user.username}`}
+                accessibilityLabel={t('auth.stored.remove_a11y', { username: user.username })}
               >
                 {({ pressed }) => (
                   <Ionicons

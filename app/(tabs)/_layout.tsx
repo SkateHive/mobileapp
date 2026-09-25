@@ -11,6 +11,7 @@ import { canPost } from "~/lib/posting";
 import { useNotificationContext } from "~/lib/notifications-context";
 import { ActionSheet } from "~/components/ui/ActionSheet";
 import { UploadPill } from "~/components/upload/UploadPill";
+import { t } from "~/lib/i18n";
 
 interface TabItem {
   name: string;
@@ -23,32 +24,32 @@ interface TabItem {
 const TAB_ITEMS: TabItem[] = [
   {
     name: "videos",
-    title: "Videos",
+    title: t("feed.nav.tab.videos"),
     icon: "home-outline",
     iconFamily: "Ionicons",
   },
   {
     name: "map",
-    title: "Map",
+    title: t("feed.nav.tab.map"),
     icon: "map-outline",
     iconFamily: "Ionicons",
   },
   {
     name: "create",
-    title: "Create",
+    title: t("feed.nav.tab.create"),
     icon: "add",
     iconFamily: "Ionicons",
     isCenter: true,
   },
   {
     name: "notifications",
-    title: "Notifications",
+    title: t("feed.nav.tab.notifications"),
     icon: "notifications-outline",
     iconFamily: "Ionicons",
   },
   {
     name: "profile",
-    title: "Profile",
+    title: t("feed.nav.tab.profile"),
     icon: "person-outline",
     iconFamily: "Ionicons",
   },
@@ -212,7 +213,7 @@ export default function TabLayout() {
               name="feed"
               options={{
                 href: null,
-                title: "Feed",
+                title: t("feed.nav.screen.feed"),
               }}
             />
 
@@ -221,7 +222,7 @@ export default function TabLayout() {
               name="leaderboard"
               options={{
                 href: null,
-                title: "Leaderboard",
+                title: t("feed.nav.screen.leaderboard"),
               }}
             />
           </Tabs>
@@ -235,30 +236,30 @@ export default function TabLayout() {
         <ActionSheet
           visible={createMenuVisible}
           onClose={() => setCreateMenuVisible(false)}
-          title="Create"
+          title={t("feed.nav.tab.create")}
           subtitle={username ? `@${username}` : undefined}
           items={[
             {
               key: "post",
               icon: "create-outline",
-              title: "Post",
-              subtitle: "Share a clip with the crew",
+              title: t("feed.create_sheet.post_title"),
+              subtitle: t("feed.create_sheet.post_subtitle"),
               variant: "primary",
               onPress: () => handleMenuChoice("/(tabs)/create"),
             },
             {
               key: "spot",
               icon: "location-outline",
-              title: "Spot",
-              subtitle: "Add a skate spot to the map",
+              title: t("feed.create_sheet.spot_title"),
+              subtitle: t("feed.create_sheet.spot_subtitle"),
               variant: "secondary",
               onPress: () => handleMenuChoice("/spot-create"),
             },
             {
               key: "play",
               icon: "game-controller-outline",
-              title: "Play",
-              subtitle: "Coach Fred — skate or dice",
+              title: t("feed.create_sheet.play_title"),
+              subtitle: t("feed.create_sheet.play_subtitle"),
               variant: "secondary",
               onPress: () => handleMenuChoice("/skate-dice"),
             },

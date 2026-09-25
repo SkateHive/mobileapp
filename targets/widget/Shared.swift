@@ -40,10 +40,16 @@ func loadPayload() -> WidgetPayload? {
   return try? JSONDecoder().decode(WidgetPayload.self, from: data)
 }
 
+/// The language the widget text is shown in (en, pt-BR, pt-PT, es), resolved from the
+/// widget bundle's localisations. Used instead of Locale.current so the decimal
+/// separator follows the language, like the app does (lib/i18n/format.ts): a comma
+/// in Portuguese and Spanish even when the device region says otherwise.
+let displayLocale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+
 /// Mirror of lib/spotmap/geo.ts `formatDistance` so labels match the app.
 func formatDistance(_ km: Double) -> String {
   if km < 1 { return "\(Int((km * 1000).rounded())) m" }
-  if km < 10 { return String(format: "%.1f km", km) }
+  if km < 10 { return String(format: "%.1f km", locale: displayLocale, km) }
   return "\(Int(km.rounded())) km"
 }
 
@@ -52,12 +58,16 @@ func loadSelectedIndex() -> Int {
   UserDefaults(suiteName: appGroupId)?.integer(forKey: selectedIndexKey) ?? 0
 }
 
-/// HUD-style "last synced" stamp, e.g. "SYNC //14:48".
+/// HUD-style "last synced" stamp, e.g. "SYNC //14:48". Looked up in Localizable.xcstrings:
+/// Text(String) does not localise, so this resolves the text itself.
 func syncLabel(_ updatedAt: Double) -> String {
-  guard updatedAt > 0 else { return "SYNC //--:--" }
+  guard updatedAt > 0 else { return NSLocalizedString("SYNC //--:--", comment: "Widget header before the first sync") }
   let f = DateFormatter()
   f.dateFormat = "HH:mm"
-  return "SYNC //" + f.string(from: Date(timeIntervalSince1970: updatedAt))
+  return String(
+    format: NSLocalizedString("SYNC //%@", comment: "Widget header: last sync time, e.g. 14:48"),
+    f.string(from: Date(timeIntervalSince1970: updatedAt))
+  )
 }
 
 /// Builds a "myapp://" deep link from an in-app path ("/spot/..", "/map").

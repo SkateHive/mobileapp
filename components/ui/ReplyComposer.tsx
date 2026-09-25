@@ -21,6 +21,7 @@ import { canPost, isUserbaseSession, postComment } from '~/lib/posting';
 import { uploadVideoToWorker, createVideoIframe } from '~/lib/upload/video-upload';
 import { uploadImageToHive, uploadImageViaUserbase, createImageMarkdown } from '~/lib/upload/image-upload';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 import type { Discussion } from '@hiveio/dhive';
 
 interface ReplyComposerProps {
@@ -35,8 +36,8 @@ export function ReplyComposer({
   parentAuthor,
   parentPermlink,
   onReplySuccess,
-  placeholder = "Write here",
-  buttonLabel = "REPLY"
+  placeholder = t("feed.reply.placeholder_default"),
+  buttonLabel = t("feed.reply.button")
 }: ReplyComposerProps) {
   const { username, session } = useAuth();
   const { showToast } = useToast();
@@ -92,7 +93,7 @@ export function ReplyComposer({
       }
     } catch (error) {
       console.error("Error selecting media:", error);
-      Alert.alert("Error", "Failed to select media. Please try again.");
+      Alert.alert(t("common.alert.error"), t("feed.composer.error_select_media"));
     } finally {
       setIsSelectingMedia(false);
     }
@@ -106,12 +107,12 @@ export function ReplyComposer({
 
   const handleReply = async () => {
     if (!content.trim() && !media) {
-      Alert.alert("Validation Error", "Please add some content to your reply");
+      Alert.alert(t("feed.composer.validation_title"), t("feed.composer.validation_message"));
       return;
     }
 
     if (!username || !canPost(session)) {
-      Alert.alert("Authentication Required", "Please log in to reply");
+      Alert.alert(t("feed.composer.auth_title"), t("feed.composer.login_to_reply"));
       return;
     }
 
@@ -128,7 +129,7 @@ export function ReplyComposer({
         const fileName = media.split("/").pop() || `${Date.now()}.${mediaType === "image" ? "jpg" : "mp4"}`;
 
         if (mediaType === "image") {
-          setUploadProgress("Uploading image...");
+          setUploadProgress(t("feed.composer.uploading_image"));
           
           try {
             const imageResult = isUserbaseSession(session)
@@ -144,11 +145,11 @@ export function ReplyComposer({
             
           } catch (imageError) {
             console.error("Image upload failed:", imageError);
-            throw new Error("Failed to upload image. Please try again.");
+            throw new Error(t("feed.composer.error_upload_image"));
           }
           
         } else if (mediaType === "video") {
-          setUploadProgress("Uploading video to IPFS...");
+          setUploadProgress(t("feed.composer.uploading_video"));
           
           try {
             const videoResult = await uploadVideoToWorker(
@@ -166,12 +167,12 @@ export function ReplyComposer({
             
           } catch (videoError) {
             console.error("Video upload failed:", videoError);
-            throw new Error("Failed to upload video. Please try again.");
+            throw new Error(t("feed.composer.error_upload_video"));
           }
         }
       }
 
-      setUploadProgress("Posting reply...");
+      setUploadProgress(t("feed.composer.posting"));
 
       // Post reply — server-signed for email accounts, local key otherwise.
       if (isUserbaseSession(session)) {
@@ -248,12 +249,12 @@ export function ReplyComposer({
       setMediaType(null);
       setMediaMimeType(null);
 
-      showToast('Reply posted successfully!', 'success');
+      showToast(t('feed.composer.reply_posted'), 'success');
       Keyboard.dismiss();
       
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
-      Alert.alert("Error", errorMsg);
+      const errorMsg = error instanceof Error ? error.message : t("feed.composer.unknown_error");
+      Alert.alert(t("common.alert.error"), errorMsg);
       console.error("Reply error:", error);
     } finally {
       setIsUploading(false);
@@ -264,7 +265,7 @@ export function ReplyComposer({
   if (username === "SPECTATOR") {
     return (
       <View style={styles.spectatorContainer}>
-        <Text style={styles.spectatorText}>Please log in to reply</Text>
+        <Text style={styles.spectatorText}>{t("feed.composer.login_to_reply")}</Text>
       </View>
     );
   }
