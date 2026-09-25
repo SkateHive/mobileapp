@@ -2,6 +2,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState, useRef } from "react";
 import { View, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { t } from "~/lib/i18n";
 
 interface VideoPlayerProps {
   url: string;
@@ -117,10 +118,10 @@ export const VideoPlayer = React.memo(
             style={styles.muteButton}
             onPress={toggleMute}
             accessibilityRole="button"
-            accessibilityLabel={isMuted ? "Unmute video" : "Mute video"}
+            accessibilityLabel={isMuted ? t("feed.player.a11y.unmute_video") : t("feed.player.a11y.mute_video")}
             accessibilityState={{ selected: isMuted }}
             accessibilityHint={
-              isMuted ? "Double tap to unmute" : "Double tap to mute"
+              isMuted ? t("feed.player.a11y.unmute_hint") : t("feed.player.a11y.mute_hint")
             }
           >
             <Ionicons

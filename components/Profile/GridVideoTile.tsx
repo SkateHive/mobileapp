@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 import {
   getVideoFirstFrame,
   requestVideoFirstFrame,
@@ -115,8 +116,8 @@ export const GridVideoTile = React.memo(
         style={[styles.tile, { width: size, height: size }]}
         onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel="Video post"
-        accessibilityHint="Double tap to open and play"
+        accessibilityLabel={t("profile.grid.video_a11y")}
+        accessibilityHint={t("profile.grid.video_hint")}
       >
         {autoplay ? (
           <>

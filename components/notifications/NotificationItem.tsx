@@ -7,6 +7,8 @@ import { Text } from "../ui/text";
 import { FullConversationDrawer } from "../Feed/FullConversationDrawer";
 import { getContent } from "~/lib/hive-utils";
 import { theme } from "~/lib/theme";
+import { t, locale } from "~/lib/i18n";
+import { formatNotificationAge, localizeHiveNotification } from "~/lib/notifications/localize";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import type { Discussion } from "@hiveio/dhive";
 
@@ -113,13 +115,7 @@ export const NotificationItem = React.memo(
       const now = new Date();
       const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-      if (diffInSeconds < 60) return "now";
-      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-      if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-      if (diffInSeconds < 604800)
-        return `${Math.floor(diffInSeconds / 86400)}d`;
-
-      return date.toLocaleDateString();
+      return formatNotificationAge(diffInSeconds, t) ?? date.toLocaleDateString();
     };
 
     const handlePress = async () => {
@@ -284,6 +280,9 @@ export const NotificationItem = React.memo(
 
     const author = getAuthor(notification.msg);
     const isUnread = !notification.isRead;
+    // The node writes this text in English. Other languages get it rebuilt from the
+    // parsed notification; English, and anything not recognised, shows the original.
+    const message = (locale !== "en" && localizeHiveNotification(notification, t)) || notification.msg;
 
     return (
       <>
@@ -308,7 +307,7 @@ export const NotificationItem = React.memo(
               style={[styles.message, isUnread && styles.unreadText]}
               numberOfLines={3}
             >
-              {notification.msg}
+              {message}
             </Text>
             <Text style={styles.date}>{formatDate(notification.date)}</Text>
           </View>

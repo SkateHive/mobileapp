@@ -1,4 +1,6 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { t } from '~/lib/i18n';
+import { describeError, failWith } from './upload-runner';
 
 interface VideoUploadResult {
   cid: string;
@@ -189,13 +191,13 @@ export async function uploadVideoToWorker(
 
         if (!uploadResponse.ok) {
           const errorText = await uploadResponse.text();
-          throw new Error(`${service.name} failed: ${uploadResponse.status} - ${errorText}`);
+          throw failWith('service_failed', { service: service.name, status: uploadResponse.status, detail: errorText });
         }
 
         const result = await uploadResponse.json();
 
         if (!result.cid || !result.gatewayUrl) {
-          throw new Error(`${service.name} returned an invalid upload response`);
+          throw failWith('service_invalid', { service: service.name });
         }
 
         options.onProgress?.(100, 'complete');
@@ -213,16 +215,16 @@ export async function uploadVideoToWorker(
               : undefined,
         };
       } catch (error) {
-        errors.push(error instanceof Error ? error.message : `${service.name} failed`);
+        errors.push(error instanceof Error ? describeError(error, t) : t('upload.error.service_fallback', { service: service.name }));
       } finally {
         settled = true;
         if (pollInterval) clearInterval(pollInterval);
       }
     }
 
-    throw new Error(`All video upload services failed: ${errors.join(' | ')}`);
+    throw failWith('video_all_failed', { errors: errors.join(' | ') });
   } catch (error) {
-    throw new Error(`Video upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw failWith('video_failed', { message: describeError(error, t) }, error);
   } finally {
     // Always deactivate keep awake, even if upload fails
     deactivateKeepAwake('video-upload');

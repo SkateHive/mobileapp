@@ -9,7 +9,7 @@ import { useToast } from "~/lib/toast-provider";
 import { canPost } from "~/lib/posting";
 import { isJobActive, type UploadEvent, type UploadJob } from "./upload-job";
 import { discard, dispatch, getJob, loadPersistedJob, subscribe } from "./upload-store";
-import { runUploadJob } from "./upload-runner";
+import { classifyError, codedError, runUploadJob } from "./upload-runner";
 import { makeRunnerDeps } from "./upload-legs";
 
 const PUBLISHED_CLEAR_MS = 4000;
@@ -64,7 +64,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     if (!s || !canPost(s) || s.username !== job.author) {
       dispatch({
         type: "failed",
-        error: { kind: "auth", message: `Log in as @${job.author} to finish this post` },
+        error: classifyError(codedError("auth", "auth", { author: job.author })),
         appActive: AppState.currentState === "active",
         at: Date.now(),
       });

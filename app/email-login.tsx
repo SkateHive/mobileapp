@@ -26,15 +26,14 @@ import {
   claimAccount,
   checkUsername,
   type UserbaseUser,
+  type UsernameReasonCode,
 } from "~/lib/userbase/api";
+import { userbaseErrorText, usernameReasonText } from "~/lib/userbase/error-text";
+import { authErrorText } from "~/lib/auth-error-text";
+import { t } from "~/lib/i18n";
 import { useAuth } from "~/lib/auth-provider";
 import { useOnboardingStep } from "~/lib/onboarding";
-import {
-  validate_posting_key,
-  InvalidKeyFormatError,
-  AccountNotFoundError,
-  InvalidKeyError,
-} from "~/lib/hive-utils";
+import { validate_posting_key, HiveError } from "~/lib/hive-utils";
 
 type Step = "email" | "otp" | "username" | "claim" | "done";
 
@@ -51,20 +50,28 @@ function maskEmail(address: string): string {
 function claimErrorMessage(handle: string, code?: string): string {
   switch (code) {
     case "invalid_key":
-      return `That key doesn't match @${handle}`;
+      return t("auth.email.claim_err_invalid_key", { handle });
     case "expired_token":
-      return "Session expired, request a new code";
+      return t("auth.email.claim_err_expired");
     case "merge_required":
-      return "This email is already used by another SkateHive account";
+      return t("auth.email.claim_err_merge");
     case "rate_limited":
-      return "Too many tries, wait a few minutes";
+      return t("auth.email.claim_err_rate_limited");
     default:
       // chain_unavailable and anything unrecognized.
-      return "Couldn't reach Hive, try again";
+      return t("auth.email.claim_err_unreachable");
   }
 }
 
 const RESEND_SECONDS = 60;
+
+// The catalog holds whole sentences ("sent to {{email}}"); the variable sits in its own
+// styled <Text>, so the sentence is rendered around a marker instead of concatenated.
+const SLOT = "\uE000";
+function aroundSlot(sentence: string): [string, string] {
+  const at = sentence.indexOf(SLOT);
+  return at < 0 ? [sentence, ""] : [sentence.slice(0, at), sentence.slice(at + SLOT.length)];
+}
 
 export default function EmailLoginScreen() {
   const { loginWithUserbase } = useAuth();
@@ -109,7 +116,13 @@ export default function EmailLoginScreen() {
 
   // Live username availability
   const [checking, setChecking] = useState(false);
-  const [avail, setAvail] = useState<{ available: boolean; reason?: string } | null>(null);
+  // `code` is the server's known reason ("hive_taken", "userbase_taken"...); the screen
+  // branches on it and never on the text. `reason` is only for reasons we do not know.
+  const [avail, setAvail] = useState<{
+    available: boolean;
+    reason?: string;
+    code?: UsernameReasonCode | "check_failed";
+  } | null>(null);
   const checkSeq = useRef(0);
 
   useEffect(() => {
@@ -119,36 +132,36 @@ export default function EmailLoginScreen() {
     if (name.length < 3) return;
     const seq = ++checkSeq.current;
     setChecking(true);
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const r = await checkUsername(name);
         if (seq !== checkSeq.current) return;
-        setAvail({ available: r.valid && r.available, reason: r.reason });
+        setAvail({ available: r.valid && r.available, reason: r.reason, code: r.reasonCode });
       } catch {
-        if (seq === checkSeq.current) setAvail({ available: false, reason: "Couldn't check" });
+        if (seq === checkSeq.current) setAvail({ available: false, code: "check_failed" });
       } finally {
         if (seq === checkSeq.current) setChecking(false);
       }
     }, 450);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [handle, step]);
 
   const sendCode = async () => {
     const em = email.trim().toLowerCase();
     if (!EMAIL_RE.test(em)) {
-      setError("Enter a valid email");
+      setError(t("auth.email.err_invalid_email"));
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const r = await requestOtp(em);
-      if (!r.success) throw new Error(r.error || "Could not send code");
+      if (!r.success) throw new Error(r.error ?? "");
       setEmail(em);
       setStep("otp");
       setResendIn(RESEND_SECONDS);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send code");
+      setError(userbaseErrorText(e, "auth.email.err_send_code"));
       // If the handed-off send failed there is no code coming, so fall back to
       // the form rather than leaving the user staring at an empty keypad.
       setStep("email");
@@ -179,20 +192,20 @@ export default function EmailLoginScreen() {
 
   useEffect(() => {
     if (resendIn <= 0) return;
-    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
   }, [resendIn]);
 
   const verify = async () => {
     if (!/^\d{6}$/.test(code.trim())) {
-      setError("Enter the 6-digit code");
+      setError(t("auth.email.err_enter_6_digits"));
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const r = await verifyOtp(email, code.trim());
-      if (!r.success) throw new Error(r.error || "Invalid code");
+      if (!r.success) throw new Error(r.error ?? "");
       if (r.token && r.user) {
         await loginWithUserbase(r.token, r.user, email);
         setUser(r.user);
@@ -205,10 +218,11 @@ export default function EmailLoginScreen() {
         setError(null);
         setStep("username");
       } else {
-        throw new Error("Unexpected response");
+        setError(t("auth.email.err_unexpected"));
+        setCode("");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Invalid code");
+      setError(userbaseErrorText(e, "auth.email.err_invalid_code"));
       // Wrong code: clear the boxes so the next attempt starts clean, instead
       // of leaving six digits that can't be retried.
       setCode("");
@@ -227,19 +241,16 @@ export default function EmailLoginScreen() {
         // A race with check-username: the name became taken between the debounced
         // check and submit. Fall back to the same two branches the live check drives.
         if (r.code === "hive_taken" || r.code === "userbase_taken") {
-          setAvail({
-            available: false,
-            reason: r.code === "hive_taken" ? "Already taken on Hive" : "Already reserved",
-          });
+          setAvail({ available: false, code: r.code });
           return;
         }
-        throw new Error(r.error || "Could not create account");
+        throw new Error(r.error ?? "");
       }
       await loginWithUserbase(r.token, r.user, email);
       setUser(r.user);
       setStep("done");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create account");
+      setError(userbaseErrorText(e, "auth.email.err_create_account"));
     } finally {
       setBusy(false);
     }
@@ -291,15 +302,8 @@ export default function EmailLoginScreen() {
       setError(null);
       setStep("done");
     } catch (e) {
-      if (
-        e instanceof InvalidKeyFormatError ||
-        e instanceof AccountNotFoundError ||
-        e instanceof InvalidKeyError
-      ) {
-        setError(e.message);
-      } else {
-        setError(e instanceof Error ? e.message : "Could not claim account");
-      }
+      // Key checks (format, unknown account, wrong key) come from validate_posting_key.
+      setError(e instanceof HiveError ? authErrorText(e, { username: name }) : userbaseErrorText(e, "auth.email.err_claim_account"));
     } finally {
       // Never persisted; drop it whether the claim succeeded, failed, or threw.
       setPostingKey("");
@@ -319,7 +323,7 @@ export default function EmailLoginScreen() {
         style={styles.closeButton}
         disabled={busy}
         accessibilityRole="button"
-        accessibilityLabel="Close"
+        accessibilityLabel={t("common.close")}
       >
         <Ionicons name="close" size={26} color={busy ? theme.colors.muted : theme.colors.white} />
       </Pressable>
@@ -328,10 +332,10 @@ export default function EmailLoginScreen() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {step === "email" && (
             <>
-              <Text style={styles.label}>Your email</Text>
+              <Text style={styles.label}>{t("auth.email.your_email")}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="you@example.com"
+                placeholder={t("auth.email.placeholder")}
                 placeholderTextColor={theme.colors.muted}
                 value={email}
                 onChangeText={setEmail}
@@ -340,23 +344,25 @@ export default function EmailLoginScreen() {
                 autoCorrect={false}
                 editable={!busy}
               />
-              <Text style={styles.hint}>We'll send you a 6-digit code. No password, no posting key.</Text>
-              <PrimaryButton label="Send code" onPress={sendCode} busy={busy} disabled={!email.trim()} />
+              <Text style={styles.hint}>{t("auth.email.hint")}</Text>
+              <PrimaryButton label={t("auth.email.send_code")} onPress={sendCode} busy={busy} disabled={!email.trim()} />
             </>
           )}
 
           {step === "otp" && (
             <>
-              <Text style={styles.otpTitle}>Enter the code</Text>
+              <Text style={styles.otpTitle}>{t("auth.email.enter_code")}</Text>
               <Text style={styles.otpSubtitle}>
-                sent to <Text style={styles.otpEmail}>{maskEmail(email)}</Text>
+                {aroundSlot(t("auth.email.sent_to", { email: SLOT }))[0]}
+                <Text style={styles.otpEmail}>{maskEmail(email)}</Text>
+                {aroundSlot(t("auth.email.sent_to", { email: SLOT }))[1]}
               </Text>
               {/* Submits on the sixth digit — see PinInput's onComplete. */}
               <PinInput
                 value={code}
-                onChangeText={(t) => {
+                onChangeText={(text) => {
                   if (error) setError(null);
-                  setCode(t);
+                  setCode(text);
                 }}
                 onComplete={verify}
                 autoFocus
@@ -378,29 +384,31 @@ export default function EmailLoginScreen() {
                 <Text style={styles.resend}>
                   {resendIn > 0 ? (
                     <>
-                      Resend in <Text style={styles.resendCount}>0:{String(resendIn).padStart(2, "0")}</Text>
+                      {aroundSlot(t("auth.email.resend_in", { time: SLOT }))[0]}
+                      <Text style={styles.resendCount}>0:{String(resendIn).padStart(2, "0")}</Text>
+                      {aroundSlot(t("auth.email.resend_in", { time: SLOT }))[1]}
                     </>
                   ) : (
-                    "Resend code"
+                    t("auth.email.resend")
                   )}
                 </Text>
               </Pressable>
               <Pressable onPress={() => { setStep("email"); setCode(""); setError(null); }} disabled={busy}>
-                <Text style={styles.linkText}>Use a different email</Text>
+                <Text style={styles.linkText}>{t("auth.email.use_different_email")}</Text>
               </Pressable>
             </>
           )}
 
           {step === "username" && (
             <>
-              <Text style={styles.label}>Choose your SkateHive username</Text>
+              <Text style={styles.label}>{t("auth.email.choose_username")}</Text>
               <TextInput
                 ref={usernameInputRef}
                 style={styles.input}
-                placeholder="e.g. tonyhawk"
+                placeholder={t("auth.email.username_placeholder")}
                 placeholderTextColor={theme.colors.muted}
                 value={handle}
-                onChangeText={(t) => setHandle(t.toLowerCase().replace(/[^a-z0-9.-]/g, ""))}
+                onChangeText={(text) => setHandle(text.toLowerCase().replace(/[^a-z0-9.-]/g, ""))}
                 autoCapitalize="none"
                 autoCorrect={false}
                 maxLength={16}
@@ -408,33 +416,33 @@ export default function EmailLoginScreen() {
               />
               <View style={styles.availRow}>
                 {checking ? (
-                  <Text style={styles.hint}>Checking…</Text>
+                  <Text style={styles.hint}>{t("auth.email.checking")}</Text>
                 ) : avail ? (
                   <Text style={[styles.hint, { color: avail.available ? theme.colors.primary : theme.colors.danger }]}>
                     {avail.available
-                      ? "✓ Available on Hive"
-                      : avail.reason === "Already reserved"
-                        ? "Already reserved by another email user"
-                        : avail.reason || "Not available"}
+                      ? t("auth.email.available")
+                      : avail.code === "check_failed"
+                        ? t("auth.email.reason_could_not_check")
+                        : usernameReasonText(avail.code, avail.reason)}
                   </Text>
                 ) : (
-                  <Text style={styles.hint}>3–16 chars, lowercase. Must be free on Hive so you can claim it later.</Text>
+                  <Text style={styles.hint}>{t("auth.email.username_hint")}</Text>
                 )}
               </View>
-              {avail?.reason === "Already taken on Hive" ? (
+              {avail?.code === "hive_taken" ? (
                 <>
-                  <PrimaryButton label="This account is mine" onPress={startClaim} busy={false} disabled={busy} />
+                  <PrimaryButton label={t("auth.email.this_account_is_mine")} onPress={startClaim} busy={false} disabled={busy} />
                   <Pressable onPress={pickAnotherName} disabled={busy} hitSlop={12}>
-                    <Text style={styles.linkText}>Pick another name</Text>
+                    <Text style={styles.linkText}>{t("auth.email.pick_another_name")}</Text>
                   </Pressable>
                 </>
-              ) : avail?.reason === "Already reserved" ? (
+              ) : avail?.code === "userbase_taken" ? (
                 <Pressable onPress={pickAnotherName} disabled={busy} hitSlop={12}>
-                  <Text style={styles.linkText}>Pick another name</Text>
+                  <Text style={styles.linkText}>{t("auth.email.pick_another_name")}</Text>
                 </Pressable>
               ) : (
                 <PrimaryButton
-                  label="Create account"
+                  label={t("auth.email.create_account")}
                   onPress={createAccount}
                   busy={busy}
                   disabled={!avail?.available}
@@ -445,11 +453,11 @@ export default function EmailLoginScreen() {
 
           {step === "claim" && (
             <>
-              <Text style={styles.otpTitle}>Prove it's yours</Text>
+              <Text style={styles.otpTitle}>{t("auth.email.claim_title")}</Text>
               <Text style={styles.emailEcho}>@{handle}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="posting key"
+                placeholder={t("auth.common.posting_key_placeholder")}
                 placeholderTextColor={theme.colors.muted}
                 value={postingKey}
                 onChangeText={setPostingKey}
@@ -458,23 +466,20 @@ export default function EmailLoginScreen() {
                 autoCorrect={false}
                 editable={!busy}
               />
-              <Text style={styles.hint}>
-                Your Hive posting key. It is stored encrypted on SkateHive's server, never on this
-                phone.
-              </Text>
+              <Text style={styles.hint}>{t("auth.email.claim_hint")}</Text>
               <PrimaryButton
-                label="Claim account"
+                label={t("auth.email.claim_button")}
                 onPress={claimHandleAccount}
                 busy={busy}
                 disabled={!postingKey.trim()}
               />
               {claimCode === "expired_token" && (
                 <Pressable onPress={restartFromEmail} disabled={busy} hitSlop={12}>
-                  <Text style={styles.linkText}>Request a new code</Text>
+                  <Text style={styles.linkText}>{t("auth.email.request_new_code")}</Text>
                 </Pressable>
               )}
               <Pressable onPress={backToUsername} disabled={busy} hitSlop={12}>
-                <Text style={styles.linkText}>Back</Text>
+                <Text style={styles.linkText}>{t("common.back")}</Text>
               </Pressable>
             </>
           )}
@@ -487,7 +492,7 @@ export default function EmailLoginScreen() {
                 contentFit="contain"
                 nativeControls={false}
               />
-              <Text style={styles.doneTitle}>You're in</Text>
+              <Text style={styles.doneTitle}>{t("auth.email.done_title")}</Text>
               <Text style={styles.emailEcho}>@{user?.handle}</Text>
               <Pressable
                 style={styles.continueBtn}
@@ -496,9 +501,9 @@ export default function EmailLoginScreen() {
                 }
                 disabled={!onboardingReady}
                 accessibilityRole="button"
-                accessibilityLabel="Continue"
+                accessibilityLabel={t("common.continue")}
               >
-                <Text style={styles.continueText}>Continue</Text>
+                <Text style={styles.continueText}>{t("common.continue")}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#000" />
               </Pressable>
             </View>

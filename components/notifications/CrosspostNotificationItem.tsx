@@ -3,6 +3,8 @@ import { View, Pressable, StyleSheet, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../ui/text";
 import { theme } from "~/lib/theme";
+import { t, locale } from "~/lib/i18n";
+import { formatNotificationAge, localizeCrossPostNotification } from "~/lib/notifications/localize";
 import type { UserbaseNotification } from "~/lib/userbase/api";
 
 interface CrosspostNotificationItemProps {
@@ -11,6 +13,7 @@ interface CrosspostNotificationItemProps {
 
 const ICONS: Record<string, { name: React.ComponentProps<typeof Ionicons>["name"]; color: string }> = {
   crosspost_queued: { name: "time-outline", color: theme.colors.muted },
+  crosspost_scheduled: { name: "calendar-outline", color: theme.colors.muted },
   crosspost_rejected: { name: "close-circle-outline", color: theme.colors.danger },
   crosspost_published: { name: "checkmark-circle-outline", color: theme.colors.primary },
   crosspost_failed: { name: "alert-circle-outline", color: theme.colors.danger },
@@ -21,12 +24,18 @@ function formatDate(dateString: string): string {
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return "now";
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`;
+  return formatNotificationAge(diffInSeconds, t) ?? date.toLocaleDateString();
+}
 
-  return date.toLocaleDateString();
+// A moment picked by a curator, shown in the reader's own timezone and language.
+function formatWhen(iso: string): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  } catch {
+    return date.toLocaleString();
+  }
 }
 
 /** Instagram curation-queue notifications: queued / rejected / published / failed. */
@@ -41,6 +50,12 @@ export const CrosspostNotificationItem = React.memo(
     // it; anything else falls back to the Hive permalink the server sent.
     const openUrl = igPermalink || notification.link;
     const isUnread = notification.read_at === null;
+    // The server writes title and body in English. English readers keep exactly that text;
+    // other languages get it rebuilt from the type (the curator's note stays as written).
+    const text =
+      locale === "en"
+        ? { title: notification.title, body: reviewNote ?? notification.body }
+        : localizeCrossPostNotification(notification, t, formatWhen);
 
     const handlePress = () => {
       if (openUrl) Linking.openURL(openUrl).catch(() => {});
@@ -60,11 +75,11 @@ export const CrosspostNotificationItem = React.memo(
 
         <View style={styles.content}>
           <Text style={[styles.title, isUnread && styles.unreadText]} numberOfLines={2}>
-            {notification.title}
+            {text.title}
           </Text>
-          {(reviewNote || notification.body) && (
+          {!!text.body && (
             <Text style={styles.body} numberOfLines={3}>
-              {reviewNote ?? notification.body}
+              {text.body}
             </Text>
           )}
           <Text style={styles.date}>{formatDate(notification.created_at)}</Text>

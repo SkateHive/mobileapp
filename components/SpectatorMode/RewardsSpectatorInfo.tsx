@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { t } from "~/lib/i18n";
 import { SpectatorInfoBase } from "./SpectatorInfoBase";
 
 // Use the exact icon names from Ionicons
@@ -8,23 +9,23 @@ export function RewardsSpectatorInfo() {
   const rewardsInfoItems = [
     {
       icon: "trending-up-outline" as IconName,
-      title: "Curation Rewards",
-      text: "Earn rewards by upvoting and engaging with content. The more you curate, the more you earn!",
+      title: t("auth.spectator.rewards_title_1"),
+      text: t("auth.spectator.rewards_text_1"),
     },
     {
       icon: "chatbubble-outline" as IconName,
-      title: "Comment Rewards",
-      text: "Get rewarded for interacting with posts. Valuable comments can earn upvotes too!",
+      title: t("auth.spectator.rewards_title_2"),
+      text: t("auth.spectator.rewards_text_2"),
     },
     {
       icon: "journal-outline" as IconName,
-      title: "Magazine Rewards",
-      text: "Participate in SkateHive's Magazine and earn extra incentives for your contributions.",
+      title: t("auth.spectator.rewards_title_3"),
+      text: t("auth.spectator.rewards_text_3"),
     },
     {
       icon: "ribbon-outline" as IconName,
-      title: "More Ways to Earn",
-      text: "Through contests, engagement, and consistent contributions, you can unlock even more rewards.",
+      title: t("auth.spectator.rewards_title_4"),
+      text: t("auth.spectator.rewards_text_4"),
     },
   ];
 
@@ -32,8 +33,8 @@ export function RewardsSpectatorInfo() {
     <SpectatorInfoBase
       icon="megaphone-outline"
       iconColor="#34C759"
-      title="Rewards"
-      description="Learn how you can earn rewards in the SkateHive community!"
+      title={t("auth.spectator.rewards_heading")}
+      description={t("auth.spectator.rewards_description")}
       infoItems={rewardsInfoItems}
     />
   );

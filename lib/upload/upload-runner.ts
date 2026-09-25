@@ -1,7 +1,10 @@
 // Pure runner: the leg sequence over the job it was given, all I/O through
 // `deps`. Never throws — every failure becomes a `failed` event. Imports
 // nothing from React Native, Expo or hive-utils so `pnpm test` runs under Node.
-import type { UploadError, UploadErrorKind, UploadEvent, UploadJob, UploadResult } from "./upload-job";
+import type { TFunction } from "../i18n/translate";
+import { enT } from "../i18n/core";
+import type { UploadError, UploadErrorKind, UploadErrorParams, UploadEvent, UploadJob, UploadResult } from "./upload-job";
+import { errorText } from "./upload-job";
 import { buildBody, buildImages, buildJsonMetadata, buildTags } from "./post-assembly";
 
 /** Same shape as `PostCommentArgs` in lib/posting.ts, redeclared to keep this module pure. */
@@ -51,21 +54,62 @@ export interface RunnerDeps {
 
 export type Emit = (event: UploadEvent) => UploadJob | null;
 
-/** An error whose kind is already known to the leg that raised it. */
+/**
+ * An error whose kind is already known to the leg that raised it. `message` is the
+ * English text (logs, and jobs from older builds); `code` + `params` let the pill
+ * show it in the reader's language (`upload.error.<code>`).
+ */
 export class UploadRunError extends Error {
   kind: UploadErrorKind;
-  constructor(kind: UploadErrorKind, message: string) {
+  code?: string;
+  params?: UploadErrorParams;
+  constructor(kind: UploadErrorKind, message: string, code?: string, params?: UploadErrorParams) {
     super(message);
     this.name = "UploadRunError";
     this.kind = kind;
+    this.code = code;
+    this.params = params;
   }
+}
+
+/** A coded error with an explicit kind; the English message comes from the catalog. */
+export function codedError(kind: UploadErrorKind, code: string, params?: UploadErrorParams): UploadRunError {
+  return new UploadRunError(kind, enT(`upload.error.${code}`, params), code, params);
+}
+
+/**
+ * A coded error whose kind is the cause's own when the cause is typed, else classified
+ * from the English text, exactly as the untyped wrapper messages were before. Never
+ * classify from `params` that were translated: only the English message is matched.
+ */
+export function failWith(code: string, params?: UploadErrorParams, cause?: unknown): UploadRunError {
+  const message = enT(`upload.error.${code}`, params);
+  const kind = cause instanceof UploadRunError ? cause.kind : classifyError(new Error(message)).kind;
+  return new UploadRunError(kind, message, code, params);
+}
+
+/** Reader-language text of anything thrown, for use inside another error's params. */
+export function describeError(error: unknown, t: TFunction): string {
+  if (error instanceof UploadRunError && error.code) {
+    return errorText({ kind: error.kind, message: error.message, code: error.code, params: error.params }, t);
+  }
+  return error instanceof Error ? error.message : t("common.unknown_error");
 }
 
 const MAX_MESSAGE = 200;
 
 export function classifyError(error: unknown): UploadError {
   if (error instanceof UploadRunError) {
-    return { kind: error.kind, message: error.message.slice(0, MAX_MESSAGE) };
+    const out: UploadError = { kind: error.kind, message: error.message.slice(0, MAX_MESSAGE) };
+    if (error.code) {
+      out.code = error.code;
+      if (error.params) {
+        const params: UploadErrorParams = {};
+        for (const [k, v] of Object.entries(error.params)) params[k] = typeof v === "string" ? v.slice(0, MAX_MESSAGE) : v;
+        out.params = params;
+      }
+    }
+    return out;
   }
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Something went wrong";
   const name = error instanceof Error ? error.name : "";
@@ -118,14 +162,14 @@ export async function runUploadJob(job: UploadJob, deps: RunnerDeps, emit: Emit)
     // Leg 2: media (skipped when the result already carries it).
     if (draft.mediaKind === "image" && !result.imageUrl) {
       if (!draft.mediaUri || !draft.mime) {
-        throw new UploadRunError("unknown", "The image is no longer on this device");
+        throw codedError("unknown", "image_gone");
       }
       const image = await deps.uploadImage(draft.mediaUri, draft.fileName ?? `${job.id}.jpg`, draft.mime);
       result.imageUrl = image.url;
       if (!alive({ type: "media_done", imageUrl: image.url })) return;
     } else if (draft.mediaKind === "video" && !result.cid) {
       if (!draft.mediaUri || !draft.mime) {
-        throw new UploadRunError("unknown", "The video is no longer on this device");
+        throw codedError("unknown", "video_gone");
       }
       const video = await deps.uploadVideo(draft.mediaUri, draft.fileName ?? `${job.id}.mp4`, draft.mime, {
         thumbnailUrl: result.coverUrl,
@@ -170,10 +214,9 @@ export async function runUploadJob(job: UploadJob, deps: RunnerDeps, emit: Emit)
         existing = await deps.getContent(deps.sharedPostingAuthor, job.permlink);
       }
     } catch (guardError) {
-      throw new UploadRunError(
-        "network",
-        `Could not confirm whether the post exists: ${guardError instanceof Error ? guardError.message : String(guardError)}`,
-      );
+      throw codedError("network", "guard", {
+        message: guardError instanceof Error ? guardError.message : String(guardError),
+      });
     }
 
     const body = buildBody(draft.caption, result);
@@ -190,10 +233,9 @@ export async function runUploadJob(job: UploadJob, deps: RunnerDeps, emit: Emit)
           jsonMetadata: buildJsonMetadata(tags, images),
         });
       } catch (broadcastError) {
-        throw new UploadRunError(
-          "broadcast",
-          broadcastError instanceof Error ? broadcastError.message : "Broadcast failed",
-        );
+        throw broadcastError instanceof Error
+          ? new UploadRunError("broadcast", broadcastError.message)
+          : codedError("broadcast", "broadcast");
       }
     }
 

@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Crown } from "lucide-react-native";
 import { useLeaderboard } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 
 interface LeaderboardProps {
@@ -78,7 +79,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+          <Text style={styles.loadingText}>{t("leaderboard.loading")}</Text>
         </View>
       </View>
     );
@@ -88,7 +89,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
     return (
       <View style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error loading leaderboard</Text>
+          <Text style={styles.errorText}>{t("leaderboard.error")}</Text>
         </View>
       </View>
     );
@@ -101,7 +102,7 @@ export function Leaderboard({ currentUsername }: LeaderboardProps) {
           <View style={styles.iconContainer}>
             <Ionicons name="podium-outline" size={48} color={theme.colors.primary} />
           </View>
-          <Text style={styles.title}>Leaderboard</Text>
+          <Text style={styles.title}>{t("leaderboard.title")}</Text>
         </View>
 
         <View style={styles.listContainer}>

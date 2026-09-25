@@ -19,13 +19,9 @@ import {
 import { AuthBackground } from "~/components/auth/AuthBackground";
 import { StoredUsersView } from "~/components/auth/StoredUsersView";
 import { PinInput } from "~/components/ui/PinInput";
-import { AuthError, useAuth } from "~/lib/auth-provider";
-import {
-  AccountNotFoundError,
-  HiveError,
-  InvalidKeyError,
-  InvalidKeyFormatError,
-} from "~/lib/hive-utils";
+import { useAuth } from "~/lib/auth-provider";
+import { authErrorText } from "~/lib/auth-error-text";
+import { t } from "~/lib/i18n";
 import { prefetchVideoFeed, warmUpVideoAssets } from "~/lib/hooks/useQueries";
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import {
@@ -112,7 +108,7 @@ export default function Index() {
 
   // What this device actually offers, so the button doesn't promise Face ID on
   // a fingerprint phone. Falls back to the generic word when unknown.
-  const [biometricLabel, setBiometricLabel] = React.useState("biometrics");
+  const [biometricLabel, setBiometricLabel] = React.useState(t("auth.index.biometrics_generic"));
   React.useEffect(() => {
     LocalAuthentication.supportedAuthenticationTypesAsync()
       .then((types) => {
@@ -141,13 +137,7 @@ export default function Index() {
       setPin("");
       router.replace("/(tabs)/videos");
     } catch (error) {
-      const known =
-        error instanceof InvalidKeyFormatError ||
-        error instanceof AccountNotFoundError ||
-        error instanceof InvalidKeyError ||
-        error instanceof AuthError ||
-        error instanceof HiveError;
-      setMessage(known ? (error as Error).message : "Could not sign in");
+      setMessage(authErrorText(error, { username: user.username }));
       setPin("");
     } finally {
       setBusy(false);
@@ -167,7 +157,7 @@ export default function Index() {
       await enterSpectatorMode();
       router.replace("/(tabs)/videos");
     } catch {
-      setMessage("Could not enter as spectator");
+      setMessage(t("auth.index.spectator_failed"));
     }
   };
 
@@ -200,10 +190,10 @@ export default function Index() {
   const footer = (
     <View style={styles.footer}>
       <Pressable onPress={handleSpectator} hitSlop={12}>
-        <Text style={styles.spectator}>Spectator</Text>
+        <Text style={styles.spectator}>{t("auth.index.spectator")}</Text>
       </Pressable>
       <Pressable onPress={() => router.push("/hive-login")} hitSlop={12}>
-        <Text style={styles.hiveLink}>Sign in with Hive ›</Text>
+        <Text style={styles.hiveLink}>{t("auth.index.sign_in_with_hive")}</Text>
       </Pressable>
     </View>
   );
@@ -234,7 +224,7 @@ export default function Index() {
 
           {pinForUser ? (
             <View style={styles.block}>
-              <Text style={styles.pinPrompt}>PIN for @{pinForUser.username}</Text>
+              <Text style={styles.pinPrompt}>{t("auth.index.pin_for", { username: pinForUser.username })}</Text>
               <PinInput
                 value={pin}
                 onChangeText={setPin}
@@ -248,7 +238,7 @@ export default function Index() {
                 }}
                 hitSlop={12}
               >
-                <Text style={styles.switchAccount}>Back</Text>
+                <Text style={styles.switchAccount}>{t("common.back")}</Text>
               </Pressable>
             </View>
           ) : showEmailHero ? (
@@ -273,11 +263,11 @@ export default function Index() {
                 accessibilityRole="button"
               >
                 <Ionicons name="mail-outline" size={20} color={theme.auth.onNeon} />
-                <Text style={styles.primaryLabel}>Continue with email</Text>
+                <Text style={styles.primaryLabel}>{t("auth.index.continue_with_email")}</Text>
               </Pressable>
 
               <Pressable onPress={() => setSwitchingAccount(true)} hitSlop={12}>
-                <Text style={styles.switchAccount}>Switch account</Text>
+                <Text style={styles.switchAccount}>{t("auth.index.switch_account")}</Text>
               </Pressable>
             </View>
           ) : showHero ? (
@@ -314,15 +304,15 @@ export default function Index() {
                     />
                     <Text style={styles.primaryLabel}>
                       {heroUser.method === "pin"
-                        ? "Sign in with PIN"
-                        : `Sign in with ${biometricLabel}`}
+                        ? t("auth.index.sign_in_with_pin")
+                        : t("auth.index.sign_in_with_method", { biometricLabel })}
                     </Text>
                   </>
                 )}
               </Pressable>
 
               <Pressable onPress={() => setSwitchingAccount(true)} hitSlop={12}>
-                <Text style={styles.switchAccount}>Switch account</Text>
+                <Text style={styles.switchAccount}>{t("auth.index.switch_account")}</Text>
               </Pressable>
             </View>
           ) : (
@@ -344,7 +334,7 @@ export default function Index() {
                         )
                       }
                       accessibilityRole="button"
-                      accessibilityLabel={`Continue as ${lastEmail.handle}`}
+                      accessibilityLabel={t("auth.index.continue_as", { handle: lastEmail.handle })}
                     >
                       <Image
                         source={{ uri: `${HIVE_AVATAR_URL}/${lastEmail.handle}/avatar` }}
@@ -352,7 +342,7 @@ export default function Index() {
                         contentFit="cover"
                       />
                       <Text style={styles.rowUsername}>@{lastEmail.handle}</Text>
-                      <Text style={styles.rowMethod}>Email</Text>
+                      <Text style={styles.rowMethod}>{t("auth.index.method_email")}</Text>
                     </Pressable>
                   )}
 
@@ -365,14 +355,14 @@ export default function Index() {
                     onDeleteUser={handleDeleteUser}
                   />
                   {deletingUser && (
-                    <Text style={styles.caption}>Removing @{deletingUser}…</Text>
+                    <Text style={styles.caption}>{t("auth.index.removing", { username: deletingUser })}</Text>
                   )}
                 </View>
               )}
 
               <TextInput
                 style={styles.emailInput}
-                placeholder="you@email.com"
+                placeholder={t("auth.index.email_placeholder")}
                 placeholderTextColor={theme.auth.placeholder}
                 value={email}
                 onChangeText={setEmail}
@@ -394,10 +384,10 @@ export default function Index() {
                 disabled={!emailValid}
                 accessibilityRole="button"
               >
-                <Text style={styles.primaryLabel}>Continue →</Text>
+                <Text style={styles.primaryLabel}>{t("auth.index.continue")}</Text>
               </Pressable>
 
-              <Text style={styles.caption}>No password — we email you a code</Text>
+              <Text style={styles.caption}>{t("auth.index.no_password_caption")}</Text>
             </View>
           )}
 

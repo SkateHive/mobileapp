@@ -2,6 +2,7 @@ import { View, Image, Pressable, Modal, Dimensions, StyleSheet } from "react-nat
 import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { useOnboardingStep, type OnboardingStep } from "~/lib/onboarding";
 
 const COACH = require("~/assets/images/skatehive-coach2.png");
@@ -27,7 +28,7 @@ if (coachUri) void Image.prefetch(coachUri).catch(() => {});
  */
 export function Coach({
   text,
-  primaryLabel = "Got it",
+  primaryLabel = t("common.got_it"),
   onPrimary,
   secondaryLabel,
   onSecondary,

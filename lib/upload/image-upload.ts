@@ -3,7 +3,9 @@ import { PrivateKey } from '@hiveio/dhive';
 import { Buffer } from 'buffer';
 import { sha256 } from 'js-sha256';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { t } from '~/lib/i18n';
 import { prepareImageForUpload, isHeicImage } from './image-converter';
+import { describeError, failWith } from './upload-runner';
 
 interface ImageUploadResult {
   url: string;
@@ -47,7 +49,7 @@ async function createImageSignature(fileUri: string, privateKey: string): Promis
     return signature.toString();
   } catch (error) {
     console.error('Error creating image signature:', error);
-    throw new Error('Failed to create image signature');
+    throw failWith('image_signature');
   }
 }
 
@@ -115,19 +117,19 @@ export async function uploadImageToHive(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Hive image upload failed:', response.status, errorText);
-      throw new Error(`Image upload failed: ${response.status} - ${errorText}`);
+      throw failWith('image_failed', { detail: `${response.status} - ${errorText}` });
     }
 
     const result = await response.json();
     
     if (!result.url) {
-      throw new Error('No URL returned from image upload');
+      throw failWith('image_no_url');
     }
 
     return { url: result.url };
   } catch (error) {
     console.error('Failed to upload image to Hive:', error);
-    throw new Error(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw failWith('image_failed', { detail: describeError(error, t) }, error);
   } finally {
     // Always deactivate keep awake, even if upload fails
     deactivateKeepAwake('image-upload');
@@ -172,14 +174,14 @@ export async function uploadImageViaUserbase(
     });
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Image upload failed: ${response.status} - ${errorText}`);
+      throw failWith('image_failed', { detail: `${response.status} - ${errorText}` });
     }
     const result = await response.json();
-    if (!result.url) throw new Error('No URL returned from image upload');
+    if (!result.url) throw failWith('image_no_url');
     return { url: result.url };
   } catch (error) {
     console.error('Failed to upload image via userbase:', error);
-    throw new Error(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw failWith('image_failed', { detail: describeError(error, t) }, error);
   } finally {
     deactivateKeepAwake('image-upload');
   }

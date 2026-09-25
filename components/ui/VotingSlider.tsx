@@ -11,12 +11,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 import { Text } from './text';
 
 const SPITFIRE = require('../../assets/images/spitfire.png');
 
 const TRACK_HEIGHT = 16;
 const THUMB_SIZE = 34;
+
+// The label runs from "VOTE 1%" to "VOTE 100%" and the button stays one width so the
+// track does not resize under your finger. The width follows the widest translation
+// (FiraCode is monospaced, so characters times an em fraction is exact enough).
+const VOTE_BUTTON_MIN_WIDTH = Math.max(
+  92,
+  Math.ceil(t('feed.slider.vote_button', { value: 100 }).length * theme.fontSizes.xs * 0.62) +
+    theme.spacing.sm * 2,
+);
 
 interface VotingSliderProps {
   value: number;
@@ -126,20 +136,20 @@ export function VotingSlider({
       </View>
 
       <Pressable
-        style={[styles.voteButton, isVoting && styles.disabled]}
+        style={[styles.voteButton, { minWidth: VOTE_BUTTON_MIN_WIDTH }, isVoting && styles.disabled]}
         onPress={onConfirm}
         disabled={isVoting}
         // 30px tall by design — a taller button would drag the whole bar with
         // it. hitSlop gets the touch target to 44 without touching the layout.
         hitSlop={{ top: 7, bottom: 7 }}
         accessibilityRole="button"
-        accessibilityLabel={`Vote ${value} percent`}
+        accessibilityLabel={t('feed.slider.a11y.vote_percent', { value })}
         accessibilityState={{ disabled: isVoting }}
       >
         {isVoting ? (
           <ActivityIndicator size="small" color={theme.colors.black} />
         ) : (
-          <Text style={styles.voteText}>VOTE {value}%</Text>
+          <Text style={styles.voteText}>{t('feed.slider.vote_button', { value })}</Text>
         )}
       </Pressable>
 
@@ -149,7 +159,7 @@ export function VotingSlider({
         disabled={isVoting}
         hitSlop={{ top: 7, bottom: 7, right: 7 }}
         accessibilityRole="button"
-        accessibilityLabel="Cancel vote"
+        accessibilityLabel={t('feed.slider.a11y.cancel_vote')}
       >
         <Ionicons name="close" size={18} color={theme.colors.white} />
       </Pressable>

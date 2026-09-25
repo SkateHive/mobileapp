@@ -19,6 +19,7 @@ import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
 import { castVote, canPost } from '~/lib/posting';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 import { extractMediaFromBody } from '~/lib/utils';
 import { recordVote } from '~/lib/vote-store';
 import type { Discussion } from '@hiveio/dhive';
@@ -29,22 +30,22 @@ const formatTimeAbbreviated = (date: Date): string => {
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
   
-  if (diffInSeconds < 60) return '1m';
+  if (diffInSeconds < 60) return t('feed.time.under_minute');
   
   const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return `${diffInMinutes}m`;
+  if (diffInMinutes < 60) return t('feed.time.minutes', { n: diffInMinutes });
   
   const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours}h`;
+  if (diffInHours < 24) return t('feed.time.hours', { n: diffInHours });
   
   const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 30) return `${diffInDays}d`;
+  if (diffInDays < 30) return t('feed.time.days', { n: diffInDays });
   
   const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) return `${diffInMonths}mo`;
+  if (diffInMonths < 12) return t('feed.time.months', { count: diffInMonths });
   
   const diffInYears = Math.floor(diffInMonths / 12);
-  return `${diffInYears}y`;
+  return t('feed.time.years', { count: diffInYears });
 };
 
 interface ConversationReplyProps {
@@ -89,7 +90,7 @@ export function ConversationReply({
       setIsVoting(true);
 
       if (!canPost(session)) {
-        showToast('Please login first', 'error');
+        showToast(t('common.please_login_first'), 'error');
         return;
       }
 
@@ -113,7 +114,7 @@ export function ConversationReply({
         throw err;
       }
     } catch (error) {
-      let errorMessage = 'Failed to vote';
+      let errorMessage = t('common.error.vote_failed');
       if (error instanceof Error) {
         errorMessage = error.message;
       }
@@ -171,7 +172,7 @@ export function ConversationReply({
             <Image
               source={{ uri: displayAvatar }}
               style={dynamicStyles.profileImage}
-              alt={`${post.author}'s avatar`}
+              alt={t('feed.reply.a11y.avatar_alt', { author: post.author })}
             />
           </Pressable>
         </View>
@@ -252,8 +253,8 @@ export function ConversationReply({
           parentAuthor={post.author}
           parentPermlink={post.permlink}
           onReplySuccess={handleReplySuccess}
-          placeholder={`Reply to @${post.author}...`}
-          buttonLabel="REPLY"
+          placeholder={t('feed.reply.placeholder_to_author', { author: post.author })}
+          buttonLabel={t('feed.reply.button')}
         />
       )}
 

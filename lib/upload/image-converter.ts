@@ -1,5 +1,7 @@
 import { Image } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { t } from '~/lib/i18n';
+import { failWith } from './upload-runner';
 
 /** Longest side an uploaded image is scaled down to. */
 const MAX_UPLOAD_DIMENSION = 1600;
@@ -113,9 +115,7 @@ export async function convertToJPEG(
     };
   } catch (error) {
     console.error('Error converting image to JPEG:', error);
-    throw new Error(
-      `Failed to convert image: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
+    throw failWith('image_convert', { message: error instanceof Error ? error.message : t('common.unknown_error') });
   }
 }
 

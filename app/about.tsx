@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { AuthBackground } from '~/components/auth/AuthBackground';
 import { useToast } from '~/lib/toast-provider';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 
 /**
  * What SkateHive is — reached from the info button on the login screen.
@@ -24,56 +25,55 @@ export default function AboutScreen() {
         style={styles.backButton}
         hitSlop={12}
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.go_back')}
       >
         <Ionicons name="chevron-back" size={26} color={theme.colors.white} />
       </Pressable>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Skatehive Community</Text>
+        <Text style={styles.title}>{t('auth.about.title')}</Text>
 
-        <Section title="🌍 What is Skatehive?">
-          <Bullet text="It's a worldwide crew of skaters, creators, and weirdos doing it our way." />
-          <Bullet text="Built on DIY, decentralization, and zero corporate bullsh*t." />
-          <Bullet text="No bosses, no brands calling shots. This is 100% skater-owned, skater-run." />
+        <Section title={t('auth.about.what_title')}>
+          <Bullet text={t('auth.about.what_1')} />
+          <Bullet text={t('auth.about.what_2')} />
+          <Bullet text={t('auth.about.what_3')} />
         </Section>
 
-        <Section title="🐝 Your account, explained">
-          <Bullet text="You start with a lite account: post, comment and vote from day one, with no crypto setup at all." />
-          <Bullet text="Your posts are real posts on the Hive blockchain. They just go out through @skatehive, the community account, instead of one of your own." />
-          <Bullet text="A few things need an account in your name: following people, editing your profile, and earning rewards directly." />
+        <Section title={t('auth.about.account_title')}>
+          <Bullet text={t('auth.about.account_1')} />
+          <Bullet text={t('auth.about.account_3')} />
         </Section>
 
-        <Section title="🛹 Your own account, once you post">
-          <Bullet text="Post your first clip and the crew sponsors a Hive account in your name. Your keys reach you by email, and the app links them to your login for you." />
-          <Bullet text="Nothing to buy, nothing to set up, no form to fill. Skate, post, and the account follows." />
-          <Bullet text="Already have a Hive account? Use 'Sign in with Hive' on the login screen. The posting key is all it ever asks for." />
+        <Section title={t('auth.about.own_account_title')}>
+          <Bullet text={t('auth.about.own_account_1')} />
+          <Bullet text={t('auth.about.own_account_2')} />
+          <Bullet text={t('auth.about.own_account_3')} />
         </Section>
 
-        <Section title="📼 Tech Revolution in Skateboarding">
-          <Bullet text="From VX tapes to IG clips, tech's always been part of the ride." />
-          <Bullet text="Skatehive is the next chapter: community-powered + crypto rewards = freedom." />
+        <Section title={t('auth.about.tech_title')}>
+          <Bullet text={t('auth.about.tech_1')} />
+          <Bullet text={t('auth.about.tech_2')} />
         </Section>
 
-        <Section title="🚀 Why It Rips">
-          <Bullet text="Post-to-earn: film a trick, drop a story, share your vibe, get rewarded." />
-          <Bullet text="Infinity Mag: our own never-ending skate mag. No ads. No fluff." />
-          <Bullet text="Decentralized sponsorships: repping your crew, getting love from the people." />
+        <Section title={t('auth.about.why_title')}>
+          <Bullet text={t('auth.about.why_1')} />
+          <Bullet text={t('auth.about.why_2')} />
+          <Bullet text={t('auth.about.why_3')} />
         </Section>
 
-        <Section title="🧰 Open-Source = Total Freedom">
-          <Bullet text="Anyone can fork this sh*t: skateshops, collectives, your homie with a laptop." />
-          <Bullet text="Your content echoes across the skateverse. Powered by blockchain, owned by you." />
+        <Section title={t('auth.about.open_title')}>
+          <Bullet text={t('auth.about.open_1')} />
+          <Bullet text={t('auth.about.open_2')} />
         </Section>
 
-        <Section title="🤝 Community-First, Always">
-          <Bullet text="Likes, posts, comments: every move adds value to *our* world." />
-          <Bullet text="We set the tone. No AI deciding what's cool. No engagement farms." />
+        <Section title={t('auth.about.community_title')}>
+          <Bullet text={t('auth.about.community_1')} />
+          <Bullet text={t('auth.about.community_2')} />
         </Section>
 
-        <Section title="🛹 Our Mission">
-          <Bullet text="Put skate media back in skaters' hands. Forever." />
-          <Bullet text="Grow a real-deal global skate culture: raw, connected, and free AF." />
+        <Section title={t('auth.about.mission_title')}>
+          <Bullet text={t('auth.about.mission_1')} />
+          <Bullet text={t('auth.about.mission_2')} />
         </Section>
       </ScrollView>
     </View>

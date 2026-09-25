@@ -7,6 +7,7 @@ import { CrosspostNotificationItem } from './CrosspostNotificationItem';
 import { Text } from '../ui/text';
 import { Button } from '../ui/button';
 import { theme } from '~/lib/theme';
+import { t } from '~/lib/i18n';
 import { useAuth } from '~/lib/auth-provider';
 import { useToast } from '~/lib/toast-provider';
 import type { UnifiedNotification } from '~/lib/notifications/merge';
@@ -34,9 +35,9 @@ export const NotificationsScreen = React.memo(() => {
       await markAsRead();
       // Immediately clear the badge and refresh it
       onNotificationsMarkedAsRead();
-      showToast('Notifications marked as read', 'success');
+      showToast(t('notif.marked_read'), 'success');
     } catch (error) {
-      showToast('Failed to mark notifications as read', 'error');
+      showToast(t('notif.mark_read_error'), 'error');
     }
   };
 
@@ -52,7 +53,7 @@ export const NotificationsScreen = React.memo(() => {
     return (
       <View style={styles.footerLoader}>
         <ActivityIndicator size="small" color={theme.colors.green} />
-        <Text style={styles.loadingText}>Loading more...</Text>
+        <Text style={styles.loadingText}>{t('notif.loading_more')}</Text>
       </View>
     );
   };
@@ -62,7 +63,7 @@ export const NotificationsScreen = React.memo(() => {
       return (
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={theme.colors.green} />
-          <Text style={styles.emptyText}>Loading notifications...</Text>
+          <Text style={styles.emptyText}>{t('notif.loading')}</Text>
         </View>
       );
     }
@@ -70,9 +71,9 @@ export const NotificationsScreen = React.memo(() => {
     if (error) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Failed to load notifications</Text>
+          <Text style={styles.emptyText}>{t('notif.load_error')}</Text>
           <Button onPress={refresh} variant="outline" size="sm">
-            <Text style={styles.buttonText}>Try Again</Text>
+            <Text style={styles.buttonText}>{t('common.try_again')}</Text>
           </Button>
         </View>
       );
@@ -82,7 +83,7 @@ export const NotificationsScreen = React.memo(() => {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
-            Please log in to view notifications
+            {t('notif.login_required')}
           </Text>
         </View>
       );
@@ -91,10 +92,10 @@ export const NotificationsScreen = React.memo(() => {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          No notifications yet
+          {t('notif.empty_title')}
         </Text>
         <Text style={styles.emptySubtext}>
-          You'll see votes, comments, and mentions here
+          {t('notif.empty_subtitle')}
         </Text>
       </View>
     );
@@ -106,7 +107,7 @@ export const NotificationsScreen = React.memo(() => {
     return (
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          Notifications
+          {t('notif.header')}
         </Text>
         {unreadCount > 0 && (
           <Button 
@@ -114,7 +115,7 @@ export const NotificationsScreen = React.memo(() => {
             variant="outline"
             size="sm"
           >
-            <Text style={styles.buttonText}>Mark All Read</Text>
+            <Text style={styles.buttonText}>{t('notif.mark_all_read')}</Text>
           </Button>
         )}
       </View>

@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 
 export interface ActionSheetItem {
   key: string;
@@ -39,7 +40,7 @@ export function ActionSheet({
   title,
   subtitle,
   items,
-  cancelLabel = "Cancel",
+  cancelLabel = t("common.cancel"),
 }: ActionSheetProps) {
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);

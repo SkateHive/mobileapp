@@ -6,6 +6,7 @@ import * as Haptics from "expo-haptics";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { formatDistance } from "~/lib/spotmap/geo";
+import { t, formatDecimal } from "~/lib/i18n";
 import type { SpotmapRow } from "~/lib/spotmap/types";
 import { isHiveSpot } from "~/lib/spotmap/types";
 
@@ -61,7 +62,7 @@ function MapSpotCardImpl({
 
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={1}>
-          {spot.name || "Unnamed spot"}
+          {spot.name || t("map.unnamed")}
         </Text>
 
         <View style={styles.metaRow}>
@@ -72,12 +73,12 @@ function MapSpotCardImpl({
           ) : (
             <View style={styles.curatedBadge}>
               <Ionicons name="map" size={10} color={theme.colors.muted} />
-              <Text style={styles.curatedText}>Curated</Text>
+              <Text style={styles.curatedText}>{t("map.card.curated")}</Text>
             </View>
           )}
           {distanceKm != null && (
             <Text style={styles.distance}>
-              📍 {formatDistance(distanceKm)}
+              📍 {formatDistance(distanceKm, t, formatDecimal)}
             </Text>
           )}
         </View>

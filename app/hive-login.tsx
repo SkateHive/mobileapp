@@ -14,14 +14,10 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { PinInput } from "~/components/ui/PinInput";
 import { AuthBackground } from "~/components/auth/AuthBackground";
-import { AuthError, useAuth } from "~/lib/auth-provider";
+import { useAuth } from "~/lib/auth-provider";
+import { authErrorText } from "~/lib/auth-error-text";
 import { hasDeviceAuthentication } from "~/lib/secure-key";
-import {
-  AccountNotFoundError,
-  HiveError,
-  InvalidKeyError,
-  InvalidKeyFormatError,
-} from "~/lib/hive-utils";
+import { t } from "~/lib/i18n";
 import { theme } from "~/lib/theme";
 import type { EncryptionMethod } from "~/lib/types";
 
@@ -67,13 +63,7 @@ export default function HiveLoginScreen() {
       await login(username.trim(), postingKey.trim(), method, pin);
       router.replace("/(tabs)/videos");
     } catch (e) {
-      const known =
-        e instanceof InvalidKeyFormatError ||
-        e instanceof AccountNotFoundError ||
-        e instanceof InvalidKeyError ||
-        e instanceof AuthError ||
-        e instanceof HiveError;
-      setError(known ? (e as Error).message : "Could not sign in");
+      setError(authErrorText(e, { username: username.trim().toLowerCase() }));
     } finally {
       setBusy(false);
     }
@@ -90,7 +80,7 @@ export default function HiveLoginScreen() {
         style={styles.backButton}
         disabled={busy}
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t("common.go_back")}
       >
         <Ionicons name="chevron-back" size={26} color={theme.colors.white} />
       </Pressable>
@@ -104,18 +94,15 @@ export default function HiveLoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Sign in with Hive</Text>
-          <Text style={styles.caption}>
-            For people who already have a Hive account. Your key is encrypted on
-            this device and never leaves it.
-          </Text>
+          <Text style={styles.title}>{t("auth.hive.title")}</Text>
+          <Text style={styles.caption}>{t("auth.hive.caption")}</Text>
 
           <TextInput
             style={styles.input}
-            placeholder="username"
+            placeholder={t("auth.hive.username_placeholder")}
             placeholderTextColor={theme.auth.placeholder}
             value={username}
-            onChangeText={(t) => setUsername(t.toLowerCase())}
+            onChangeText={(text) => setUsername(text.toLowerCase())}
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="username"
@@ -124,7 +111,7 @@ export default function HiveLoginScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="posting key"
+            placeholder={t("auth.common.posting_key_placeholder")}
             placeholderTextColor={theme.auth.placeholder}
             value={postingKey}
             onChangeText={setPostingKey}
@@ -148,7 +135,7 @@ export default function HiveLoginScreen() {
                     accessibilityState={{ selected: active }}
                   >
                     <Text style={[styles.methodText, active && styles.methodTextActive]}>
-                      {option === "pin" ? "Unlock with PIN" : "Unlock with biometrics"}
+                      {option === "pin" ? t("auth.hive.unlock_pin") : t("auth.hive.unlock_biometrics")}
                     </Text>
                   </Pressable>
                 );
@@ -158,17 +145,17 @@ export default function HiveLoginScreen() {
 
           {method === "pin" && (
             <>
-              <Text style={styles.caption}>Create a 6-digit PIN</Text>
+              <Text style={styles.caption}>{t("auth.hive.create_pin")}</Text>
               <PinInput value={pin} onChangeText={setPin} />
 
-              <Text style={styles.caption}>Type it again</Text>
+              <Text style={styles.caption}>{t("auth.hive.type_again")}</Text>
               <PinInput
                 value={confirmPin}
                 onChangeText={setConfirmPin}
                 hasError={pinMismatch}
               />
               {pinMismatch && (
-                <Text style={styles.error}>Those PINs don't match.</Text>
+                <Text style={styles.error}>{t("auth.hive.pins_mismatch")}</Text>
               )}
             </>
           )}
@@ -186,7 +173,7 @@ export default function HiveLoginScreen() {
             {busy ? (
               <ActivityIndicator size="small" color={theme.auth.onNeon} />
             ) : (
-              <Text style={styles.primaryLabel}>Sign in</Text>
+              <Text style={styles.primaryLabel}>{t("auth.hive.sign_in")}</Text>
             )}
           </Pressable>
 

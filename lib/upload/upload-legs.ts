@@ -6,10 +6,11 @@ import { isUserbaseSession, postComment } from "~/lib/posting";
 import { COMMUNITY_TAG, HiveClient, SNAPS_CONTAINER_AUTHOR, getLastSnapsContainer } from "~/lib/hive-utils";
 import { crossPostToInstagram, CrossPostError, crossPostErrorMessage } from "~/lib/instagram";
 import { WEB_BASE_URL } from "~/lib/constants";
+import { t } from "~/lib/i18n";
 import { uploadImageToHive, uploadImageViaUserbase } from "./image-upload";
 import { isHiveNotFoundError } from "./hive-errors";
 import { uploadVideoToWorker } from "./video-upload";
-import { UploadRunError, type RunnerDeps } from "./upload-runner";
+import { codedError, type RunnerDeps } from "./upload-runner";
 
 // Mirrors DEFAULT_HIVE_POSTING_ACCOUNT in the skatehive-api comment route: the
 // server signs and broadcasts email/lite (userbase) posts under this shared
@@ -18,7 +19,7 @@ const SHARED_POSTING_ACCOUNT = "skateuser";
 
 function assertOnDevice(uri: string, what: "video" | "image"): void {
   if (!new File(uri).exists) {
-    throw new UploadRunError("unknown", `The ${what} is no longer on this device`);
+    throw codedError("unknown", what === "video" ? "video_gone" : "image_gone");
   }
 }
 
@@ -97,7 +98,7 @@ export function makeRunnerDeps(
           caption: args.caption,
           permalinkUrl: `${WEB_BASE_URL}/post/${session.username}/${args.permlink}`,
         });
-        onCrossPostResult?.(true, "Sent to Instagram curation");
+        onCrossPostResult?.(true, t("ig.crosspost.ok"));
       } catch (e) {
         const message = e instanceof CrossPostError ? crossPostErrorMessage(e.status) : crossPostErrorMessage(0);
         onCrossPostResult?.(false, message);

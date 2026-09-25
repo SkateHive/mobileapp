@@ -1,4 +1,5 @@
 import { comment } from '../hive-utils';
+import { t } from '~/lib/i18n';
 
 export interface PostData {
   title: string;
@@ -96,7 +97,7 @@ export async function createHivePost(
     return result;
   } catch (error) {
     console.error('Failed to create Hive post:', error);
-    throw new Error(`Post creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(t('upload.error.post_failed', { message: error instanceof Error ? error.message : t('common.unknown_error') }));
   }
 }
 
@@ -150,6 +151,6 @@ export async function createHiveComment(
     return result;
   } catch (error) {
     console.error('Failed to create Hive comment:', error);
-    throw new Error(`Comment creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(t('upload.error.comment_failed', { message: error instanceof Error ? error.message : t('common.unknown_error') }));
   }
 }

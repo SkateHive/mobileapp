@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { t } from "~/lib/i18n";
 import { SpectatorInfoBase } from "./SpectatorInfoBase";
 
 // Use the exact icon names from Ionicons
@@ -8,23 +9,23 @@ export function CreateSpectatorInfo() {
   const createInfoItems = [
     {
       icon: "flash-outline" as IconName,
-      title: "GET PAID. FOR REAL",
-      text: "No shadowbans. No demonetization. Get paid for every post, comment, and share.",
+      title: t("auth.spectator.create_title_1"),
+      text: t("auth.spectator.create_text_1"),
     },
     {
       icon: "flame-outline" as IconName,
-      title: "BUILD YOUR CREW",
-      text: "Your followers? They actually see your content. Grow without begging algorithms.",
+      title: t("auth.spectator.create_title_2"),
+      text: t("auth.spectator.create_text_2"),
     },
     {
       icon: "eye-off-outline" as IconName,
-      title: "NO CENSORSHIP. NO BS",
-      text: "Say what you want. Create what you want. No suits deciding what's 'allowed'.",
+      title: t("auth.spectator.create_title_3"),
+      text: t("auth.spectator.create_text_3"),
     },
     {
       icon: "hammer-outline" as IconName,
-      title: "BE YOUR OWN PLATFORM",
-      text: "Web3 means you own your content. No bans. No takedowns. No begging for ad revenue.",
+      title: t("auth.spectator.create_title_4"),
+      text: t("auth.spectator.create_text_4"),
     },
   ];
 
@@ -32,9 +33,9 @@ export function CreateSpectatorInfo() {
     <SpectatorInfoBase
       icon="skull-outline"
       iconColor="#34C759"
-      title="F*ck Web2"
+      title={t("auth.spectator.create_heading")}
       titleUppercase={true}
-      description="Own Your Content. No ads. No overlords. Just you, your content, and your rewards."
+      description={t("auth.spectator.create_description")}
       infoItems={createInfoItems}
     />
   );

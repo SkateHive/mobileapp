@@ -5,6 +5,7 @@
 
 import { getLastSnapsContainer, COMMUNITY_TAG } from "~/lib/hive-utils";
 import { postComment } from "~/lib/posting";
+import { t } from "~/lib/i18n";
 import type { AuthSession } from "~/lib/types";
 
 export interface SpotMedia {
@@ -84,9 +85,7 @@ export async function submitSpot(
     parentAuthor = container.author;
     parentPermlink = container.permlink;
   } catch (err) {
-    throw new Error(
-      "Couldn't reach Hive to post the spot. Check your connection and try again."
-    );
+    throw new Error(t("map.create.error.hive_unreachable"));
   }
 
   const permlink = generateSpotPermlink();

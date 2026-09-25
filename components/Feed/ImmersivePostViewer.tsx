@@ -32,6 +32,7 @@ import { extractMediaFromBody, formatPayout, metadataImageUrl } from "~/lib/util
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { useVideoMuted } from "~/lib/video-mute";
+import { t } from "~/lib/i18n";
 import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 
@@ -190,10 +191,10 @@ function ImmersivePostItem({
     // Alert, not the toast: toasts render in the root tree, which is BEHIND
     // this full-screen Modal. Every outcome here was invisible, so a failing
     // download and a working one looked exactly the same — like a dead button.
-    const say = (msg: string) => Alert.alert("Save to camera roll", msg);
+    const say = (msg: string) => Alert.alert(t("feed.viewer.save_title"), msg);
     const url = videoUrl || images[imageIndex] || images[0];
     if (!url) {
-      say("There's no media on this post to save.");
+      say(t("feed.viewer.no_media"));
       return;
     }
     try {
@@ -204,11 +205,11 @@ function ImmersivePostItem({
       const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) {
         Alert.alert(
-          "Save to camera roll",
-          "SkateHive needs permission to add photos and videos.",
+          t("feed.viewer.save_title"),
+          t("feed.viewer.permission_needed"),
           [
-            { text: "Not now", style: "cancel" },
-            { text: "Open Settings", onPress: () => Linking.openSettings() },
+            { text: t("feed.viewer.not_now"), style: "cancel" },
+            { text: t("common.open_settings"), onPress: () => Linking.openSettings() },
           ]
         );
         return;
@@ -222,11 +223,11 @@ function ImmersivePostItem({
       const file = await File.downloadFileAsync(url, dest);
       await MediaLibrary.saveToLibraryAsync(file.uri);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      say("Saved.");
+      say(t("feed.viewer.saved"));
     } catch (e) {
       // The message matters: this failed silently for a while, and "it didn't
       // work" is not enough to tell a gateway timeout from a permission problem.
-      say(e instanceof Error ? e.message : "Download failed.");
+      say(e instanceof Error ? e.message : t("feed.viewer.download_failed"));
     } finally {
       setDownloading(false);
     }
@@ -327,7 +328,7 @@ function ImmersivePostItem({
               nestedScrollEnabled
             >
               <Text style={styles.captionText}>{caption}</Text>
-              <Text style={styles.captionToggle}>less</Text>
+              <Text style={styles.captionToggle}>{t("feed.viewer.caption_less")}</Text>
             </ScrollView>
           ) : (
             <>
@@ -335,7 +336,7 @@ function ImmersivePostItem({
                 {caption}
               </Text>
               {(caption.length > 80 || caption.includes("\n")) && (
-                <Text style={styles.captionToggle}>… more</Text>
+                <Text style={styles.captionToggle}>{t("feed.viewer.caption_more")}</Text>
               )}
             </>
           )}
@@ -447,7 +448,7 @@ export function ImmersivePostViewer({
     async (post: any) => {
       const key = postKey(post);
       if (!canPost(session)) {
-        showToast("Please login first", "error");
+        showToast(t("common.please_login_first"), "error");
         return;
       }
       if (votingLockRef.current[key]) return;
@@ -467,11 +468,11 @@ export function ImmersivePostViewer({
         setVoteCountStates((p) => ({ ...p, [key]: prevCount + 1 }));
         await castVote(session!, post.author, post.permlink, 10000);
         recordVote(post.author, post.permlink, 10000);
-        showToast("Voted!", "success");
+        showToast(t("feed.viewer.voted_toast"), "success");
       } catch (error) {
         setLikedStates((p) => ({ ...p, [key]: wasLiked }));
         setVoteCountStates((p) => ({ ...p, [key]: prevCount }));
-        showToast(error instanceof Error ? error.message : "Failed to vote", "error");
+        showToast(error instanceof Error ? error.message : t("common.error.vote_failed"), "error");
       } finally {
         votingLockRef.current[key] = false;
         setVotingStates((p) => ({ ...p, [key]: false }));
@@ -486,7 +487,7 @@ export function ImmersivePostViewer({
     try {
       const url = `https://skatehive.app/@${post.author}/${post.permlink}`;
       await Share.share({
-        message: post.title ? `${post.title}\n\n${url}` : `Check this out\n\n${url}`,
+        message: post.title ? `${post.title}\n\n${url}` : `${t("feed.viewer.share_message")}\n\n${url}`,
         url,
       });
     } catch {}

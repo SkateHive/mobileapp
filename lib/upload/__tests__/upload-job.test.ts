@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createT, enT } from "../../i18n/core";
 import {
   createJob,
   isJobActive,
@@ -327,29 +328,29 @@ test("invariant: result survives failed, retry and resume", () => {
 
 test("pillLabel / pillDetail follow the UI table", () => {
   let job = activeVideo();
-  assert.equal(pillLabel(job), "Uploading… 0%");
-  assert.equal(pillDetail(job), "Sending to server");
+  assert.equal(pillLabel(job, enT), "Uploading… 0%");
+  assert.equal(pillDetail(job, enT), "Sending to server");
   job = reduce(job, { type: "progress", progress: 62, stage: "transcoding" }) as UploadJob;
-  assert.equal(pillLabel(job), "Transcoding… 62%");
-  assert.equal(pillDetail(job), "Transcoding video");
+  assert.equal(pillLabel(job, enT), "Transcoding… 62%");
+  assert.equal(pillDetail(job, enT), "Transcoding video");
   job = reduce(job, { type: "progress", progress: 62, stage: "optimized" }) as UploadJob;
-  assert.equal(pillLabel(job), "Transcoding… 62%");
-  assert.equal(pillDetail(job), "Video already optimized");
+  assert.equal(pillLabel(job, enT), "Transcoding… 62%");
+  assert.equal(pillDetail(job, enT), "Video already optimized");
   job = reduce(job, { type: "progress", progress: 80, stage: "uploading" }) as UploadJob;
-  assert.equal(pillLabel(job), "Pinning… 80%");
-  assert.equal(pillDetail(job), "Uploading to IPFS");
+  assert.equal(pillLabel(job, enT), "Pinning… 80%");
+  assert.equal(pillDetail(job, enT), "Uploading to IPFS");
   job = reduce(job, { type: "media_done", cid: "a", gatewayUrl: "g" }) as UploadJob;
-  assert.equal(pillLabel(job), "Publishing…");
-  assert.equal(pillDetail(job), "Posting to Hive");
+  assert.equal(pillLabel(job, enT), "Publishing…");
+  assert.equal(pillDetail(job, enT), "Posting to Hive");
   const resuming = reduce(job, { type: "resume", kind: "launch", at: 1 }) as UploadJob;
-  assert.equal(pillLabel(resuming), "Resuming…");
-  assert.equal(pillDetail(resuming), "Picking up where it left off");
+  assert.equal(pillLabel(resuming, enT), "Resuming…");
+  assert.equal(pillDetail(resuming, enT), "Picking up where it left off");
   const published = reduce(job, { type: "published", at: 2 }) as UploadJob;
-  assert.equal(pillLabel(published), "Published");
-  assert.equal(pillDetail(published), "Tap to open");
+  assert.equal(pillLabel(published, enT), "Published");
+  assert.equal(pillDetail(published, enT), "Tap to open");
   const failed = reduce(job, { type: "failed", error: { kind: "broadcast", message: "RC too low" }, appActive: true, at: 3 }) as UploadJob;
-  assert.equal(pillLabel(failed), "Upload failed");
-  assert.equal(pillDetail(failed), "RC too low");
+  assert.equal(pillLabel(failed, enT), "Upload failed");
+  assert.equal(pillDetail(failed, enT), "RC too low");
 });
 
 test("parsePersistedJob accepts a serialized job and resets pendingResume", () => {
@@ -369,4 +370,38 @@ test("parsePersistedJob rejects garbage, unknown status and missing id/permlink"
   assert.equal(parsePersistedJob(JSON.stringify({ ...activeVideo(), id: "" })), null);
   const { permlink: _dropped, ...noPermlink } = activeVideo();
   assert.equal(parsePersistedJob(JSON.stringify(noPermlink)), null);
+});
+
+test("the failed pill translates a known error code and falls back to the raw message", () => {
+  const base = { ...activeVideo() };
+  const coded = reduce(base, {
+    type: "failed",
+    error: { kind: "unknown", message: "The video is no longer on this device", code: "video_gone" },
+    appActive: true,
+    at: 3,
+  }) as UploadJob;
+  assert.equal(pillDetail(coded, enT), "The video is no longer on this device");
+  assert.equal(pillDetail(coded, createT("pt-BR")), createT("pt-BR")("upload.error.video_gone"));
+  assert.notEqual(pillDetail(coded, createT("pt-BR")), pillDetail(coded, enT));
+
+  const withParams = reduce(base, {
+    type: "failed",
+    error: { kind: "server", message: "x", code: "auth", params: { author: "fred" } },
+    appActive: true,
+    at: 3,
+  }) as UploadJob;
+  assert.equal(pillDetail(withParams, enT), "Log in as @fred to finish this post");
+
+  const oldBuild = reduce(base, { type: "failed", error: { kind: "network", message: "Network request failed" }, appActive: true, at: 3 }) as UploadJob;
+  assert.equal(pillDetail(oldBuild, createT("pt-BR")), "Network request failed", "no code: the raw message is shown");
+  const unknownCode = reduce(base, { type: "failed", error: { kind: "unknown", message: "raw", code: "not_a_real_code" }, appActive: true, at: 3 }) as UploadJob;
+  assert.equal(pillDetail(unknownCode, enT), "raw");
+});
+
+test("an error persisted without a code still parses", () => {
+  const job = activeVideo();
+  const text = JSON.stringify({ ...job, status: "failed", error: { kind: "network", message: "old" } });
+  const parsed = parsePersistedJob(text);
+  assert.equal(parsed?.error?.code, undefined);
+  assert.equal(parsed?.error?.message, "old");
 });

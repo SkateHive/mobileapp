@@ -1,40 +1,40 @@
-// Funny hype/taunt lines for the Skate-or-Dice character. "{t}" is replaced by
-// the rolled trick (highlighted in the speech balloon).
-const SENTENCES: string[] = [
-  'Bet you can’t land a {t} 😏',
-  'Okay hotshot — send it: {t}!',
-  'Land a {t} or you buy the crew pizza 🍕',
-  'Easy. Just a casual {t}, no big deal.',
-  '{t}? Pics or it didn’t happen 📸',
-  'Warm-up’s over. {t}, let’s go!',
-  'Your nan could do a {t}. Prove me wrong.',
-  'Roll away clean: {t} 🛹',
-  'Sketchy or steezy? Show me a {t}.',
-  'First try {t} or it’s a coffee run ☕',
-  'Commit to the {t}. Don’t kook it.',
-  '{t}. Bend those knees, champ.',
-  'Three tries for a {t}. Clock’s ticking ⏱️',
-  'Stomp a {t} and I’ll stop heckling.',
-  'Nollie crew hates this one trick: {t}',
-];
+import { t } from '~/lib/i18n';
 
-const PROMPTS: string[] = [
-  'Tap PLAY and I’ll hook you up with a trick 🛹',
-  'Ready to roll? Hit PLAY, hotshot.',
-  'Shake the phone or smash PLAY 🎲',
-];
+// Funny hype/taunt lines for the Skate-or-Dice character. The catalog text has a
+// "{{t}}" token that is replaced by the rolled trick (highlighted in the speech balloon).
+const SENTENCE_KEYS = [
+  'dice.sentence.001',
+  'dice.sentence.002',
+  'dice.sentence.003',
+  'dice.sentence.004',
+  'dice.sentence.005',
+  'dice.sentence.006',
+  'dice.sentence.007',
+  'dice.sentence.008',
+  'dice.sentence.009',
+  'dice.sentence.010',
+  'dice.sentence.011',
+  'dice.sentence.012',
+  'dice.sentence.013',
+  'dice.sentence.014',
+  'dice.sentence.015',
+] as const;
+
+const PROMPT_KEYS = ['dice.prompt.001', 'dice.prompt.002', 'dice.prompt.003'] as const;
+
+const TRICK_TOKEN = '{{t}}';
 
 export function randomSentenceTemplate(): string {
-  return SENTENCES[Math.floor(Math.random() * SENTENCES.length)];
+  return t(SENTENCE_KEYS[Math.floor(Math.random() * SENTENCE_KEYS.length)]);
 }
 
 export function randomPrompt(): string {
-  return PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+  return t(PROMPT_KEYS[Math.floor(Math.random() * PROMPT_KEYS.length)]);
 }
 
-// Split a "{t}" template into the text before/after the trick token.
+// Split a "{{t}}" template into the text before/after the trick token.
 export function splitTemplate(template: string): { before: string; after: string } {
-  const i = template.indexOf('{t}');
+  const i = template.indexOf(TRICK_TOKEN);
   if (i === -1) return { before: template, after: '' };
-  return { before: template.slice(0, i), after: template.slice(i + 3) };
+  return { before: template.slice(0, i), after: template.slice(i + TRICK_TOKEN.length) };
 }

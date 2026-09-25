@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 
 const VOTE_ICON = 28;
 const ACTION_ICON = 26;
@@ -74,7 +75,7 @@ export function VideoActionRail({
           style={styles.action}
           onPress={onToggleMute}
           accessibilityRole="button"
-          accessibilityLabel={isMuted ? "Unmute" : "Mute"}
+          accessibilityLabel={isMuted ? t("feed.rail.a11y.unmute") : t("feed.rail.a11y.mute")}
           accessibilityState={{ selected: !isMuted }}
         >
           <Ionicons
@@ -91,7 +92,7 @@ export function VideoActionRail({
           onPress={onDownload}
           disabled={isDownloading}
           accessibilityRole="button"
-          accessibilityLabel="Save to camera roll"
+          accessibilityLabel={t("feed.viewer.save_title")}
         >
           {isDownloading ? (
             <ActivityIndicator size="small" color={theme.colors.primary} />
@@ -107,14 +108,14 @@ export function VideoActionRail({
           onPress={onVote}
           disabled={isVoting}
           accessibilityRole="button"
-          accessibilityLabel={isLiked ? `Voted, ${voteCount} votes` : `Upvote, ${voteCount} votes`}
+          accessibilityLabel={isLiked ? t("feed.post.a11y.voted", { count: voteCount }) : t("feed.post.a11y.upvote", { count: voteCount })}
           accessibilityState={{ selected: isLiked, disabled: isVoting }}
         >
           {voteBody}
         </Pressable>
       ) : (
         // Your own post: the count still matters, the button doesn't.
-        <View style={styles.action} accessible accessibilityLabel={`${voteCount} votes`}>
+        <View style={styles.action} accessible accessibilityLabel={t("feed.rail.a11y.votes_count", { count: voteCount })}>
           {voteBody}
         </View>
       )}
@@ -123,7 +124,7 @@ export function VideoActionRail({
         style={styles.action}
         onPress={onComment}
         accessibilityRole="button"
-        accessibilityLabel={`${commentCount} replies`}
+        accessibilityLabel={t("feed.post.a11y.replies", { count: commentCount })}
       >
         <Ionicons name="chatbubble-outline" size={ACTION_ICON} color={theme.colors.white} />
         {commentCount > 0 && <Text style={styles.count}>{commentCount}</Text>}
@@ -133,7 +134,7 @@ export function VideoActionRail({
         style={styles.action}
         onPress={onShare}
         accessibilityRole="button"
-        accessibilityLabel="Share"
+        accessibilityLabel={t("feed.rail.a11y.share")}
       >
         <Ionicons name="share-outline" size={ACTION_ICON} color={theme.colors.white} />
       </Pressable>

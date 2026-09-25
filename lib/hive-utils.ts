@@ -1,5 +1,6 @@
 import { Client, Comment, PrivateKey, Discussion, PublicKey } from '@hiveio/dhive';
 import CryptoJS from 'crypto-js';
+import { t } from '~/lib/i18n';
 import { 
   SNAPS_CONTAINER_AUTHOR as ENV_SNAPS_CONTAINER_AUTHOR,
   SNAPS_PAGE_MIN_SIZE as ENV_SNAPS_PAGE_MIN_SIZE,
@@ -53,6 +54,10 @@ export interface Transaction {
  * Anything else — a node down, a timeout — is a real error and must stay loud.
  */
 export function isMissingAccountError(error: unknown): boolean {
+  if (error instanceof HiveError && (error.code === 'account_not_found' || error.code === 'profile_not_found')) {
+    return true;
+  }
+  // The text below is what Hive nodes answer, always in English, so it cannot be localised.
   const message = error instanceof Error ? error.message : String(error);
   return /account not found|does not exist|invalid account name/i.test(message);
 }
@@ -324,33 +329,82 @@ export async function getContent(author: string, permlink: string): Promise<Disc
   }
 }
 
+// Stable identifiers for the errors below. The English `message` is for logs; screens
+// show describeHiveError(error), which turns the code into the reader's language.
+export type HiveErrorCode =
+  | 'unknown'
+  | 'invalid_key_format'
+  | 'account_not_found'
+  | 'invalid_key'
+  | 'validate_failed'
+  | 'profile_not_found'
+  | 'report_crypto_unavailable'
+  | 'report_encryption_failed'
+  | 'report_not_configured';
+
 // Define custom error classes for better error handling
 export class HiveError extends Error {
-  constructor(message: string) {
+  code: HiveErrorCode;
+  params?: Record<string, string | number>;
+
+  constructor(message: string, code: HiveErrorCode = 'unknown', params?: Record<string, string | number>) {
     super(message);
     this.name = 'HiveError';
+    this.code = code;
+    this.params = params;
   }
 }
 
 export class InvalidKeyFormatError extends HiveError {
   constructor() {
-    super('Invalid posting key format. Posting keys should start with 5.');
+    super('Invalid posting key format. Posting keys should start with 5.', 'invalid_key_format');
     this.name = 'InvalidKeyFormatError';
   }
 }
 
 export class AccountNotFoundError extends HiveError {
   constructor(username: string) {
-    super(`Account '${username}' not found on the Hive blockchain.`);
+    super(`Account '${username}' not found on the Hive blockchain.`, 'account_not_found', { username });
     this.name = 'AccountNotFoundError';
   }
 }
 
 export class InvalidKeyError extends HiveError {
   constructor() {
-    super('The posting key is invalid for the given username.');
+    super('The posting key is invalid for the given username.', 'invalid_key');
     this.name = 'InvalidKeyError';
   }
+}
+
+/**
+ * The text to show a skater for an error from this module. HiveErrors are translated by
+ * code; anything else (a network failure, a node's own message) is shown as it came.
+ */
+export function describeHiveError(error: unknown): string {
+  if (error instanceof HiveError) {
+    const message = String(error.params?.message ?? error.message);
+    switch (error.code) {
+      case 'invalid_key_format':
+        return t('auth.key.invalid_format');
+      case 'account_not_found':
+        return t('auth.key.account_not_found', { username: String(error.params?.username ?? '') });
+      case 'invalid_key':
+        return t('auth.key.invalid_for_user');
+      case 'validate_failed':
+        return t('auth.key.validate_error', { message });
+      case 'profile_not_found':
+        return t('profile.error.account_not_found');
+      case 'report_crypto_unavailable':
+        return t('report.error.crypto_unavailable');
+      case 'report_encryption_failed':
+        return t('report.error.encryption_failed', { message });
+      case 'report_not_configured':
+        return t('report.error.not_configured');
+      default:
+        return error.message;
+    }
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -408,7 +462,8 @@ export async function validate_posting_key(
       throw error;
     }
     // Convert unknown errors to HiveError
-    throw new HiveError(`Error validating posting key: ${error instanceof Error ? error.message : String(error)}`);
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new HiveError(`Error validating posting key: ${reason}`, 'validate_failed', { message: reason });
   }
 }
 
@@ -1042,10 +1097,10 @@ function encryptForPublicKey(data: any, publicKey: string): string {
     
     // Check if it's specifically a crypto module error
     if (errorMessage.includes('Native crypto module') || errorMessage.includes('secure random')) {
-      throw new Error('Crypto module not available in React Native environment. This is a known limitation.');
+      throw new HiveError('Crypto module not available in React Native environment. This is a known limitation.', 'report_crypto_unavailable');
     }
     
-    throw new Error(`Encryption failed: ${errorMessage}`);
+    throw new HiveError(`Encryption failed: ${errorMessage}`, 'report_encryption_failed', { message: errorMessage });
   }
 }
 
@@ -1081,7 +1136,7 @@ export function buildEncryptedReportPayload(
   additionalInfo?: string
 ): { encrypted: boolean; data: string; version: number; encryption_method: string } {
   if (!MODERATOR_PUBLIC_KEY) {
-    throw new Error('Report system not configured - missing moderator public key');
+    throw new HiveError('Report system not configured - missing moderator public key', 'report_not_configured');
   }
 
   const reportData = {

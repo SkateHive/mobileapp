@@ -18,6 +18,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Text } from "~/components/ui/text";
 import { EnhancedMarkdownRenderer } from "~/components/markdown/EnhancedMarkdownRenderer";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { useAllSpots, useSpot } from "~/lib/hooks/useSpotmap";
 import { parseKmlDescription } from "~/lib/spotmap/parseKmlDescription";
 import { KML_AUTHOR, isHiveSpot, type SpotmapRow } from "~/lib/spotmap/types";
@@ -27,16 +28,16 @@ function relativeDate(iso?: string | null): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const s = Math.floor((Date.now() - then) / 1000);
-  if (s < 60) return "just now";
+  if (s < 60) return t("map.relative.now");
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return t("map.relative.minutes", { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t("map.relative.hours", { n: h });
   const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
+  if (d < 30) return t("map.relative.days", { n: d });
   const mo = Math.floor(d / 30);
-  if (mo < 12) return `${mo}mo ago`;
-  return `${Math.floor(mo / 12)}y ago`;
+  if (mo < 12) return t("map.relative.months", { count: mo });
+  return t("map.relative.years", { count: Math.floor(mo / 12) });
 }
 
 export default function SpotDetailScreen() {
@@ -68,7 +69,7 @@ export default function SpotDetailScreen() {
   if (!allSpots) {
     return (
       <View style={styles.container}>
-        <Header title="Spot" />
+        <Header title={t("map.detail.title")} />
         <View style={styles.centerFill}>
           <ActivityIndicator color={theme.colors.primary} />
         </View>
@@ -79,9 +80,9 @@ export default function SpotDetailScreen() {
   if (initialIndex < 0) {
     return (
       <View style={styles.container}>
-        <Header title="Spot" />
+        <Header title={t("map.detail.title")} />
         <View style={styles.centerFill}>
-          <Text style={styles.muted}>Spot not found.</Text>
+          <Text style={styles.muted}>{t("map.detail.not_found")}</Text>
         </View>
       </View>
     );
@@ -91,7 +92,7 @@ export default function SpotDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title={current?.name || "Spot"} />
+      <Header title={current?.name || t("map.detail.title")} />
       <FlatList
         ref={listRef}
         data={allSpots}
@@ -186,15 +187,13 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.name}>{spot.name || "Unnamed spot"}</Text>
+        <Text style={styles.name}>{spot.name || t("map.unnamed")}</Text>
 
         {/* Source attribution */}
         {isKml ? (
           <View style={styles.curatedBadge}>
             <Ionicons name="map" size={14} color={theme.colors.muted} />
-            <Text style={styles.curatedText}>
-              From the curated Google My Maps dataset
-            </Text>
+            <Text style={styles.curatedText}>{t("map.detail.curated_source")}</Text>
           </View>
         ) : (
           <Pressable
@@ -222,7 +221,7 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
       {/* About */}
       {!!aboutText && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>About this spot</Text>
+          <Text style={styles.cardTitle}>{t("map.detail.about")}</Text>
           {isKml ? (
             <Text style={styles.kmlText}>{aboutText}</Text>
           ) : (
@@ -233,7 +232,7 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
 
       {/* Location */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Location</Text>
+        <Text style={styles.cardTitle}>{t("map.detail.location")}</Text>
         <View style={styles.miniMapWrap}>
           <MapView
             provider={PROVIDER_DEFAULT}
@@ -263,11 +262,11 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
       <View style={styles.actions}>
         <Pressable style={styles.actionPrimary} onPress={openDirections}>
           <Ionicons name="navigate" size={18} color={theme.colors.black} />
-          <Text style={styles.actionPrimaryText}>Directions</Text>
+          <Text style={styles.actionPrimaryText}>{t("map.detail.directions")}</Text>
         </Pressable>
         <Pressable style={styles.actionSecondary} onPress={openInMaps}>
           <Ionicons name="map-outline" size={18} color={theme.colors.primary} />
-          <Text style={styles.actionSecondaryText}>Open in Maps</Text>
+          <Text style={styles.actionSecondaryText}>{t("map.detail.open_in_maps")}</Text>
         </Pressable>
       </View>
 
@@ -278,7 +277,7 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
             size={18}
             color={theme.colors.primary}
           />
-          <Text style={styles.discussionText}>View discussion</Text>
+          <Text style={styles.discussionText}>{t("map.detail.discussion")}</Text>
         </Pressable>
       )}
     </ScrollView>

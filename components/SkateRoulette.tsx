@@ -16,7 +16,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Text } from '~/components/ui/text';
-import { SKATE_DICE, type SkateDie } from '~/lib/skate-dice-data';
+import { SKATE_DICE, faceLabel, type SkateDie } from '~/lib/skate-dice-data';
+import { t } from '~/lib/i18n';
 import { theme } from '~/lib/theme';
 
 interface Props {
@@ -66,7 +67,7 @@ function Reel({
 
   return (
     <View style={styles.reel}>
-      <Text style={styles.reelHeader}>{die.key.toUpperCase()}</Text>
+      <Text style={styles.reelHeader}>{t(die.headerKey)}</Text>
       <View style={styles.window}>
         <Animated.View style={style}>
           {data.map((face, i) => (
@@ -77,7 +78,7 @@ function Reel({
                 adjustsFontSizeToFit
                 minimumFontScale={0.5}
               >
-                {face}
+                {faceLabel(face)}
               </Text>
             </View>
           ))}
@@ -104,15 +105,15 @@ const SkateRoulette = forwardRef<SkateRouletteHandle, Props>(({ onRoll }, ref) =
     lastRollRef.current = Date.now();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const t = SKATE_DICE.map(() => Math.floor(Math.random() * 6));
-    setTargets(t);
+    const picks = SKATE_DICE.map(() => Math.floor(Math.random() * 6));
+    setTargets(picks);
     setSpinId((id) => id + 1);
 
     const total = BASE_DURATION + (SKATE_DICE.length - 1) * STAGGER;
     setTimeout(() => {
       spinningRef.current = false;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onRoll(SKATE_DICE.map((d, i) => d.faces[t[i]]));
+      onRoll(SKATE_DICE.map((d, i) => d.faces[picks[i]]));
     }, total + 80);
   }, [onRoll]);
 

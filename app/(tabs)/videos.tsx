@@ -33,6 +33,7 @@ import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store
 import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
+import { t } from "~/lib/i18n";
 
 // ─── Native video item ─────────────────────────────────────────────────────
 // Each item gets its own expo-video player — no WebView overhead.
@@ -312,7 +313,7 @@ export default function VideosScreen() {
   const handleVote = useCallback(async (video: VideoPost) => {
     const key = `${video.author}-${video.permlink}`;
     if (!canPost(session)) {
-      showToast("Please login first", "error");
+      showToast(t("common.please_login_first"), "error");
       return;
     }
     // Use ref for immediate synchronous lock — prevents double-tap race before state update lands
@@ -340,7 +341,7 @@ export default function VideosScreen() {
     } catch (error) {
       setLikedStates((p) => ({ ...p, [key]: wasLiked }));
       setVoteCountStates((p) => ({ ...p, [key]: prevCount }));
-      showToast(error instanceof Error ? error.message : "Failed to vote", "error");
+      showToast(error instanceof Error ? error.message : t("common.error.vote_failed"), "error");
     } finally {
       votingLockRef.current[key] = false;
       setVotingStates((p) => ({ ...p, [key]: false }));
@@ -355,7 +356,7 @@ export default function VideosScreen() {
     try {
       const url = `https://skatehive.app/@${video.author}/${video.permlink}`;
       await Share.share({
-        message: video.title ? `${video.title}\n\n${url}` : `Check out this video by @${video.author}\n\n${url}`,
+        message: video.title ? `${video.title}\n\n${url}` : `${t("feed.videos.share_message", { author: video.author })}\n\n${url}`,
         url,
       });
     } catch {}
@@ -409,7 +410,7 @@ export default function VideosScreen() {
           router.push("/(tabs)/feed");
         }}
         accessibilityRole="button"
-        accessibilityLabel="Open feed"
+        accessibilityLabel={t("feed.videos.open_feed")}
         hitSlop={8}
       >
         <Ionicons name="reader-outline" size={24} color="#fff" />
@@ -458,7 +459,7 @@ export default function VideosScreen() {
       ) : (
         <View style={styles.emptyContainer}>
           <Ionicons name="videocam-off-outline" size={64} color={theme.colors.gray} />
-          <Text style={styles.emptyText}>No videos found</Text>
+          <Text style={styles.emptyText}>{t("feed.videos.empty")}</Text>
         </View>
       )}
 

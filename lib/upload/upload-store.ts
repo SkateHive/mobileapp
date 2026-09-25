@@ -5,6 +5,7 @@
 import { useSyncExternalStore } from "react";
 import { Directory, File, Paths } from "expo-file-system";
 import type { AuthSession } from "~/lib/types";
+import { t } from "~/lib/i18n";
 import {
   createJob,
   isJobActive,
@@ -215,8 +216,8 @@ export async function enqueue(input: EnqueueInput, session: AuthSession): Promis
   // job is guaranteed to be created — see below.
   let publishedIdToClear: string | null = null;
   if (existing !== null) {
-    if (isJobActive(existing)) throw new UploadBusyError("Wait for the current upload to finish");
-    if (existing.status === "failed") throw new UploadBusyError("Retry or discard the failed upload first");
+    if (isJobActive(existing)) throw new UploadBusyError(t("create.upload.busy"));
+    if (existing.status === "failed") throw new UploadBusyError(t("create.upload.failed_blocking"));
     if (existing.status === "published") publishedIdToClear = existing.id;
   }
   if (input.mediaKind === "video" && !input.mediaUri) {
@@ -250,7 +251,7 @@ export async function enqueue(input: EnqueueInput, session: AuthSession): Promis
     // copy failure never leaves the user's completed post disappeared with
     // no replacement job created.
     deleteJobFiles(id);
-    throw error instanceof Error ? error : new Error("Could not copy the media for upload");
+    throw error instanceof Error ? error : new Error(t("upload.error.copy_failed"));
   }
 
   const created = createJob({

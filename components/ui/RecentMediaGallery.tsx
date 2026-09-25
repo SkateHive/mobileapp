@@ -12,6 +12,7 @@ import * as MediaLibrary from "expo-media-library";
 import { Image } from "expo-image";
 import { Text } from "./text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 
 interface MediaAsset {
   id: string;
@@ -144,7 +145,7 @@ export function RecentMediaGallery({
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text style={styles.statusText}>Checking photo access...</Text>
+          <Text style={styles.statusText}>{t("feed.gallery.checking")}</Text>
         </View>
       </View>
     );
@@ -155,18 +156,18 @@ export function RecentMediaGallery({
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <Ionicons name="images-outline" size={32} color={theme.colors.gray} />
-          <Text style={styles.statusText}>Media access required</Text>
+          <Text style={styles.statusText}>{t("feed.gallery.access_required")}</Text>
           <Text style={styles.subText}>
             {canAskAgain
-              ? "Grant permission to view your recent photos and videos"
-              : "Photo access is off. Turn it on in Settings to see your recent photos and videos here — or use Add media, which needs no permission."}
+              ? t("feed.gallery.grant_hint")
+              : t("feed.gallery.settings_hint")}
           </Text>
           <Pressable
             style={styles.permissionButton}
             onPress={canAskAgain ? requestPermission : Linking.openSettings}
           >
             <Text style={styles.permissionButtonText}>
-              {canAskAgain ? "Grant Permission" : "Open Settings"}
+              {canAskAgain ? t("feed.gallery.grant_button") : t("common.open_settings")}
             </Text>
           </Pressable>
         </View>
@@ -179,7 +180,7 @@ export function RecentMediaGallery({
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text style={styles.statusText}>Loading recent media...</Text>
+          <Text style={styles.statusText}>{t("feed.gallery.loading")}</Text>
         </View>
       </View>
     );
@@ -190,7 +191,7 @@ export function RecentMediaGallery({
       <View style={styles.container}>
         <View style={styles.emptyContainer}>
           <Ionicons name="images-outline" size={32} color={theme.colors.gray} />
-          <Text style={styles.statusText}>No recent media found</Text>
+          <Text style={styles.statusText}>{t("feed.gallery.empty")}</Text>
         </View>
       </View>
     );
@@ -199,8 +200,8 @@ export function RecentMediaGallery({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Recent Media</Text>
-        <Text style={styles.countText}>{mediaAssets.length} items</Text>
+        <Text style={styles.headerText}>{t("feed.gallery.title")}</Text>
+        <Text style={styles.countText}>{t("feed.gallery.count", { count: mediaAssets.length })}</Text>
       </View>
       <View style={styles.gridContainer}>
         {mediaAssets.slice(0, 9).map((item, index) => (

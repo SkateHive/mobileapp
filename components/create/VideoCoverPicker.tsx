@@ -5,6 +5,7 @@ import { useVideoPlayer, type VideoThumbnail } from "expo-video";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 
 const FRAME_COUNT = 10;
 // Big enough to stay sharp as a profile-grid tile, small enough to upload fast.
@@ -124,7 +125,7 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
   if (isWorking) {
     return (
       <View style={styles.container}>
-        <Text style={styles.label}>COVER</Text>
+        <Text style={styles.label}>{t("create.cover.label")}</Text>
         <View style={styles.loading}>
           <ActivityIndicator size="small" color={theme.colors.primary} />
         </View>
@@ -136,8 +137,8 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>COVER</Text>
-      <Text style={styles.hint}>Shown on your profile grid — it can't be changed later.</Text>
+      <Text style={styles.label}>{t("create.cover.label")}</Text>
+      <Text style={styles.hint}>{t("create.cover.hint")}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
         {frames.map((frame, i) => (
           <Pressable
@@ -145,7 +146,7 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
             onPress={() => pick(i)}
             disabled={disabled}
             accessibilityRole="button"
-            accessibilityLabel={`Cover option ${i + 1} of ${frames.length}`}
+            accessibilityLabel={t("create.cover.option_a11y", { n: i + 1, total: frames.length })}
             accessibilityState={{ selected: i === selected }}
             style={[styles.frame, i === selected && styles.frameSelected]}
           >
