@@ -2,7 +2,7 @@
   "expo": {
     "name": "SkateHive",
     "slug": "skatehive-app",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon-ios.png",
     "scheme": "myapp",
@@ -25,7 +25,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.bgrana.skatehive",
       "appleTeamId": "JBJ68VAF83",
-      "buildNumber": "24",
+      "buildNumber": "25",
       "icon": "./assets/images/icon-ios.png",
       "entitlements": {
         "com.apple.security.application-groups": [
