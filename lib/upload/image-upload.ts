@@ -6,6 +6,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { t } from '~/lib/i18n';
 import { prepareImageForUpload, isHeicImage } from './image-converter';
 import { describeError, failWith } from './upload-runner';
+import { assertSessionAccepted, SessionExpiredError } from '~/lib/userbase/session-expiry';
 
 interface ImageUploadResult {
   url: string;
@@ -172,6 +173,7 @@ export async function uploadImageViaUserbase(
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
+    assertSessionAccepted(response);
     if (!response.ok) {
       const errorText = await response.text();
       throw failWith('image_failed', { detail: `${response.status} - ${errorText}` });
@@ -180,6 +182,8 @@ export async function uploadImageViaUserbase(
     if (!result.url) throw failWith('image_no_url');
     return { url: result.url };
   } catch (error) {
+    // Already readable, and the app is signing the account out.
+    if (error instanceof SessionExpiredError) throw error;
     console.error('Failed to upload image via userbase:', error);
     throw failWith('image_failed', { detail: describeError(error, t) }, error);
   } finally {

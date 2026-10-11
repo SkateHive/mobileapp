@@ -25,6 +25,7 @@ import { uploadImageToHive, uploadImageViaUserbase, createImageMarkdown } from "
 import { canPost, isUserbaseSession } from "~/lib/posting";
 import { uploadVideoToWorker, createVideoIframe } from "~/lib/upload/video-upload";
 import { submitSpot } from "~/lib/spotmap/createSpot";
+import { SessionExpiredError } from "~/lib/userbase/session-expiry";
 import { syncOneSpot, fetchAllSpots } from "~/lib/spotmap/api";
 import { syncSpotWidget } from "~/lib/widgets/spotWidget";
 import { persistUserLoc } from "~/lib/hooks/useSpotWidgetSync";
@@ -316,6 +317,8 @@ export default function SpotCreateScreen() {
       showToast(doneMessage, synced ? "success" : "info");
       router.replace("/(tabs)/map");
     } catch (err) {
+      // An expired login already gets its own "Session expired" prompt.
+      if (err instanceof SessionExpiredError) return;
       const msg = err instanceof Error ? err.message : t("map.create.error.add_failed");
       Alert.alert(t("common.error"), msg);
     } finally {

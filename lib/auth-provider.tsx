@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Alert } from 'react-native';
 import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { STORED_USERS_KEY } from './constants';
 import {
@@ -29,7 +30,8 @@ import {
 import { canPost, setRelationship } from './posting';
 import { t } from './i18n';
 import type { UserbaseUser } from './userbase/api';
-import { logout as userbaseLogout } from './userbase/api';
+import { checkSession, logout as userbaseLogout } from './userbase/api';
+import { onSessionExpired, setSessionExpiryTranslator } from './userbase/session-expiry';
 import {
   loadUserbaseSession,
   saveUserbaseSession,
@@ -115,6 +117,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 
+setSessionExpiryTranslator(t);
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
@@ -125,6 +129,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mutedList, setMutedList] = useState<string[]>([]);
   const [blacklistedList, setBlacklistedList] = useState<string[]>([]);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionRef = useRef<AuthSession | null>(null);
+  const sessionExpiryHandledRef = useRef(false);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  // The server no longer accepts the email session (30 idle days, or revoked
+  // from another device). Sign out here and ask for a new code, once, instead
+  // of letting every action fail with the server's raw "Unauthorized".
+  const handleUserbaseSessionExpired = useCallback(async () => {
+    if (sessionExpiryHandledRef.current) return;
+    sessionExpiryHandledRef.current = true;
+    await clearUserbaseSession();
+    setSession(null);
+    setIsAuthenticated(false);
+    setUsername(null);
+    setFollowingList([]);
+    setMutedList([]);
+    setBlacklistedList([]);
+    Alert.alert(t('auth.session_expired.title'), t('auth.session_expired.body'));
+  }, []);
+
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        if (sessionRef.current?.kind === 'userbase') {
+          void handleUserbaseSessionExpired();
+        }
+      }),
+    [handleUserbaseSessionExpired]
+  );
 
   // Delete a single stored user and update state
   const removeStoredUser = async (usernameToRemove: string) => {
@@ -275,6 +311,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           kind: 'userbase',
           userbaseToken: ub.token,
         });
+        // The stored token may have died while the app was closed. Check in
+        // the background; offline or a server hiccup keeps the user signed in.
+        void checkSession(ub.token).then((state) => {
+          if (state === 'expired') void handleUserbaseSessionExpired();
+        });
         return;
       }
       // Hive-key accounts: restore the cached active session ("stay logged in"
@@ -306,6 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Log in a server-custody email (userbase) account: persist the bearer token
   // and mark the app authenticated. No local posting key (the server signs).
   const loginWithUserbase = async (token: string, user: UserbaseUser, email?: string) => {
+    sessionExpiryHandledRef.current = false;
     await saveUserbaseSession(token, user);
     // Remembered past logout so the login screen can greet this account by
     // name — no credential involved, just the handle and the address to send

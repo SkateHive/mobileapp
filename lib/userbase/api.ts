@@ -2,6 +2,8 @@
 // Server-custody: we only ever hold an opaque bearer session token; the server
 // signs Hive actions. No posting key on the device.
 
+import { assertSessionAccepted } from "./session-expiry";
+
 const BASE = "https://api.skatehive.app/api/userbase";
 
 export interface UserbaseUser {
@@ -32,6 +34,8 @@ async function postJson<T>(path: string, body: unknown, token?: string): Promise
     },
     body: JSON.stringify(body),
   });
+  // A 401 on an authenticated call means the stored session is dead.
+  if (token) assertSessionAccepted(res);
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok && !(data as any)?.error) {
     throw new RequestFailedError(res.status);
@@ -154,6 +158,23 @@ export async function getSession(token: string): Promise<SessionResult> {
   return (await res.json().catch(() => ({ success: false }))) as SessionResult;
 }
 
+export type SessionCheck = "valid" | "expired" | "unknown";
+/**
+ * Is the stored session still accepted? Only a 401 counts as expired: offline
+ * or a server hiccup is "unknown", so the user is never signed out by mistake.
+ */
+export async function checkSession(token: string): Promise<SessionCheck> {
+  try {
+    const res = await fetch(`${BASE}/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) return "expired";
+    return res.ok ? "valid" : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 export function logout(token: string): Promise<{ success: boolean }> {
   return postJson("/auth/logout", {}, token);
 }
@@ -189,6 +210,7 @@ export async function getUserbaseNotifications(
   const res = await fetch(`${BASE}/notifications${qs ? `?${qs}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  assertSessionAccepted(res);
   return (await res.json().catch(() => ({ success: false }))) as UserbaseNotificationsResult;
 }
 

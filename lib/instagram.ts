@@ -7,6 +7,7 @@ import { HiveClient, convertVestToHive } from "./hive-utils";
 import { isUserbaseSession } from "./posting";
 import { t } from "./i18n";
 import type { AuthSession } from "./types";
+import { assertSessionAccepted } from "./userbase/session-expiry";
 
 // Client for the skatehive-api Instagram cross-post + IG-handle endpoints.
 // Auth depends on the account kind:
@@ -188,6 +189,7 @@ export async function crossPostToInstagram(
     headers,
     body: JSON.stringify(payload),
   });
+  if (isUserbaseSession(session)) assertSessionAccepted(res);
   const data = (await res.json().catch(() => ({}))) as CrossPostResult & { error?: string };
   // res.ok covers the whole 2xx range, so a 202 pending_review is handled the
   // same as an old-style 200 direct publish — both are success.
