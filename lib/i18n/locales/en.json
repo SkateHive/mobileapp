@@ -354,6 +354,7 @@
   "feed.time.years.one": "{{count}}y",
   "feed.time.years.other": "{{count}}y",
   "feed.videos.load_failed": "Couldn't load videos. The server is slow right now.",
+  "feed.videos.more_failed": "Couldn't load more videos.",
   "feed.videos.empty": "No videos found",
   "feed.videos.open_feed": "Open feed",
   "feed.videos.share_message": "Check out this video by @{{author}}",

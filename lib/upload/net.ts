@@ -87,28 +87,70 @@ export interface UploadProgress {
   stage: string;
 }
 
+// Transcoder progress model, read from SkateHive/video-transcoder src/server.js
+// (main 5a6d26f; the deployed workers' versions are unverified). One job-wide
+// 0..100 scale, not per stage and not monotonic:
+//   waiting 0 (sent for any id) -> receiving 5 (only once the whole body is in;
+//   no byte progress) -> transcoding 10, then ffmpeg 0..80 (a legitimate drop)
+//   or optimized 50 -> uploading 80, 85..100, retries as uploading_retry_N back
+//   at 85 -> complete 100 (a hint only). busy / error / timeout 0 are terminal.
+const NOT_PROGRESS = new Set(["waiting", "busy", "error", "timeout"]);
+
 /**
  * Decides which progress events are real movement, the only proof of life
- * that may keep an upload alive: a percentage above the highest seen so far,
- * or a stage never seen before. Repeats, values going back, a stage seen
- * earlier (flip-flopping, or a stream reopened and replaying its last state)
- * and "waiting" don't count. The transcoder sends {"progress":0,
- * "stage":"waiting"} for any id, even one it has never seen.
+ * that may keep an upload alive (it never decides success or failure: only the
+ * POST response with a CID does):
+ *  - a stage seen for the first time is movement (each uploading_retry_N is a
+ *    new, bounded stage);
+ *  - within the current stage, a value above that stage's high-water mark is
+ *    movement. A stage may start over once (the ffmpeg drop inside
+ *    "transcoding"): the first drop resets its mark without counting;
+ *  - an earlier stage again (A -> B -> A, or a reopened stream replaying old
+ *    events), repeats, a second drop in the same stage, NaN, "waiting" and the
+ *    terminal statuses are not movement.
  */
 export function createProgressTracker() {
-  let maxProgress = -Infinity;
-  const seenStages = new Set<string>();
+  const stages = new Map<string, { max: number; restarted: boolean }>();
+  let current: string | null = null;
   return {
     /** True when `next` is real forward movement (and records it). */
     advance(next: UploadProgress): boolean {
-      if (next.stage === "waiting" || !Number.isFinite(next.progress)) return false;
-      const higher = next.progress > maxProgress;
-      const newStage = !seenStages.has(next.stage);
-      if (higher) maxProgress = next.progress;
-      seenStages.add(next.stage);
-      return higher || newStage;
+      if (NOT_PROGRESS.has(next.stage) || !Number.isFinite(next.progress)) return false;
+      const stage = stages.get(next.stage);
+      if (!stage) {
+        stages.set(next.stage, { max: next.progress, restarted: false });
+        current = next.stage;
+        return true;
+      }
+      if (next.stage !== current) return false;
+      if (next.progress > stage.max) {
+        stage.max = next.progress;
+        return true;
+      }
+      if (next.progress < stage.max && !stage.restarted) {
+        stage.max = next.progress;
+        stage.restarted = true;
+      }
+      return false;
     },
   };
+}
+
+/**
+ * Picks the next transcoder to send the video to, by asking each candidate's
+ * health endpoint in order (GET, no body, bounded). Nothing is uploaded until
+ * a server answers, so skipping an unreachable one can't duplicate a job.
+ * Returns the index of the first reachable service at or after `from`, or -1.
+ */
+export async function nextReachable<T>(
+  services: T[],
+  from: number,
+  isReachable: (service: T) => Promise<boolean>,
+): Promise<number> {
+  for (let i = from; i < services.length; i++) {
+    if (await isReachable(services[i])) return i;
+  }
+  return -1;
 }
 
 export interface UploadFailure {

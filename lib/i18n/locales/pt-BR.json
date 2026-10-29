@@ -354,6 +354,7 @@
   "feed.time.years.one": "{{count}}a",
   "feed.time.years.other": "{{count}}a",
   "feed.videos.load_failed": "Não deu para carregar os vídeos. O servidor está lento agora.",
+  "feed.videos.more_failed": "Não deu para carregar mais vídeos.",
   "feed.videos.empty": "Nenhum vídeo encontrado",
   "feed.videos.open_feed": "Abrir feed",
   "feed.videos.share_message": "Olha esse vídeo de @{{author}}",

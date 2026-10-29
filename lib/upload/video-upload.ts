@@ -6,11 +6,14 @@ import {
   createProgressTracker,
   createStallWatchdog,
   fetchWithTimeout,
+  nextReachable,
 } from './net';
 import { followEventStream } from './sse';
 
 // The status lookup only picks a server; past this, use the built-in list.
 const STATUS_TIMEOUT_MS = 5_000;
+// Each candidate's /healthz must answer within this before it gets the video.
+const PROBE_TIMEOUT_MS = 4_000;
 // Transcoding a clip can take minutes. Once the progress stream has shown real
 // movement, an upload whose progress then stops for this long is cut; before
 // that, only the hard cap applies (see createStallWatchdog).
@@ -139,8 +142,26 @@ export async function uploadVideoToWorker(
 
     const services = await getTranscodeServices();
     const errors: string[] = [];
+    // Ask a server's health endpoint (GET, no body) before sending it the
+    // video: an unreachable server is skipped without any risk of a duplicate
+    // job, and a server that is down no longer stops the whole upload.
+    const isReachable = async (service: TranscodeService) => {
+      try {
+        const response = await fetchWithTimeout(service.healthUrl, {}, PROBE_TIMEOUT_MS);
+        if (response.ok) return true;
+      } catch {
+        // unreachable
+      }
+      errors.push(t('upload.error.service_fallback', { service: service.name }));
+      return false;
+    };
 
-    for (const service of services) {
+    for (
+      let index = await nextReachable(services, 0, isReachable);
+      index >= 0;
+      index = await nextReachable(services, index + 1, isReachable)
+    ) {
+      const service = services[index];
       const workerApiUrl = service.transcodeUrl;
       const baseUrl = workerApiUrl.replace(/\/transcode$/, '');
       const correlationId = `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;

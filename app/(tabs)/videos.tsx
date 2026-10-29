@@ -274,6 +274,7 @@ export default function VideosScreen() {
     fetchNextPage,
     hasNextPage,
     isFetching,
+    isFetchNextPageError,
   } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
@@ -502,6 +503,21 @@ export default function VideosScreen() {
         </View>
       )}
 
+      {/* The next page failed: say so near the end of the list and offer a
+          retry right there; the clips already loaded stay. */}
+      {isFetchNextPageError && videos.length > 0 && currentIndex >= videos.length - 2 && (
+        <View style={styles.moreFailed} pointerEvents="box-none">
+          <Text style={styles.moreFailedText}>{t("feed.videos.more_failed")}</Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => fetchNextPage()}
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryText}>{t("common.try_again")}</Text>
+          </Pressable>
+        </View>
+      )}
+
       {conversationVideo && (
         <FullConversationDrawer
           visible={!!conversationVideo}
@@ -605,4 +621,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   retryText: { color: theme.colors.primary, fontFamily: theme.fonts.bold },
+  moreFailed: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: theme.colors.secondaryCard,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  moreFailedText: { flex: 1, color: theme.colors.muted, fontSize: 14 },
 });

@@ -5,6 +5,7 @@ import {
   createStallWatchdog,
   fetchWithTimeout,
   isAbortError,
+  nextReachable,
   createProgressTracker,
   type Timers,
 } from "../net";
@@ -95,29 +96,53 @@ test("the hard cap applies even while progress keeps coming", () => {
   w.dispose();
 });
 
-test("only real movement counts as progress", () => {
+// The worker's real sequence (video-transcoder src/server.js, main 5a6d26f).
+const SOURCE_TRACE: Array<[string, number, boolean]> = [
+  ["waiting", 0, false], // sent for any id
+  ["receiving", 5, true], // whole body received
+  ["transcoding", 10, true],
+  ["transcoding", 0, false], // ffmpeg starts at 0: a legitimate drop, not movement
+  ["transcoding", 12, true], // but it must count again from here
+  ["transcoding", 40, true],
+  ["transcoding", 80, true],
+  ["uploading", 80, true],
+  ["uploading", 85, true],
+  ["uploading", 90, true],
+  ["uploading_retry_1", 85, true], // a retry is a new bounded stage
+  ["uploading_retry_1", 95, true],
+  ["complete", 100, true],
+];
+
+test("follows the transcoder's real progress sequence", () => {
   const p = createProgressTracker();
-  // The transcoder answers "waiting" for any id, even an unknown one.
-  assert.equal(p.advance({ progress: 0, stage: "waiting" }), false);
-  assert.equal(p.advance({ progress: 0, stage: "receiving" }), true);
-  assert.equal(p.advance({ progress: 40, stage: "transcoding" }), true);
-  // Repeats and values going back don't count.
-  assert.equal(p.advance({ progress: 40, stage: "transcoding" }), false);
-  assert.equal(p.advance({ progress: 35, stage: "transcoding" }), false);
-  assert.equal(p.advance({ progress: 41, stage: "transcoding" }), true);
+  for (const [stage, progress, moves] of SOURCE_TRACE) {
+    assert.equal(p.advance({ progress, stage }), moves, `${stage} ${progress}`);
+  }
 });
 
-test("stage flip-flops and reconnect replays can't keep a stall alive", () => {
+test("terminal statuses and waiting are never movement", () => {
   const p = createProgressTracker();
-  assert.equal(p.advance({ progress: 50, stage: "transcoding" }), true);
-  assert.equal(p.advance({ progress: 50, stage: "uploading" }), true); // first time
-  // Flipping back and forth between seen stages at the same value: not progress.
+  for (const stage of ["waiting", "busy", "error", "timeout"]) {
+    assert.equal(p.advance({ progress: 0, stage }), false, stage);
+  }
+});
+
+test("replays, flip-flops and repeated drops can't keep a stall alive", () => {
+  const p = createProgressTracker();
+  assert.equal(p.advance({ progress: 10, stage: "transcoding" }), true);
+  assert.equal(p.advance({ progress: 80, stage: "uploading" }), true);
+  // Back to an earlier stage (flip-flop or a reopened stream replaying): no.
   for (let i = 0; i < 5; i++) {
     assert.equal(p.advance({ progress: 50, stage: "transcoding" }), false);
-    assert.equal(p.advance({ progress: 50, stage: "uploading" }), false);
+    assert.equal(p.advance({ progress: 80, stage: "uploading" }), false);
   }
-  // A reopened stream replaying the last state: not progress.
-  assert.equal(p.advance({ progress: 50, stage: "uploading" }), false);
+  // One drop restarts a stage; oscillating after that does not count.
+  assert.equal(p.advance({ progress: 0, stage: "uploading" }), false);
+  assert.equal(p.advance({ progress: 81, stage: "uploading" }), true);
+  for (let i = 0; i < 5; i++) {
+    assert.equal(p.advance({ progress: 0, stage: "uploading" }), false);
+    assert.equal(p.advance({ progress: 81, stage: "uploading" }), false);
+  }
   assert.equal(p.advance({ progress: Number.NaN, stage: "uploading" }), false);
 });
 
@@ -150,4 +175,17 @@ test("SSE parser: events split across chunks, CRLF, multi-line data", () => {
   feed('event: progress\r\ndata: {"progress":40}\r\n\r\n');
   feed("data: line one\ndata: line two\n\n");
   assert.deepEqual(got, ['{"progress":5,"stage":"receiving"}', '{"progress":40}', "line one\nline two"]);
+});
+
+test("an unreachable server is skipped before anything is sent", async () => {
+  const probed: string[] = [];
+  const up = new Set(["oracle"]);
+  const probe = async (name: string) => {
+    probed.push(name);
+    return up.has(name);
+  };
+  const services = ["mac", "oracle", "spare"];
+  assert.equal(await nextReachable(services, 0, probe), 1);
+  assert.deepEqual(probed, ["mac", "oracle"]); // stops at the first that answers
+  assert.equal(await nextReachable(services, 2, probe), -1);
 });
