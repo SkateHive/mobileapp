@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, FiraCode_400Regular, FiraCode_700Bold } from '@expo-google-fonts/fira-code';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
@@ -14,6 +14,7 @@ import { SoftPostProvider } from '~/lib/userbase/soft-post-context';
 import { UploadProvider } from '~/lib/upload/upload-provider';
 import { useSpotWidgetSync } from '~/lib/hooks/useSpotWidgetSync';
 import { theme } from '~/lib/theme';
+import { AnimatedSplash } from '~/components/AnimatedSplash';
 
 const styles = StyleSheet.create({
   container: {
@@ -93,6 +94,10 @@ export default function RootLayout() {
     'FiraCode-Regular': FiraCode_400Regular,
     'FiraCode-Bold': FiraCode_700Bold,
   });
+
+  // Android opens on a plain black native splash and plays the logo animation
+  // in JS; iOS keeps its native logo splash for now.
+  const [showIntro, setShowIntro] = useState(Platform.OS === 'android');
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -223,6 +228,7 @@ export default function RootLayout() {
         </NavigationGuard>
       </AuthProvider>
     </QueryClientProvider>
+    {showIntro && <AnimatedSplash onDone={() => setShowIntro(false)} />}
     </GestureHandlerRootView>
   );
 }
