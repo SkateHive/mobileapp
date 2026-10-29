@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, View, FlatList, Dimensions, StyleSheet } from 'react-native';
+import { Modal, Pressable, View, FlatList, Dimensions, StyleSheet, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '../ui/text';
 import { VideoPlayer } from './VideoPlayer';
@@ -155,7 +155,15 @@ export function MediaPreview({
               item.type === 'embed' ? {} : { height: getVideoHeight() },
             ]}
           >
-            {item.type === 'video' ? (
+            {item.type === 'video' && Platform.OS === 'android' && isVisible === false ? (
+              // Android: a clip off screen shows its poster instead of holding
+              // a player; many idle players filled the 256 MB Java heap.
+              <View style={[styles.fullSize, styles.videoPoster]}>
+                {thumbnailUrl ? (
+                  <Image source={{ uri: thumbnailUrl }} style={styles.fullSize} contentFit="cover" />
+                ) : null}
+              </View>
+            ) : item.type === 'video' ? (
               <VideoWithAutoplay
                 url={item.url}
                 thumbnailUrl={thumbnailUrl}
@@ -236,6 +244,9 @@ const styles = StyleSheet.create({
   fullSize: {
     width: '100%',
     height: '100%',
+  },
+  videoPoster: {
+    backgroundColor: theme.colors.background,
   },
   carousel: {
     width: '100%',
