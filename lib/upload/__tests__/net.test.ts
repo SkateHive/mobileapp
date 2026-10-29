@@ -84,22 +84,18 @@ test("only real movement counts as progress", () => {
   assert.equal(isForwardProgress({ progress: 100, stage: "transcoding" }, { progress: 100, stage: "uploading" }), true);
 });
 
-test("fail over only when the video can't have been taken", () => {
+test("fail over only on an explicit refusal", () => {
   const early = { watchdogFired: false, elapsedMs: 300 };
-  const late = { watchdogFired: false, elapsedMs: 8_000 };
-  // Network error right away, never acknowledged: it never got the video.
-  assert.equal(canFailOver(early, false), true);
-  // A later network error, or any after an acknowledgement: ambiguous.
-  assert.equal(canFailOver(late, false), false);
-  assert.equal(canFailOver(early, true), false);
+  // No network error proves the video wasn't taken, however early.
+  assert.equal(canFailOver(early, false), false);
+  assert.equal(canFailOver({ watchdogFired: false, elapsedMs: 8_000 }, true), false);
   // Refused with a 4xx: not processed, so the next server may try.
   for (const status of [400, 401, 413, 415, 422]) {
-    assert.equal(canFailOver({ ...late, status }, true), true, `status ${status}`);
+    assert.equal(canFailOver({ ...early, status }, true), true, `status ${status}`);
   }
   // A 500, gateway errors, 408 and 429 don't prove it wasn't started.
   for (const status of [408, 429, 500, 502, 503, 504]) {
     assert.equal(canFailOver({ ...early, status }, false), false, `status ${status}`);
   }
-  // The watchdog cut it: never fail over.
-  assert.equal(canFailOver({ watchdogFired: true, elapsedMs: 300 }, false), false);
+  assert.equal(canFailOver({ watchdogFired: true, elapsedMs: 300, status: 400 }, false), false);
 });

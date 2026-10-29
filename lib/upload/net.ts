@@ -92,31 +92,25 @@ export interface UploadFailure {
   elapsedMs: number;
 }
 
-/** A network error this early can't have carried a video to the server. */
-export const PRE_UPLOAD_FAILURE_MS = 2_000;
-
 /**
  * Whether a failed upload may be sent to the next server.
  *
- * The transcoder has no idempotency key, and none of its answers says
- * whether it already started on the video, so this is deliberately narrow.
- * The next server gets the video only when:
- *  - this one refused it with a 4xx (other than 408/429): by HTTP semantics
- *    the request was not processed; or
- *  - the request failed with a network error within PRE_UPLOAD_FAILURE_MS
- *    and no progress poll ever answered: too early for the video to have
- *    reached the server (host down, DNS, connection refused).
- * Everything else (a 500, a 2xx without a result, gateway 502/503/504, a
- * later network error, a stall) is treated as ambiguous: the server may
- * still finish, so we stop instead of risking a second transcode.
+ * The transcoder has no idempotency key and no answer says whether it
+ * already took the video, so only an explicit refusal counts: a 4xx other
+ * than 408/429 means, by HTTP semantics, the request was not processed.
+ * Every other failure (a network error at any time, a 500, a 2xx without a
+ * result, 502/503/504, a stall) may hide a video the server is still
+ * transcoding, so we stop rather than risk a second transcode. Until the
+ * transcoders share an idempotency key and durable job storage, a server
+ * that is down is avoided by the status lookup (unhealthy services are
+ * skipped), not by failing over mid-upload.
  *
  * Publishing to Hive is a separate step after the upload, with a permlink
  * fixed at enqueue and a check for an existing post, which makes a
  * duplicate post unlikely but is not an atomic guarantee.
  */
-export function canFailOver(failure: UploadFailure, serverAcknowledged: boolean): boolean {
+export function canFailOver(failure: UploadFailure, _serverAcknowledged: boolean): boolean {
   if (failure.watchdogFired) return false;
   const s = failure.status;
-  if (s !== undefined) return s >= 400 && s < 500 && s !== 408 && s !== 429;
-  return !serverAcknowledged && failure.elapsedMs < PRE_UPLOAD_FAILURE_MS;
+  return s !== undefined && s >= 400 && s < 500 && s !== 408 && s !== 429;
 }
