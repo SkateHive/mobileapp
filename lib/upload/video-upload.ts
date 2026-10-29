@@ -1,6 +1,15 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { t } from '~/lib/i18n';
 import { describeError, failWith } from './upload-runner';
+import { createStallWatchdog, fetchWithTimeout } from './net';
+
+// The status lookup only picks a server; past this, use the built-in list.
+const STATUS_TIMEOUT_MS = 5_000;
+const PROGRESS_POLL_TIMEOUT_MS = 4_000;
+// Transcoding a clip can take minutes, so an upload is cut only when its
+// progress stops moving for this long (or it runs past the hard cap).
+const UPLOAD_STALL_MS = 120_000;
+const UPLOAD_MAX_MS = 20 * 60_000;
 
 interface VideoUploadResult {
   cid: string;
@@ -82,7 +91,7 @@ async function getTranscodeServices(): Promise<TranscodeService[]> {
   const STATUS_API_URL = 'https://api.skatehive.app/api/transcode/status';
 
   try {
-    const response = await fetch(STATUS_API_URL);
+    const response = await fetchWithTimeout(STATUS_API_URL, {}, STATUS_TIMEOUT_MS);
 
     if (!response.ok) {
       throw new Error(`Status API request failed: ${response.status}`);
@@ -153,7 +162,14 @@ export async function uploadVideoToWorker(
         formData.append('thumbnail', options.thumbnailUrl);
       }
 
+      // Without progress polling there is no proof of life, so only the hard
+      // cap applies.
+      const watchdog = createStallWatchdog(
+        options.onProgress ? UPLOAD_STALL_MS : Infinity,
+        UPLOAD_MAX_MS,
+      );
       let pollInterval: ReturnType<typeof setInterval> | null = null;
+      let polling = false;
       // clearInterval stops future ticks but can't cancel a poll already in
       // flight. Without this guard a late response lands after the caller has
       // reset its UI and re-writes a stale stage — leaving "Done!" on screen.
@@ -161,10 +177,15 @@ export async function uploadVideoToWorker(
       if (options.onProgress) {
         options.onProgress(5, 'receiving');
         pollInterval = setInterval(async () => {
+          // A slow poll must not pile up behind the next tick.
+          if (polling) return;
+          polling = true;
           try {
-            const resp = await fetch(`${baseUrl}/progress/${correlationId}`, {
-              headers: { 'Accept': 'text/event-stream' },
-            });
+            const resp = await fetchWithTimeout(
+              `${baseUrl}/progress/${correlationId}`,
+              { headers: { 'Accept': 'text/event-stream' } },
+              PROGRESS_POLL_TIMEOUT_MS,
+            );
             if (!resp.ok || settled) return;
             const text = await resp.text();
             const lines = text.split('\n').filter(l => l.startsWith('data:'));
@@ -174,11 +195,14 @@ export async function uploadVideoToWorker(
               // Re-checked here and not only above: reading the body is a second
               // await, and the upload can settle while it's pending.
               if (!settled && data.progress !== undefined) {
+                watchdog.kick();
                 options.onProgress?.(data.progress, data.stage || 'processing');
               }
             }
           } catch {
             // Polling errors are non-fatal
+          } finally {
+            polling = false;
           }
         }, 1500);
       }
@@ -187,6 +211,7 @@ export async function uploadVideoToWorker(
         const uploadResponse = await fetch(workerApiUrl, {
           method: 'POST',
           body: formData,
+          signal: watchdog.signal,
         });
 
         if (!uploadResponse.ok) {
@@ -215,9 +240,15 @@ export async function uploadVideoToWorker(
               : undefined,
         };
       } catch (error) {
+        // Cut by the watchdog: this server got the video and may still finish
+        // it. Sending it to the next server could publish it twice, so stop.
+        if (watchdog.reason) {
+          throw failWith('video_stalled', { service: service.name });
+        }
         errors.push(error instanceof Error ? describeError(error, t) : t('upload.error.service_fallback', { service: service.name }));
       } finally {
         settled = true;
+        watchdog.dispose();
         if (pollInterval) clearInterval(pollInterval);
       }
     }

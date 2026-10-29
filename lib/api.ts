@@ -1,7 +1,13 @@
 import { API_BASE_URL } from './constants';
 import type { Post } from './types';
 
-async function fetchWithRetry(url: string, retries = 2, timeoutMs = 10_000): Promise<Response> {
+/**
+ * GET with a timeout, retrying only on network errors (no connection, DNS).
+ * A request that timed out is not retried: the server got it and is slow, so
+ * asking again only piles more load on it (a cold /videos took 22.8 s, and
+ * three 10 s attempts left users waiting ~31 s before the fallback feed).
+ */
+export async function fetchWithRetry(url: string, retries = 2, timeoutMs = 10_000): Promise<Response> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -13,6 +19,7 @@ async function fetchWithRetry(url: string, retries = 2, timeoutMs = 10_000): Pro
     } catch (err) {
       clearTimeout(timeoutId);
       lastError = err;
+      if (err instanceof Error && err.name === 'AbortError') break;
       if (attempt < retries) {
         await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
       }

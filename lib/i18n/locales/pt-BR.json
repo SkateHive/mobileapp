@@ -664,6 +664,7 @@
   "upload.error.service_fallback": "{{service}} falhou",
   "upload.error.service_invalid": "{{service}} devolveu uma resposta de envio inválida",
   "upload.error.video_all_failed": "Todos os servidores de envio de vídeo falharam: {{errors}}",
+  "upload.error.video_stalled": "{{service}} parou de responder. O vídeo ainda pode terminar de processar: confira seu perfil daqui a alguns minutos antes de tentar de novo.",
   "upload.error.video_failed": "Falha no envio do vídeo: {{message}}",
   "upload.error.video_gone": "O vídeo não está mais neste aparelho",
   "upload.pill.detail_optimized": "Vídeo já otimizado",
