@@ -39,13 +39,15 @@ function SpotMarkerImpl({ spot, highlighted, onPress }: SpotMarkerProps) {
       tracksViewChanges={tracking || highlighted}
       anchor={{ x: 0.5, y: 0.5 }}
     >
-      <View
-        style={[
-          styles.pin,
-          highlighted && styles.pinHighlighted,
-        ]}
-      >
-        <Text style={styles.pinEmoji}>🛹</Text>
+      <View style={styles.pinBox}>
+        <View
+          style={[
+            styles.pin,
+            highlighted && styles.pinHighlighted,
+          ]}
+        >
+          <Text style={styles.pinEmoji}>🛹</Text>
+        </View>
       </View>
     </Marker>
   );
@@ -94,6 +96,13 @@ function ClusterMarkerImpl({
 export const ClusterMarker = React.memo(ClusterMarkerImpl);
 
 const styles = StyleSheet.create({
+  // Android maps draw a marker from a snapshot of its view. A fixed box big
+  // enough for the highlighted pin keeps that snapshot from being cut square
+  // when the pin grows; iOS sizes to the pin as before.
+  pinBox: Platform.select({
+    android: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+    default: {},
+  }),
   pin: {
     width: 34,
     height: 34,
@@ -110,7 +119,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.6,
         shadowRadius: 4,
       },
-      android: { elevation: 4 },
+      // No elevation: its shadow falls outside the snapshot and gets clipped.
+      android: {},
     }),
   },
   pinHighlighted: {
