@@ -3,10 +3,9 @@ import { t } from '~/lib/i18n';
 import { describeError, failWith } from './upload-runner';
 import {
   canFailOver,
+  createProgressTracker,
   createStallWatchdog,
   fetchWithTimeout,
-  isForwardProgress,
-  type UploadProgress,
 } from './net';
 import { followEventStream } from './sse';
 
@@ -170,7 +169,7 @@ export async function uploadVideoToWorker(
       }
 
       const watchdog = createStallWatchdog(UPLOAD_STALL_MS, UPLOAD_MAX_MS);
-      let lastProgress: UploadProgress | null = null;
+      const progress = createProgressTracker();
       let failedStatus: number | undefined;
       // A progress event can still arrive after the upload settled (the stream
       // is closed asynchronously); without this guard it would re-write a stale
@@ -189,10 +188,7 @@ export async function uploadVideoToWorker(
           }
           if (data.progress === undefined) return;
           const next = { progress: Number(data.progress), stage: String(data.stage || 'processing') };
-          if (isForwardProgress(lastProgress, next)) {
-            lastProgress = next;
-            watchdog.kick();
-          }
+          if (progress.advance(next)) watchdog.kick();
           options.onProgress?.(next.progress, next.stage);
         });
       }

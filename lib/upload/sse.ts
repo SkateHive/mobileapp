@@ -78,8 +78,16 @@ export function followEventStream(
 
   open();
   return () => {
+    if (closed) return;
     closed = true;
     if (reopenTimer) clearTimeout(reopenTimer);
-    xhr?.abort();
+    if (xhr) {
+      // Detach first so nothing fires (or reopens) after close.
+      xhr.onprogress = null;
+      xhr.onload = null;
+      xhr.onerror = null;
+      xhr.abort();
+      xhr = null;
+    }
   };
 }

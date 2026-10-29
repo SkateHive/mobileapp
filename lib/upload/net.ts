@@ -88,15 +88,27 @@ export interface UploadProgress {
 }
 
 /**
- * Only real movement counts as proof of life: a higher percentage or a new
- * stage. A server that keeps repeating the same value is stuck, and must not
- * keep the upload alive. "waiting" is never proof: the transcoder sends
- * {"progress":0,"stage":"waiting"} for any id, even one it has never seen.
+ * Decides which progress events are real movement, the only proof of life
+ * that may keep an upload alive: a percentage above the highest seen so far,
+ * or a stage never seen before. Repeats, values going back, a stage seen
+ * earlier (flip-flopping, or a stream reopened and replaying its last state)
+ * and "waiting" don't count. The transcoder sends {"progress":0,
+ * "stage":"waiting"} for any id, even one it has never seen.
  */
-export function isForwardProgress(prev: UploadProgress | null, next: UploadProgress): boolean {
-  if (next.stage === "waiting") return false;
-  if (!prev) return true;
-  return next.progress > prev.progress || next.stage !== prev.stage;
+export function createProgressTracker() {
+  let maxProgress = -Infinity;
+  const seenStages = new Set<string>();
+  return {
+    /** True when `next` is real forward movement (and records it). */
+    advance(next: UploadProgress): boolean {
+      if (next.stage === "waiting" || !Number.isFinite(next.progress)) return false;
+      const higher = next.progress > maxProgress;
+      const newStage = !seenStages.has(next.stage);
+      if (higher) maxProgress = next.progress;
+      seenStages.add(next.stage);
+      return higher || newStage;
+    },
+  };
 }
 
 export interface UploadFailure {

@@ -5,7 +5,7 @@ import {
   createStallWatchdog,
   fetchWithTimeout,
   isAbortError,
-  isForwardProgress,
+  createProgressTracker,
   type Timers,
 } from "../net";
 import { createSseParser } from "../sse";
@@ -96,13 +96,29 @@ test("the hard cap applies even while progress keeps coming", () => {
 });
 
 test("only real movement counts as progress", () => {
-  assert.equal(isForwardProgress(null, { progress: 0, stage: "receiving" }), true);
+  const p = createProgressTracker();
   // The transcoder answers "waiting" for any id, even an unknown one.
-  assert.equal(isForwardProgress(null, { progress: 0, stage: "waiting" }), false);
-  assert.equal(isForwardProgress({ progress: 40, stage: "transcoding" }, { progress: 40, stage: "transcoding" }), false);
-  assert.equal(isForwardProgress({ progress: 40, stage: "transcoding" }, { progress: 35, stage: "transcoding" }), false);
-  assert.equal(isForwardProgress({ progress: 40, stage: "transcoding" }, { progress: 41, stage: "transcoding" }), true);
-  assert.equal(isForwardProgress({ progress: 100, stage: "transcoding" }, { progress: 100, stage: "uploading" }), true);
+  assert.equal(p.advance({ progress: 0, stage: "waiting" }), false);
+  assert.equal(p.advance({ progress: 0, stage: "receiving" }), true);
+  assert.equal(p.advance({ progress: 40, stage: "transcoding" }), true);
+  // Repeats and values going back don't count.
+  assert.equal(p.advance({ progress: 40, stage: "transcoding" }), false);
+  assert.equal(p.advance({ progress: 35, stage: "transcoding" }), false);
+  assert.equal(p.advance({ progress: 41, stage: "transcoding" }), true);
+});
+
+test("stage flip-flops and reconnect replays can't keep a stall alive", () => {
+  const p = createProgressTracker();
+  assert.equal(p.advance({ progress: 50, stage: "transcoding" }), true);
+  assert.equal(p.advance({ progress: 50, stage: "uploading" }), true); // first time
+  // Flipping back and forth between seen stages at the same value: not progress.
+  for (let i = 0; i < 5; i++) {
+    assert.equal(p.advance({ progress: 50, stage: "transcoding" }), false);
+    assert.equal(p.advance({ progress: 50, stage: "uploading" }), false);
+  }
+  // A reopened stream replaying the last state: not progress.
+  assert.equal(p.advance({ progress: 50, stage: "uploading" }), false);
+  assert.equal(p.advance({ progress: Number.NaN, stage: "uploading" }), false);
 });
 
 test("fail over only on an explicit refusal", () => {
