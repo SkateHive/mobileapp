@@ -1,4 +1,5 @@
-import { useQuery, QueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQuery, useInfiniteQuery, infiniteQueryOptions, QueryClient } from '@tanstack/react-query';
 import {
   getFeed,
   getBalance,
@@ -28,7 +29,9 @@ export interface VideoPost {
   active_votes: { voter: string; weight: number }[];
 }
 
-const VIDEO_FEED_QUERY_KEY = ['videoFeed'] as const;
+// Paged since the tab would otherwise stop after the first 30 clips.
+const VIDEO_FEED_QUERY_KEY = ['videoFeed', 'pages'] as const;
+const VIDEO_PAGE_SIZE = 30;
 const VIDEO_FEED_STALE_TIME = 1000 * 60 * 1; // 1 minute (API caches for 60s)
 
 /**
@@ -73,38 +76,75 @@ function extractVideosFromFeed(posts: Post[]): VideoPost[] {
   return videoList;
 }
 
-async function fetchVideoFeed(): Promise<VideoPost[]> {
+interface VideoFeedPage {
+  videos: VideoPost[];
+  nextPage?: number;
+}
+
+async function fetchVideoFeedPage(page: number): Promise<VideoFeedPage> {
   // Try the dedicated /videos endpoint first
-  const result = await getVideoFeed(1, 30);
+  const result = await getVideoFeed(page, VIDEO_PAGE_SIZE);
   if (result) {
     const mapped = result.data.map((entry: any) => ({
       ...entry,
       username: entry.author,
     }));
-    return filterModeratedPosts(filterDeletedPosts(mapped));
+    const pagination = result.pagination;
+    return {
+      videos: filterModeratedPosts(filterDeletedPosts(mapped)),
+      nextPage: pagination?.hasNextPage ? pagination.nextPage ?? page + 1 : undefined,
+    };
   }
+
+  // The fallback below has no pages: it is one slice of the general feed.
+  if (page > 1) return { videos: [] };
 
   // Fallback: use general feed + client-side extraction
   const posts = await getFeed(1, 50);
-  return filterModeratedPosts(
-    filterDeletedPosts(extractVideosFromFeed(filterDeletedPosts(posts)))
-  );
+  return {
+    videos: filterModeratedPosts(
+      filterDeletedPosts(extractVideosFromFeed(filterDeletedPosts(posts)))
+    ),
+  };
 }
 
+const videoFeedOptions = infiniteQueryOptions({
+  queryKey: VIDEO_FEED_QUERY_KEY,
+  queryFn: ({ pageParam }) => fetchVideoFeedPage(pageParam),
+  initialPageParam: 1,
+  getNextPageParam: (last: VideoFeedPage) => last.nextPage,
+  staleTime: VIDEO_FEED_STALE_TIME,
+});
+
+// New posts arriving between two page loads shift the API's pages, so the
+// same video can come back on the next page. Keep the first copy.
+function flattenVideoPages(pages: VideoFeedPage[] | undefined): VideoPost[] {
+  if (!pages) return [];
+  const seen = new Set<string>();
+  const out: VideoPost[] = [];
+  for (const page of pages) {
+    for (const video of page.videos) {
+      const key = `${video.author}-${video.permlink}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(video);
+    }
+  }
+  return out;
+}
+
+/**
+ * The Videos tab feed. `data` is the flat list of every page loaded so far;
+ * call `fetchNextPage` near the end of the list to keep going.
+ */
 export function useVideoFeed() {
-  return useQuery({
-    queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: fetchVideoFeed,
-    staleTime: VIDEO_FEED_STALE_TIME,
-  });
+  const query = useInfiniteQuery(videoFeedOptions);
+  const videos = useMemo(() => flattenVideoPages(query.data?.pages), [query.data]);
+  return { ...query, data: videos };
 }
 
 export function prefetchVideoFeed(queryClient: QueryClient) {
-  queryClient.prefetchQuery({
-    queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: fetchVideoFeed,
-    staleTime: VIDEO_FEED_STALE_TIME,
-  });
+  queryClient.prefetchInfiniteQuery(videoFeedOptions);
 }
 
 /**
@@ -114,11 +154,8 @@ export function prefetchVideoFeed(queryClient: QueryClient) {
 export async function warmUpVideoAssets(queryClient: QueryClient) {
   const { Image } = require('react-native');
 
-  const data = await queryClient.ensureQueryData({
-    queryKey: VIDEO_FEED_QUERY_KEY,
-    queryFn: fetchVideoFeed,
-    staleTime: VIDEO_FEED_STALE_TIME,
-  });
+  const feed = await queryClient.ensureInfiniteQueryData(videoFeedOptions);
+  const data = feed?.pages[0]?.videos;
 
   if (!data || data.length === 0) return;
 

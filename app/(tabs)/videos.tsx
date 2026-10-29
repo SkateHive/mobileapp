@@ -34,6 +34,7 @@ import { HIVE_AVATAR_URL } from "~/lib/constants";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
 import { DollarBurst, type DollarBurstHandle } from "~/components/ui/DollarBurst";
 import { t } from "~/lib/i18n";
+import { setAndroidBuffer } from "~/lib/video-buffer";
 
 // ─── Native video item ─────────────────────────────────────────────────────
 // Each item gets its own expo-video player — no WebView overhead.
@@ -88,6 +89,7 @@ const VideoItem = React.memo(function VideoItem({
   const player = useVideoPlayer(item.videoUrl, (p) => {
     p.loop = true;
     p.muted = isMuted;
+    setAndroidBuffer(p, "idle"); // the effect below raises it by role
   });
 
   useEffect(() => {
@@ -115,6 +117,10 @@ const VideoItem = React.memo(function VideoItem({
   // is held at zero on Android; on iOS zero means "let AVPlayer decide", which
   // is aggressive, so far items keep the default there too.
   useEffect(() => {
+    if (Platform.OS === "android") {
+      setAndroidBuffer(player, isActive ? "active" : isNeighbor ? "neighbor" : "idle");
+      return;
+    }
     try {
       player.bufferOptions = isActive
         ? {}
@@ -259,7 +265,15 @@ export default function VideosScreen() {
   const router = useRouter();
   const { session, username } = useAuth();
   const { showToast } = useToast();
-  const { data: videos = [], isLoading, refetch, isRefetching } = useVideoFeed();
+  const {
+    data: videos,
+    isLoading,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
   const votingLockRef = useRef<Record<string, boolean>>({});
@@ -443,6 +457,12 @@ export default function VideosScreen() {
           // Both: a flick ends in momentum, a slow drag ends without it.
           onMomentumScrollEnd={settleOnIndex}
           onScrollEndDrag={settleOnIndex}
+          // Load the next page while two clips are still left, so the swipe
+          // after the last one has somewhere to go.
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={2}
           removeClippedSubviews
           maxToRenderPerBatch={2}
           // One screen either side: the clips directly above and below the

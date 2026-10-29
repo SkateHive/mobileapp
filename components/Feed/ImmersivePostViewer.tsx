@@ -35,6 +35,7 @@ import { useVideoMuted } from "~/lib/video-mute";
 import { t } from "~/lib/i18n";
 import { recordVote, resolveVoteState, useVoteOverrides } from "~/lib/vote-store";
 import { FullConversationDrawer } from "~/components/Feed/FullConversationDrawer";
+import { setAndroidBuffer } from "~/lib/video-buffer";
 
 const postKey = (p: any) => `${p.author}/${p.permlink}`;
 
@@ -131,7 +132,13 @@ function ImmersivePostItem({
   const player = useVideoPlayer(videoUrl ?? null, (p) => {
     p.loop = true;
     p.muted = isMuted;
+    setAndroidBuffer(p, "idle"); // raised below for the post on screen
   });
+
+  // Off-screen pages stay mounted; only the one in front downloads.
+  useEffect(() => {
+    setAndroidBuffer(player, isActive ? "active" : "idle");
+  }, [isActive, player]);
 
   useEffect(() => {
     player.muted = isMuted;

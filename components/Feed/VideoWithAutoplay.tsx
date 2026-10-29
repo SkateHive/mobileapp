@@ -6,6 +6,7 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { useVideoMuted } from '~/lib/video-mute';
 import { t } from '~/lib/i18n';
+import { setAndroidBuffer } from '~/lib/video-buffer';
 
 interface VideoWithAutoplayProps {
   url: string;
@@ -37,11 +38,18 @@ export function VideoWithAutoplay({
   const player = useVideoPlayer(url, (p) => {
     p.loop = true;
     p.muted = isMuted;
+    setAndroidBuffer(p, "idle"); // raised below once the card is on screen
   });
 
   useEffect(() => {
     player.muted = isMuted;
   }, [isMuted, player]);
+
+  // The feed keeps several screens of cards mounted; only the one on screen
+  // may download much (see lib/video-buffer.ts).
+  useEffect(() => {
+    setAndroidBuffer(player, shouldPlay ? "active" : isVisible ? "neighbor" : "idle");
+  }, [shouldPlay, isVisible, player]);
 
   useEffect(() => {
     try {

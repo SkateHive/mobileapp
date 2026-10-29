@@ -7,6 +7,8 @@ import {
   Platform,
 } from "react-native";
 import MapView, { PROVIDER_DEFAULT, type Region as RNRegion } from "react-native-maps";
+import { NATIVE_MAP_AVAILABLE } from "~/lib/spotmap/map-availability";
+import { MapUnavailable } from "~/components/spotmap/MapUnavailable";
 import BottomSheet, {
   BottomSheetFlatList,
   type BottomSheetFlatListMethods,
@@ -293,6 +295,9 @@ export default function MapScreen() {
   );
 
   const total = spots?.length ?? 0;
+
+  // A module constant, so this never changes the hook order between renders.
+  if (!NATIVE_MAP_AVAILABLE) return <MapUnavailable />;
 
   return (
     <View style={styles.container}>

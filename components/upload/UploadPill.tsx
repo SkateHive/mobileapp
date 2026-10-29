@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { t } from "~/lib/i18n";
+import { useTabBarBottomInset } from "~/lib/use-tab-bar-inset";
 import { isJobActive, pillDetail, pillLabel, type UploadJob } from "~/lib/upload/upload-job";
 import { discard, dispatch, useUploadJob } from "~/lib/upload/upload-store";
 
@@ -76,6 +77,7 @@ export function UploadPill() {
   const job = useUploadJob();
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const bottomInset = useTabBarBottomInset();
 
   // Collapse again when the post goes out.
   useEffect(() => {
@@ -107,7 +109,7 @@ export function UploadPill() {
   };
 
   return (
-    <View style={styles.host}>
+    <View style={[styles.host, { bottom: styles.host.bottom + bottomInset }]}>
       <Pressable
         onPress={onPress}
         style={styles.pill}

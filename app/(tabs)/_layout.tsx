@@ -12,6 +12,7 @@ import { useNotificationContext } from "~/lib/notifications-context";
 import { ActionSheet } from "~/components/ui/ActionSheet";
 import { UploadPill } from "~/components/upload/UploadPill";
 import { t } from "~/lib/i18n";
+import { useTabBarBottomInset } from "~/lib/use-tab-bar-inset";
 
 interface TabItem {
   name: string;
@@ -84,6 +85,7 @@ const styles = StyleSheet.create({
 export default function TabLayout() {
   const router = useRouter();
   const { session, username } = useAuth();
+  const bottomInset = useTabBarBottomInset();
   const { badgeCount } = useNotificationContext();
   const [createMenuVisible, setCreateMenuVisible] = useState(false);
 
@@ -143,8 +145,8 @@ export default function TabLayout() {
               tabBarStyle: {
                 backgroundColor: theme.colors.background,
                 borderTopColor: theme.colors.border,
-                height: theme.layout.tabBarHeight,
-                paddingBottom: 8,
+                height: theme.layout.tabBarHeight + bottomInset,
+                paddingBottom: 8 + bottomInset,
               },
               tabBarActiveTintColor: theme.colors.primary,
               tabBarInactiveTintColor: theme.colors.gray,
