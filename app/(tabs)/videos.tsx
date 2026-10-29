@@ -268,6 +268,7 @@ export default function VideosScreen() {
   const {
     data: videos,
     isLoading,
+    isError,
     refetch,
     isRefetching,
     fetchNextPage,
@@ -480,8 +481,24 @@ export default function VideosScreen() {
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Ionicons name="videocam-off-outline" size={64} color={theme.colors.gray} />
-          <Text style={styles.emptyText}>{t("feed.videos.empty")}</Text>
+          <Ionicons
+            name={isError ? "cloud-offline-outline" : "videocam-off-outline"}
+            size={64}
+            color={theme.colors.gray}
+          />
+          {/* A load that failed is not an empty feed: say so and offer a retry. */}
+          <Text style={styles.emptyText}>
+            {isError ? t("feed.videos.load_failed") : t("feed.videos.empty")}
+          </Text>
+          {isError && (
+            <Pressable
+              style={styles.retryButton}
+              onPress={() => refetch()}
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryText}>{t("common.try_again")}</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -579,5 +596,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
-  emptyText: { color: theme.colors.gray, fontSize: 16 },
+  emptyText: { color: theme.colors.gray, fontSize: 16, textAlign: "center", paddingHorizontal: 24 },
+  retryButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { color: theme.colors.primary, fontFamily: theme.fonts.bold },
 });

@@ -37,6 +37,41 @@ interface ApiResponse<T> {
  * Fetches the main feed, filtering duplicate votes to keep only the latest vote per user
  */
 
+// The feeds the Videos tab reads are slow when the API's cache is cold
+// (measured: /videos page 1 22.8 s, page 2 14.3 s cold vs 0.4 s warm), so they
+// get a longer budget than the default 10 s. Still one attempt per call: a
+// timed-out request isn't repeated (see fetchWithRetry); the UI offers a retry.
+export const FEED_TIMEOUT_MS = 20_000;
+
+/**
+ * One page of the main feed. Throws when it can't be loaded, so callers can
+ * tell a failure from an empty page. `getFeed` keeps the old never-throw API.
+ */
+export async function fetchFeedPage(page = 1, limit = 10, timeoutMs = 10_000): Promise<Post[]> {
+  const response = await fetchWithRetry(`${API_BASE_URL}/feed?page=${page}&limit=${limit}`, 2, timeoutMs);
+  const data: ApiResponse<Post[]> = await response.json();
+  if (!data.success || !Array.isArray(data.data)) {
+    throw new Error(`Feed page ${page} failed to load`);
+  }
+  return dedupeVotes(data.data);
+}
+
+function dedupeVotes(posts: Post[]): Post[] {
+  return posts.map((post: Post) => {
+    if (post.votes && Array.isArray(post.votes)) {
+      const latestVotesMap = new Map();
+      post.votes.forEach(vote => {
+        const existingVote = latestVotesMap.get(vote.voter);
+        if (!existingVote || new Date(vote.timestamp) > new Date(existingVote.timestamp)) {
+          latestVotesMap.set(vote.voter, vote);
+        }
+      });
+      post.votes = Array.from(latestVotesMap.values());
+    }
+    return post;
+  });
+}
+
 // Paginated feed fetcher
 export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
   try {
@@ -71,7 +106,7 @@ export async function getFeed(page = 1, limit = 10): Promise<Post[]> {
  */
 export async function getVideoFeed(page = 1, limit = 20) {
   try {
-    const response = await fetchWithRetry(`${API_BASE_URL}/videos?page=${page}&limit=${limit}`);
+    const response = await fetchWithRetry(`${API_BASE_URL}/videos?page=${page}&limit=${limit}`, 2, FEED_TIMEOUT_MS);
     // Guard against non-JSON responses (404 HTML page if endpoint not deployed yet)
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {

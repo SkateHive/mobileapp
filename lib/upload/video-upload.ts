@@ -8,12 +8,13 @@ import {
   isForwardProgress,
   type UploadProgress,
 } from './net';
+import { followEventStream } from './sse';
 
 // The status lookup only picks a server; past this, use the built-in list.
 const STATUS_TIMEOUT_MS = 5_000;
-const PROGRESS_POLL_TIMEOUT_MS = 4_000;
-// Transcoding a clip can take minutes, so an upload is cut when its progress
-// stops moving for this long while we poll it. The hard cap always applies.
+// Transcoding a clip can take minutes. Once the progress stream has shown real
+// movement, an upload whose progress then stops for this long is cut; before
+// that, only the hard cap applies (see createStallWatchdog).
 const UPLOAD_STALL_MS = 120_000;
 const UPLOAD_MAX_MS = 20 * 60_000;
 
@@ -168,63 +169,35 @@ export async function uploadVideoToWorker(
         formData.append('thumbnail', options.thumbnailUrl);
       }
 
-      // Without progress polling there is no proof of life, so no stall limit:
-      // the hard cap alone bounds it.
-      const watchdog = createStallWatchdog(
-        options.onProgress ? UPLOAD_STALL_MS : Infinity,
-        UPLOAD_MAX_MS,
-      );
-      let pollInterval: ReturnType<typeof setInterval> | null = null;
-      let polling = false;
-      // The server confirmed it has this job (it answered a progress poll).
-      let acknowledged = false;
+      const watchdog = createStallWatchdog(UPLOAD_STALL_MS, UPLOAD_MAX_MS);
       let lastProgress: UploadProgress | null = null;
       let failedStatus: number | undefined;
-      let startedAt = Date.now();
-      // clearInterval stops future ticks but can't cancel a poll already in
-      // flight. Without this guard a late response lands after the caller has
-      // reset its UI and re-writes a stale stage — leaving "Done!" on screen.
+      // A progress event can still arrive after the upload settled (the stream
+      // is closed asynchronously); without this guard it would re-write a stale
+      // stage over the caller's reset UI.
       let settled = false;
+      let closeProgress: (() => void) | null = null;
       if (options.onProgress) {
         options.onProgress(5, 'receiving');
-        pollInterval = setInterval(async () => {
-          // A slow poll must not pile up behind the next tick.
-          if (polling) return;
-          polling = true;
+        closeProgress = followEventStream(`${baseUrl}/progress/${correlationId}`, (raw) => {
+          if (settled) return;
+          let data: { progress?: unknown; stage?: unknown };
           try {
-            const resp = await fetchWithTimeout(
-              `${baseUrl}/progress/${correlationId}`,
-              { headers: { 'Accept': 'text/event-stream' } },
-              PROGRESS_POLL_TIMEOUT_MS,
-            );
-            if (!resp.ok || settled) return;
-            const text = await resp.text();
-            const lines = text.split('\n').filter(l => l.startsWith('data:'));
-            if (lines.length > 0) {
-              const lastLine = lines[lines.length - 1];
-              const data = JSON.parse(lastLine.replace('data: ', ''));
-              // Re-checked here and not only above: reading the body is a second
-              // await, and the upload can settle while it's pending.
-              if (!settled && data.progress !== undefined) {
-                acknowledged = true;
-                const next = { progress: Number(data.progress), stage: String(data.stage || 'processing') };
-                if (isForwardProgress(lastProgress, next)) {
-                  lastProgress = next;
-                  watchdog.kick();
-                }
-                options.onProgress?.(next.progress, next.stage);
-              }
-            }
+            data = JSON.parse(raw);
           } catch {
-            // Polling errors are non-fatal
-          } finally {
-            polling = false;
+            return;
           }
-        }, 1500);
+          if (data.progress === undefined) return;
+          const next = { progress: Number(data.progress), stage: String(data.stage || 'processing') };
+          if (isForwardProgress(lastProgress, next)) {
+            lastProgress = next;
+            watchdog.kick();
+          }
+          options.onProgress?.(next.progress, next.stage);
+        });
       }
 
       try {
-        startedAt = Date.now();
         const uploadResponse = await fetch(workerApiUrl, {
           method: 'POST',
           body: formData,
@@ -258,23 +231,17 @@ export async function uploadVideoToWorker(
               : undefined,
         };
       } catch (error) {
-        // This server may still be transcoding it (see canFailOver): sending
-        // the video to the next one would transcode it twice, so stop here.
-        if (!canFailOver(
-            {
-              status: failedStatus,
-              watchdogFired: watchdog.reason !== null,
-              elapsedMs: Date.now() - startedAt,
-            },
-            acknowledged,
-          )) {
+        // Unless this server refused the video outright, it may still be
+        // transcoding it (see canFailOver): stop rather than send it to the
+        // next server and transcode it twice.
+        if (!canFailOver({ status: failedStatus, watchdogFired: watchdog.reason !== null })) {
           throw failWith('video_unconfirmed', { service: service.name });
         }
         errors.push(error instanceof Error ? describeError(error, t) : t('upload.error.service_fallback', { service: service.name }));
       } finally {
         settled = true;
         watchdog.dispose();
-        if (pollInterval) clearInterval(pollInterval);
+        closeProgress?.();
       }
     }
 

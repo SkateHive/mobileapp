@@ -4,7 +4,9 @@ import {
   getFeed,
   getBalance,
   getRewards,
-  getVideoFeed } from '../api';
+  getVideoFeed,
+  fetchFeedPage,
+  FEED_TIMEOUT_MS } from '../api';
 import { API_BASE_URL, LEADERBOARD_API_URL, HIVE_AVATAR_URL } from '../constants';
 import { extractMediaFromBody, filterDeletedPosts } from '../utils';
 import { filterModeratedPosts } from '../moderation';
@@ -101,8 +103,10 @@ async function fetchVideoFeedPage(page: number): Promise<VideoFeedPage> {
   // again once the network is back.
   if (page > 1) throw new Error(`Video feed page ${page} failed to load`);
 
-  // Fallback: use general feed + client-side extraction
-  const posts = await getFeed(1, 50);
+  // Fallback: use general feed + client-side extraction. fetchFeedPage throws
+  // when it fails too, so a double failure shows as an error with a retry,
+  // never as an empty "no videos" feed.
+  const posts = await fetchFeedPage(1, 50, FEED_TIMEOUT_MS);
   return {
     videos: filterModeratedPosts(
       filterDeletedPosts(extractVideosFromFeed(filterDeletedPosts(posts)))
