@@ -24,6 +24,13 @@ export interface SpotmapRow {
    * `thumbnail` (the full-size image) wherever a small preview is needed, e.g.
    * the widget's downsampled spot photos. */
   thumbnail_small?: string | null;
+  /** API contract (skatehive API #50, not deployed yet): a generated medium
+   * image measured at <= 800 px, else null. */
+  thumbnail_medium?: string | null;
+  /** thumbnail_medium, else a stored small image <= 400 px, else null. Never
+   * the original upload. Absent until the API change is deployed. */
+  thumbnail_bounded?: string | null;
+  thumbnail_bounded_kind?: "medium" | "small" | null;
   images?: SpotImage[] | null;
   hive_author?: string | null; // 'skatehive-map' for KML
   hive_permlink?: string | null; // row uuid for KML

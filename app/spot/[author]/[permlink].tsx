@@ -8,7 +8,9 @@ import {
   Linking,
   ActivityIndicator,
   useWindowDimensions,
+  Platform,
 } from "react-native";
+import { spotImageUri } from "~/lib/spotmap/images";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -135,7 +137,10 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
     if (isKml && spot.kml_description) {
       parseKmlDescription(spot.kml_description).images.forEach((u) => urls.push(u));
     }
-    if (!urls.length && spot.thumbnail) urls.push(spot.thumbnail);
+    if (!urls.length) {
+      const fallback = spotImageUri(spot, Platform.OS !== "android");
+      if (fallback) urls.push(fallback);
+    }
     return Array.from(new Set(urls));
   }, [spot, isKml]);
 
