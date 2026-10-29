@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { View, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "~/lib/i18n";
+import { setAndroidBuffer } from "~/lib/video-buffer";
 
 interface VideoPlayerProps {
   url: string;
@@ -39,6 +40,7 @@ export const VideoPlayer = React.memo(
     // and paused instead (see GridVideoTile).
     const player = useVideoPlayer(url, (player) => {
       player.loop = loop;
+      setAndroidBuffer(player, "active"); // cap only; see lib/video-buffer.ts
     });
 
     // Set initial muted state after player is created
