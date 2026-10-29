@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  react-native-maps@1.20.1:
+    hash: e2inailnsamn24dzta2tqw2jrm
+    path: patches/react-native-maps@1.20.1.patch
+
 importers:
 
   .:
@@ -148,7 +153,7 @@ importers:
         version: 1.11.0(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))
       react-native-maps:
         specifier: 1.20.1
-        version: 1.20.1(react-native-web@0.20.0(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
+        version: 1.20.1(patch_hash=e2inailnsamn24dzta2tqw2jrm)(react-native-web@0.20.0(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
       react-native-markdown-display:
         specifier: ^7.0.2
         version: 7.0.2(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0)
@@ -7851,7 +7856,7 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0)
 
-  react-native-maps@1.20.1(react-native-web@0.20.0(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0):
+  react-native-maps@1.20.1(patch_hash=e2inailnsamn24dzta2tqw2jrm)(react-native-web@0.20.0(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.26.10)(@types/react@19.1.13)(react@19.1.0))(react@19.1.0):
     dependencies:
       '@types/geojson': 7946.0.16
       react: 19.1.0

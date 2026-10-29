@@ -86,5 +86,10 @@
     "cosmiconfig": "^9.0.1",
     "tsx": "^4.20.6"
   },
-  "private": true
+  "private": true,
+  "pnpm": {
+    "patchedDependencies": {
+      "react-native-maps@1.20.1": "patches/react-native-maps@1.20.1.patch"
+    }
+  }
 }

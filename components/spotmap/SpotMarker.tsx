@@ -11,10 +11,14 @@ import type { SpotmapRow } from "~/lib/spotmap/types";
  * the map re-rasterizes every marker on each frame and stutters badly).
  * This hook flips it false shortly after mount.
  */
+// Google Maps on Android can take longer than iOS to be ready to draw;
+// snapshotting before that left the pins blank until the map was panned.
+const SETTLE_MS = Platform.OS === "android" ? 1500 : 600;
+
 function useSettledTracking(): boolean {
   const [tracking, setTracking] = React.useState(true);
   React.useEffect(() => {
-    const t = setTimeout(() => setTracking(false), 600);
+    const t = setTimeout(() => setTracking(false), SETTLE_MS);
     return () => clearTimeout(t);
   }, []);
   return tracking;
