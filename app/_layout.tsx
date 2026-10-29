@@ -95,22 +95,36 @@ export default function RootLayout() {
     'FiraCode-Bold': FiraCode_700Bold,
   });
 
-  // Android opens on a plain black native splash and plays the logo animation
-  // in JS; iOS keeps its native logo splash for now.
-  const [showIntro, setShowIntro] = useState(Platform.OS === 'android');
+  // Android opens on a plain black native splash, then AnimatedSplash builds
+  // the logo. The app mounts only once the logo is built (mounting it earlier
+  // stalled the animation), and the overlay dives away once the app has had
+  // a moment to render. iOS keeps its native logo splash for now.
+  const isAndroid = Platform.OS === 'android';
+  const [showIntro, setShowIntro] = useState(isAndroid);
+  const [appMountAllowed, setAppMountAllowed] = useState(!isAndroid);
+  const [appReady, setAppReady] = useState(false);
+  const appMounted = fontsLoaded && appMountAllowed;
 
   useEffect(() => {
-    if (fontsLoaded) {
+    // On Android the intro hides the native splash on its first frame.
+    if (fontsLoaded && !isAndroid) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, isAndroid]);
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    if (!appMounted) return;
+    const t = setTimeout(() => setAppReady(true), 250);
+    return () => clearTimeout(t);
+  }, [appMounted]);
+
+  if (!fontsLoaded && !showIntro) {
     return null;
   }
 
   return (
     <GestureHandlerRootView style={styles.container}>
+    {appMounted && (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NavigationGuard>
@@ -228,7 +242,15 @@ export default function RootLayout() {
         </NavigationGuard>
       </AuthProvider>
     </QueryClientProvider>
-    {showIntro && <AnimatedSplash onDone={() => setShowIntro(false)} />}
+    )}
+    {showIntro && (
+      <AnimatedSplash
+        onReady={() => SplashScreen.hideAsync()}
+        onAppMount={() => setAppMountAllowed(true)}
+        appReady={appReady}
+        onDone={() => setShowIntro(false)}
+      />
+    )}
     </GestureHandlerRootView>
   );
 }
