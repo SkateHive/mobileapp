@@ -1,6 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Platform } from "react-native";
-import { Marker } from "react-native-maps";
+import { SpotMapMarker as Marker } from "~/components/spotmap/SpotMapView";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import type { SpotmapRow } from "~/lib/spotmap/types";
