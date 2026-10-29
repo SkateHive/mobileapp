@@ -88,27 +88,35 @@ export interface UploadFailure {
   status?: number;
   /** The stall watchdog cut the request. */
   watchdogFired: boolean;
-  /** The server answered 2xx but without a usable result: it is done with it. */
-  finishedWithoutResult?: boolean;
+  /** How long after sending the request it failed. */
+  elapsedMs: number;
 }
+
+/** A network error this early can't have carried a video to the server. */
+export const PRE_UPLOAD_FAILURE_MS = 2_000;
 
 /**
  * Whether a failed upload may be sent to the next server.
  *
- * Sending it again is safe only when this server can't still be working on
- * it: it rejected the job outright (4xx other than 408, or its own 500), or
- * it never acknowledged the job (no progress seen) before a network error
- * or gateway error. After an acknowledgement, a lost connection, a gateway
- * 502/503/504 or a stall is ambiguous: the server may finish, so stop.
+ * The transcoder has no idempotency key, and none of its answers says
+ * whether it already started on the video, so this is deliberately narrow.
+ * The next server gets the video only when:
+ *  - this one refused it with a 4xx (other than 408/429): by HTTP semantics
+ *    the request was not processed; or
+ *  - the request failed with a network error within PRE_UPLOAD_FAILURE_MS
+ *    and no progress poll ever answered: too early for the video to have
+ *    reached the server (host down, DNS, connection refused).
+ * Everything else (a 500, a 2xx without a result, gateway 502/503/504, a
+ * later network error, a stall) is treated as ambiguous: the server may
+ * still finish, so we stop instead of risking a second transcode.
  *
- * This only guards against transcoding the same video twice. Publishing is
- * separate and idempotent (the post's permlink is fixed when the job is
- * queued, and the runner checks for an existing post before broadcasting).
+ * Publishing to Hive is a separate step after the upload, with a permlink
+ * fixed at enqueue and a check for an existing post, which makes a
+ * duplicate post unlikely but is not an atomic guarantee.
  */
 export function canFailOver(failure: UploadFailure, serverAcknowledged: boolean): boolean {
   if (failure.watchdogFired) return false;
-  if (failure.finishedWithoutResult) return true;
   const s = failure.status;
-  if (s !== undefined && ((s >= 400 && s < 500 && s !== 408) || s === 500)) return true;
-  return !serverAcknowledged;
+  if (s !== undefined) return s >= 400 && s < 500 && s !== 408 && s !== 429;
+  return !serverAcknowledged && failure.elapsedMs < PRE_UPLOAD_FAILURE_MS;
 }

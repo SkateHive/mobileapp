@@ -180,7 +180,7 @@ export async function uploadVideoToWorker(
       let acknowledged = false;
       let lastProgress: UploadProgress | null = null;
       let failedStatus: number | undefined;
-      let finishedWithoutResult = false;
+      let startedAt = Date.now();
       // clearInterval stops future ticks but can't cancel a poll already in
       // flight. Without this guard a late response lands after the caller has
       // reset its UI and re-writes a stale stage — leaving "Done!" on screen.
@@ -224,6 +224,7 @@ export async function uploadVideoToWorker(
       }
 
       try {
+        startedAt = Date.now();
         const uploadResponse = await fetch(workerApiUrl, {
           method: 'POST',
           body: formData,
@@ -239,7 +240,6 @@ export async function uploadVideoToWorker(
         const result = await uploadResponse.json();
 
         if (!result.cid || !result.gatewayUrl) {
-          finishedWithoutResult = true;
           throw failWith('service_invalid', { service: service.name });
         }
 
@@ -261,7 +261,11 @@ export async function uploadVideoToWorker(
         // This server may still be transcoding it (see canFailOver): sending
         // the video to the next one would transcode it twice, so stop here.
         if (!canFailOver(
-            { status: failedStatus, watchdogFired: watchdog.reason !== null, finishedWithoutResult },
+            {
+              status: failedStatus,
+              watchdogFired: watchdog.reason !== null,
+              elapsedMs: Date.now() - startedAt,
+            },
             acknowledged,
           )) {
           throw failWith('video_unconfirmed', { service: service.name });

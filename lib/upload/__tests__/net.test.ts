@@ -84,22 +84,22 @@ test("only real movement counts as progress", () => {
   assert.equal(isForwardProgress({ progress: 100, stage: "transcoding" }, { progress: 100, stage: "uploading" }), true);
 });
 
-test("fail over only when this server can't still be working on the video", () => {
-  const net = { status: undefined, watchdogFired: false };
-  // Never acknowledged: a network or gateway error means it likely never got it.
-  assert.equal(canFailOver(net, false), true);
-  assert.equal(canFailOver({ status: 502, watchdogFired: false }, false), true);
-  // Acknowledged, then lost: ambiguous, stop.
-  assert.equal(canFailOver(net, true), false);
-  for (const status of [502, 503, 504, 408]) {
-    assert.equal(canFailOver({ status, watchdogFired: false }, true), false, `status ${status}`);
+test("fail over only when the video can't have been taken", () => {
+  const early = { watchdogFired: false, elapsedMs: 300 };
+  const late = { watchdogFired: false, elapsedMs: 8_000 };
+  // Network error right away, never acknowledged: it never got the video.
+  assert.equal(canFailOver(early, false), true);
+  // A later network error, or any after an acknowledgement: ambiguous.
+  assert.equal(canFailOver(late, false), false);
+  assert.equal(canFailOver(early, true), false);
+  // Refused with a 4xx: not processed, so the next server may try.
+  for (const status of [400, 401, 413, 415, 422]) {
+    assert.equal(canFailOver({ ...late, status }, true), true, `status ${status}`);
   }
-  // Explicit rejection: safe to try the next server.
-  for (const status of [400, 401, 413, 415, 422, 500]) {
-    assert.equal(canFailOver({ status, watchdogFired: false }, true), true, `status ${status}`);
+  // A 500, gateway errors, 408 and 429 don't prove it wasn't started.
+  for (const status of [408, 429, 500, 502, 503, 504]) {
+    assert.equal(canFailOver({ ...early, status }, false), false, `status ${status}`);
   }
-  // Answered 2xx without a result: it's done, so the next server may try.
-  assert.equal(canFailOver({ watchdogFired: false, finishedWithoutResult: true }, true), true);
   // The watchdog cut it: never fail over.
-  assert.equal(canFailOver({ status: undefined, watchdogFired: true }, false), false);
+  assert.equal(canFailOver({ watchdogFired: true, elapsedMs: 300 }, false), false);
 });
