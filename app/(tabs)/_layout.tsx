@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs, usePathname, useRouter } from "expo-router";
 import { StyleSheet, View, PanResponder } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRef, useState } from "react";
@@ -115,10 +115,18 @@ export default function TabLayout() {
     router.push(target);
   };
 
+  // The map pans with horizontal drags too: on the Map tab, a quick drag to the
+  // right was taken for the create swipe and opened the post composer (seen on
+  // Android with MapLibre). The swipe is off there.
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+
   // Create swipe gesture using PanResponder (simpler, less likely to crash)
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
+        if (pathnameRef.current.endsWith("/map")) return false;
         // Only respond to horizontal swipes
         return (
           Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
