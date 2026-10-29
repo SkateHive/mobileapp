@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createStallWatchdog, fetchWithTimeout, isAbortError } from "../net";
+import {
+  canFailOver,
+  createStallWatchdog,
+  fetchWithTimeout,
+  isAbortError,
+  isForwardProgress,
+} from "../net";
 import { classifyError, failWith } from "../upload-runner";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -64,8 +70,36 @@ test("without a stall limit only the hard cap applies", async () => {
 });
 
 test("a stalled upload is not a network error, so it is never auto-retried", () => {
-  const stalled = failWith("video_stalled", { service: "Mac Mini M4 (Primary)" });
+  const stalled = failWith("video_unconfirmed", { service: "Mac Mini M4 (Primary)" });
   assert.notEqual(classifyError(stalled).kind, "network");
   const wrapped = failWith("video_failed", { message: stalled.message }, stalled);
   assert.notEqual(classifyError(wrapped).kind, "network");
+});
+
+test("only real movement counts as progress", () => {
+  assert.equal(isForwardProgress(null, { progress: 0, stage: "receiving" }), true);
+  assert.equal(isForwardProgress({ progress: 40, stage: "transcoding" }, { progress: 40, stage: "transcoding" }), false);
+  assert.equal(isForwardProgress({ progress: 40, stage: "transcoding" }, { progress: 35, stage: "transcoding" }), false);
+  assert.equal(isForwardProgress({ progress: 40, stage: "transcoding" }, { progress: 41, stage: "transcoding" }), true);
+  assert.equal(isForwardProgress({ progress: 100, stage: "transcoding" }, { progress: 100, stage: "uploading" }), true);
+});
+
+test("fail over only when this server can't still be working on the video", () => {
+  const net = { status: undefined, watchdogFired: false };
+  // Never acknowledged: a network or gateway error means it likely never got it.
+  assert.equal(canFailOver(net, false), true);
+  assert.equal(canFailOver({ status: 502, watchdogFired: false }, false), true);
+  // Acknowledged, then lost: ambiguous, stop.
+  assert.equal(canFailOver(net, true), false);
+  for (const status of [502, 503, 504, 408]) {
+    assert.equal(canFailOver({ status, watchdogFired: false }, true), false, `status ${status}`);
+  }
+  // Explicit rejection: safe to try the next server.
+  for (const status of [400, 401, 413, 415, 422, 500]) {
+    assert.equal(canFailOver({ status, watchdogFired: false }, true), true, `status ${status}`);
+  }
+  // Answered 2xx without a result: it's done, so the next server may try.
+  assert.equal(canFailOver({ watchdogFired: false, finishedWithoutResult: true }, true), true);
+  // The watchdog cut it: never fail over.
+  assert.equal(canFailOver({ status: undefined, watchdogFired: true }, false), false);
 });

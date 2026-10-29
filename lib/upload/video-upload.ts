@@ -1,13 +1,19 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { t } from '~/lib/i18n';
 import { describeError, failWith } from './upload-runner';
-import { createStallWatchdog, fetchWithTimeout } from './net';
+import {
+  canFailOver,
+  createStallWatchdog,
+  fetchWithTimeout,
+  isForwardProgress,
+  type UploadProgress,
+} from './net';
 
 // The status lookup only picks a server; past this, use the built-in list.
 const STATUS_TIMEOUT_MS = 5_000;
 const PROGRESS_POLL_TIMEOUT_MS = 4_000;
-// Transcoding a clip can take minutes, so an upload is cut only when its
-// progress stops moving for this long (or it runs past the hard cap).
+// Transcoding a clip can take minutes, so an upload is cut when its progress
+// stops moving for this long while we poll it. The hard cap always applies.
 const UPLOAD_STALL_MS = 120_000;
 const UPLOAD_MAX_MS = 20 * 60_000;
 
@@ -162,14 +168,19 @@ export async function uploadVideoToWorker(
         formData.append('thumbnail', options.thumbnailUrl);
       }
 
-      // Without progress polling there is no proof of life, so only the hard
-      // cap applies.
+      // Without progress polling there is no proof of life, so no stall limit:
+      // the hard cap alone bounds it.
       const watchdog = createStallWatchdog(
         options.onProgress ? UPLOAD_STALL_MS : Infinity,
         UPLOAD_MAX_MS,
       );
       let pollInterval: ReturnType<typeof setInterval> | null = null;
       let polling = false;
+      // The server confirmed it has this job (it answered a progress poll).
+      let acknowledged = false;
+      let lastProgress: UploadProgress | null = null;
+      let failedStatus: number | undefined;
+      let finishedWithoutResult = false;
       // clearInterval stops future ticks but can't cancel a poll already in
       // flight. Without this guard a late response lands after the caller has
       // reset its UI and re-writes a stale stage — leaving "Done!" on screen.
@@ -195,8 +206,13 @@ export async function uploadVideoToWorker(
               // Re-checked here and not only above: reading the body is a second
               // await, and the upload can settle while it's pending.
               if (!settled && data.progress !== undefined) {
-                watchdog.kick();
-                options.onProgress?.(data.progress, data.stage || 'processing');
+                acknowledged = true;
+                const next = { progress: Number(data.progress), stage: String(data.stage || 'processing') };
+                if (isForwardProgress(lastProgress, next)) {
+                  lastProgress = next;
+                  watchdog.kick();
+                }
+                options.onProgress?.(next.progress, next.stage);
               }
             }
           } catch {
@@ -215,6 +231,7 @@ export async function uploadVideoToWorker(
         });
 
         if (!uploadResponse.ok) {
+          failedStatus = uploadResponse.status;
           const errorText = await uploadResponse.text();
           throw failWith('service_failed', { service: service.name, status: uploadResponse.status, detail: errorText });
         }
@@ -222,6 +239,7 @@ export async function uploadVideoToWorker(
         const result = await uploadResponse.json();
 
         if (!result.cid || !result.gatewayUrl) {
+          finishedWithoutResult = true;
           throw failWith('service_invalid', { service: service.name });
         }
 
@@ -240,10 +258,13 @@ export async function uploadVideoToWorker(
               : undefined,
         };
       } catch (error) {
-        // Cut by the watchdog: this server got the video and may still finish
-        // it. Sending it to the next server could publish it twice, so stop.
-        if (watchdog.reason) {
-          throw failWith('video_stalled', { service: service.name });
+        // This server may still be transcoding it (see canFailOver): sending
+        // the video to the next one would transcode it twice, so stop here.
+        if (!canFailOver(
+            { status: failedStatus, watchdogFired: watchdog.reason !== null, finishedWithoutResult },
+            acknowledged,
+          )) {
+          throw failWith('video_unconfirmed', { service: service.name });
         }
         errors.push(error instanceof Error ? describeError(error, t) : t('upload.error.service_fallback', { service: service.name }));
       } finally {

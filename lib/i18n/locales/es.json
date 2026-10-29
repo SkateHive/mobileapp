@@ -664,7 +664,7 @@
   "upload.error.service_fallback": "{{service}} falló",
   "upload.error.service_invalid": "{{service}} devolvió una respuesta de subida no válida",
   "upload.error.video_all_failed": "Todos los servidores de subida de video fallaron: {{errors}}",
-  "upload.error.video_stalled": "{{service}} dejó de responder. El video aún puede terminar de procesarse: revisa tu perfil en unos minutos antes de intentarlo otra vez.",
+  "upload.error.video_unconfirmed": "{{service}} recibió el video, pero perdimos el seguimiento. Aún puede terminar de procesarse: revisa tu perfil en unos minutos antes de intentarlo otra vez.",
   "upload.error.video_failed": "Falló la subida del video: {{message}}",
   "upload.error.video_gone": "El video ya no está en este dispositivo",
   "upload.pill.detail_optimized": "Video ya optimizado",

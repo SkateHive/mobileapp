@@ -664,7 +664,7 @@
   "upload.error.service_fallback": "{{service}} failed",
   "upload.error.service_invalid": "{{service}} returned an invalid upload response",
   "upload.error.video_all_failed": "All video upload services failed: {{errors}}",
-  "upload.error.video_stalled": "{{service}} stopped responding. The video may still finish processing, so check your profile in a few minutes before trying again.",
+  "upload.error.video_unconfirmed": "{{service}} got the video, but we lost track of it. It may still finish processing, so check your profile in a few minutes before trying again.",
   "upload.error.video_failed": "Video upload failed: {{message}}",
   "upload.error.video_gone": "The video is no longer on this device",
   "upload.pill.detail_optimized": "Video already optimized",
