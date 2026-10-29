@@ -96,8 +96,10 @@ async function fetchVideoFeedPage(page: number): Promise<VideoFeedPage> {
     };
   }
 
-  // The fallback below has no pages: it is one slice of the general feed.
-  if (page > 1) return { videos: [] };
+  // A later page failing (getVideoFeed gives up with null) must not look like
+  // the end of the feed: throw, so the query retries and onEndReached can ask
+  // again once the network is back.
+  if (page > 1) throw new Error(`Video feed page ${page} failed to load`);
 
   // Fallback: use general feed + client-side extraction
   const posts = await getFeed(1, 50);
@@ -117,14 +119,19 @@ const videoFeedOptions = infiniteQueryOptions({
 });
 
 // New posts arriving between two page loads shift the API's pages, so the
-// same video can come back on the next page. Keep the first copy.
+// same video can come back on the next page. Keep the first copy. A post can
+// hold several clips (the general-feed fallback lists each), hence the URL.
+export function videoKey(video: VideoPost): string {
+  return `${video.author}-${video.permlink}-${video.videoUrl}`;
+}
+
 function flattenVideoPages(pages: VideoFeedPage[] | undefined): VideoPost[] {
   if (!pages) return [];
   const seen = new Set<string>();
   const out: VideoPost[] = [];
   for (const page of pages) {
     for (const video of page.videos) {
-      const key = `${video.author}-${video.permlink}`;
+      const key = videoKey(video);
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(video);

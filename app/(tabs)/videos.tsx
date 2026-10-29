@@ -24,7 +24,7 @@ import { useAuth } from "~/lib/auth-provider";
 import { castVote, canPost } from "~/lib/posting";
 import { useSoftPostOverlay } from "~/lib/userbase/soft-post-context";
 import { useToast } from "~/lib/toast-provider";
-import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
+import { useVideoFeed, videoKey, type VideoPost } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { useIsFocused } from "@react-navigation/native";
@@ -272,7 +272,7 @@ export default function VideosScreen() {
     isRefetching,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage,
+    isFetching,
   } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
@@ -435,7 +435,7 @@ export default function VideosScreen() {
           data={videos}
           renderItem={renderItem}
           extraData={extraData}
-          keyExtractor={(item) => `${item.author}-${item.permlink}`}
+          keyExtractor={videoKey}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -460,7 +460,9 @@ export default function VideosScreen() {
           // Load the next page while two clips are still left, so the swipe
           // after the last one has somewhere to go.
           onEndReached={() => {
-            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+            // isFetching also covers a pull-to-refresh, which a page load
+            // started now would cancel.
+            if (hasNextPage && !isFetching) fetchNextPage();
           }}
           onEndReachedThreshold={2}
           removeClippedSubviews
