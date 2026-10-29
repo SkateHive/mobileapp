@@ -443,6 +443,8 @@
   "map.near_me.failed": "No se pudo obtener tu ubicación",
   "map.near_me.permission_denied": "Activa la ubicación en Ajustes → Privacidad y seguridad → Localización → Skatehive",
   "map.near_me.permission_denied_android": "Activa la ubicación en Ajustes → Apps → Skatehive → Permisos",
+  "map.unavailable.title": "Mapa no disponible",
+  "map.unavailable.body": "El mapa todavía no carga en este dispositivo. Los spots aparecerán aquí en una próxima actualización.",
   "map.relative.days": "hace {{n}} d",
   "map.relative.hours": "hace {{n}} h",
   "map.relative.minutes": "hace {{n}} min",
