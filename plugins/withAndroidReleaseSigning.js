@@ -16,12 +16,19 @@ const { withAppBuildGradle } = require("expo/config-plugins");
 const MARK = "// skatehive-release-signing";
 
 const HELPER = `${MARK}: the Play upload key lives outside the repo.
+// A relative SKATEHIVE_UPLOAD_PROPERTIES is relative to the repo root (rootDir is android/), the same base
+// scripts/build-android-aab.js uses; Gradle's own working directory is not guaranteed. A relative storeFile
+// is relative to the properties file.
 def skatehiveUploadProps() {
     def path = System.getenv('SKATEHIVE_UPLOAD_PROPERTIES') ?: "\${System.getProperty('user.home')}/.skatehive/android-upload.properties"
     def f = new File(path)
+    if (!f.isAbsolute()) f = new File(rootDir.parentFile, path)
     if (!f.exists()) return null
     def p = new Properties()
     f.withInputStream { p.load(it) }
+    def store = new File(p['storeFile'])
+    if (!store.isAbsolute()) store = new File(f.parentFile, p['storeFile'])
+    p['storeFile'] = store.absolutePath
     return p
 }
 `;
