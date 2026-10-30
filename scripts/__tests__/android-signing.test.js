@@ -157,3 +157,56 @@ test("a missing or invalid expected fingerprint, or a missing bundle, is refused
   }
   assert.throws(() => s.verifyBundle(path.join(dir, "absent.aab"), keys.upload.fp), /does not exist/);
 });
+
+// ---------------------------------------------------------------- parser parity with Gradle
+// Gradle reads the config with java.util.Properties; readProps must read every accepted file the same way.
+function javaProps(file) {
+  const src = path.join(dir, "ReadProps.java");
+  fs.writeFileSync(src, `import java.io.*; import java.util.*;
+public class ReadProps { public static void main(String[] a) throws Exception {
+  Properties p = new Properties(); try (InputStream in = new FileInputStream(a[0])) { p.load(in); }
+  StringBuilder b = new StringBuilder("{");
+  for (String k : new TreeSet<>(p.stringPropertyNames())) {
+    if (b.length() > 1) b.append(',');
+    b.append('"').append(k).append("\\":\\"").append(p.getProperty(k).replace("\\"", "\\\\u0022")).append('"');
+  }
+  System.out.print(b.append('}'));
+}}`);
+  return JSON.parse(run("java", [src, file]));
+}
+test("readProps reads the config exactly as Gradle's java.util.Properties does", () => {
+  const fp = keys.upload.fp;
+  const store = path.basename(keys.upload.store);
+  const pass = keys.upload.pass;
+  const variants = {
+    spaces: `storeFile = ${store}\n  storePassword=   ${pass}\nkeyAlias\t=upload\nkeyPassword=${pass}\nuploadCertSha256=${fp}\n`,
+    colons: `storeFile:${store}\nstorePassword: ${pass}\nkeyAlias upload\nkeyPassword=${pass}\nuploadCertSha256 : ${fp}`,
+    comments: `# a comment\n! another\n\nstoreFile=${store}\r\nstorePassword=${pass}\r\nkeyAlias=upload\rkeyPassword=${pass}\nuploadCertSha256=${fp}\n`,
+    punctuation: `storeFile=${store}\nstorePassword=${pass}\nkeyAlias=upload\nkeyPassword=${pass}\nuploadCertSha256=${fp}\nnote=a=b:c #d !e "q"\ntrailing=x  \n`,
+  };
+  for (const [name, text] of Object.entries(variants)) {
+    const f = path.join(dir, `parity-${name}.properties`);
+    fs.writeFileSync(f, text);
+    const java = javaProps(f);
+    const ours = s.readProps(f);
+    for (const k of Object.keys(java)) {
+      if (k === "storeFile" || k === "uploadCertSha256") continue; // readProps resolves / normalises these
+      assert.equal(ours[k], java[k], `${name}: ${k} differs`);
+    }
+    assert.equal(ours.storeFile, path.resolve(dir, java.storeFile), `${name}: storeFile differs`);
+    assert.equal(ours.uploadCertSha256, java.uploadCertSha256.trim().toUpperCase(), `${name}: fingerprint differs`);
+  }
+});
+
+test("config features the two parsers could read differently are refused", () => {
+  const base = `storeFile=${path.basename(keys.upload.store)}\nkeyAlias=upload\nuploadCertSha256=${keys.upload.fp}\n`;
+  for (const [name, extra] of Object.entries({
+    escape: `storePassword=a\\tb\nkeyPassword=x\n`,
+    continuation: `storePassword=abc\\\n  def\nkeyPassword=x\n`,
+    unicode: `storePassword=skäte\nkeyPassword=x\n`,
+  })) {
+    const f = path.join(dir, `ambiguous-${name}.properties`);
+    fs.writeFileSync(f, base + extra);
+    assert.throws(() => s.readProps(f), /plain ASCII key=value lines without backslashes/, name);
+  }
+});

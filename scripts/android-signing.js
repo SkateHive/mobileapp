@@ -38,10 +38,18 @@ function readProps(file) {
   } catch {
     throw new SigningError(`No readable upload key config at ${file}.`);
   }
+  const raw = fs.readFileSync(file);
+  if (raw.some((b) => b > 0x7f) || raw.includes(0x5c)) {
+    throw new SigningError(`${file} must be plain ASCII key=value lines without backslashes.`);
+  }
+  // java.util.Properties rules for that subset (what Gradle reads): comments start with # or !, the key
+  // ends at the first =, : or whitespace, leading blanks of the value are dropped, trailing ones kept.
   const props = {};
-  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-    const m = /^\s*([^#!=\s][^=]*?)\s*=\s*(.*?)\s*$/.exec(line);
-    if (m) props[m[1]] = m[2];
+  for (const line of raw.toString("latin1").split(/\r\n|\r|\n/)) {
+    const t = line.replace(/^[ \t\f]+/, "");
+    if (!t || t[0] === "#" || t[0] === "!") continue;
+    const m = /^([^=:\s]*)[ \t\f]*(?:[=:][ \t\f]*)?(.*)$/.exec(t);
+    props[m[1]] = m[2];
   }
   const missing = REQUIRED.filter((k) => !props[k]);
   if (missing.length) throw new SigningError(`${file} is missing ${missing.join(", ")}.`);

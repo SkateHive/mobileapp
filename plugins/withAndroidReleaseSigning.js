@@ -8,7 +8,12 @@
 //   storePassword=...
 //   keyAlias=upload
 //   keyPassword=...
-//   uploadCertSha256=AA:BB:...                  (checked by scripts/build-android-aab.js)
+//   uploadCertSha256=AA:BB:...                  (SHA-256 of the upload certificate)
+//
+// Plain ASCII key=value lines, no backslash escapes or line continuations: Gradle reads the file with
+// java.util.Properties and scripts/android-signing.js with its own parser, and both refuse the rest so they
+// can't read the same file differently. Every release build (Gradle directly or the wrapper) checks the
+// keystore holds the declared certificate. The wrapper also verifies the finished bundle's signature.
 //
 // Debug builds never need it. A release build (assemble/bundle/package/sign *Release) without a valid
 // config FAILS, instead of silently signing with the debug key. For a local release build meant only for
@@ -23,19 +28,54 @@ const MARK = "// skatehive-release-signing";
 
 const HELPER = `${MARK}: the Play upload key lives outside the repo.
 // Returns [props: Properties] for a valid config, [error: String] for a broken one, or [absent: File].
+// Valid means: plain ASCII key=value lines (no backslash escapes), all five fields, a readable keystore that
+// opens with storePassword, holds the key keyAlias that keyPassword unlocks, and whose certificate's SHA-256
+// is the declared uploadCertSha256. Checked once per build.
 def skatehiveUploadSigning() {
+    if (project.ext.has('skatehiveUploadSigningResult')) return project.ext.skatehiveUploadSigningResult
+    def r = skatehiveUploadSigningCheck()
+    project.ext.skatehiveUploadSigningResult = r
+    return r
+}
+def skatehiveUploadSigningCheck() {
     def path = System.getenv('SKATEHIVE_UPLOAD_PROPERTIES') ?: "\${System.getProperty('user.home')}/.skatehive/android-upload.properties"
     def f = new File(path)
     if (!f.isAbsolute()) f = new File(rootDir.parentFile, path)
     if (!f.exists()) return [absent: f]
     if (!f.canRead()) return [error: "Upload key config \${f} is not readable."]
+    def raw = f.bytes
+    if (raw.any { it < 0 } || new String(raw, 'US-ASCII').contains('\\\\')) {
+        return [error: "Upload key config \${f} must be plain ASCII key=value lines without backslashes."]
+    }
     def p = new Properties()
     f.withInputStream { p.load(it) }
-    def missing = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].findAll { !p[it] }
+    def missing = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword', 'uploadCertSha256'].findAll { !p[it] }
     if (missing) return [error: "Upload key config \${f} is missing: \${missing.join(', ')}."]
+    def declared = p['uploadCertSha256'].trim().toUpperCase()
+    if (!(declared ==~ /([0-9A-F]{2}:){31}[0-9A-F]{2}/)) {
+        return [error: "Upload key config \${f}: uploadCertSha256 is not a SHA-256 fingerprint (AA:BB:... 32 bytes)."]
+    }
     def store = new File(p['storeFile'])
     if (!store.isAbsolute()) store = new File(f.parentFile, p['storeFile'])
     if (!store.canRead()) return [error: "The keystore \${store} named in \${f} is not readable."]
+    def ks
+    try {
+        ks = java.security.KeyStore.getInstance(store, p['storePassword'].toCharArray())
+    } catch (Exception e) {
+        return [error: "Couldn't open the keystore \${store}: wrong store password?"]
+    }
+    def alias = p['keyAlias']
+    if (!ks.isKeyEntry(alias)) return [error: "The keystore \${store} has no key named \${alias}."]
+    try {
+        if (ks.getKey(alias, p['keyPassword'].toCharArray()) == null) throw new Exception()
+    } catch (Exception e) {
+        return [error: "Couldn't unlock the key \${alias} in \${store}: wrong key password?"]
+    }
+    def fp = java.security.MessageDigest.getInstance('SHA-256').digest(ks.getCertificate(alias).encoded)
+        .collect { String.format('%02X', it & 0xff) }.join(':')
+    if (fp != declared) {
+        return [error: "The key \${alias} in \${store} (SHA-256 \${fp}) is not the declared upload certificate \${declared}."]
+    }
     p['storeFile'] = store.absolutePath
     return [props: p]
 }
