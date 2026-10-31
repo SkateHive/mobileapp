@@ -24,7 +24,7 @@ import { useAuth } from "~/lib/auth-provider";
 import { castVote, canPost } from "~/lib/posting";
 import { useSoftPostOverlay } from "~/lib/userbase/soft-post-context";
 import { useToast } from "~/lib/toast-provider";
-import { useVideoFeed, type VideoPost } from "~/lib/hooks/useQueries";
+import { useVideoFeed, videoKey, type VideoPost } from "~/lib/hooks/useQueries";
 import { theme } from "~/lib/theme";
 import { VideoActionRail } from "~/components/ui/VideoActionRail";
 import { useIsFocused } from "@react-navigation/native";
@@ -262,17 +262,20 @@ const VideoItem = React.memo(function VideoItem({
 
 export default function VideosScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const screenHeight = SCREEN_HEIGHT;
   const router = useRouter();
   const { session, username } = useAuth();
   const { showToast } = useToast();
   const {
     data: videos,
     isLoading,
+    isError,
     refetch,
     isRefetching,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage,
+    isFetching,
+    isFetchNextPageError,
   } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
@@ -286,8 +289,13 @@ export default function VideosScreen() {
   // Latest per-item state, readable from callbacks that must not change
   // identity: handleVote and renderItem read these instead of closing over
   // the maps, so a vote doesn't hand every mounted item a new render function.
-  const itemStateRef = useRef({ currentIndex, likedStates, votingStates, voteCountStates });
-  itemStateRef.current = { currentIndex, likedStates, votingStates, voteCountStates };
+  // Leaving the tab releases every clip's player: the tab stays mounted (the
+  // `unmountOnBlur` option is gone in React Navigation 7), and on Android the
+  // idle players' buffers filled the 256 MB Java heap later in the feed and
+  // profile. Same-height placeholders keep the list's scroll position.
+  const screenFocused = useIsFocused();
+  const itemStateRef = useRef({ currentIndex, likedStates, votingStates, voteCountStates, screenFocused });
+  itemStateRef.current = { currentIndex, likedStates, votingStates, voteCountStates, screenFocused };
 
   // Init liked/vote states when data arrives. This feed is prefetched at login
   // and cached for a minute, so on its own it happily shows an empty heart for
@@ -381,8 +389,9 @@ export default function VideosScreen() {
   // VideoItem is memoized on the scalars it gets, so only the items whose
   // active/neighbour status or vote state actually changed re-render.
   const renderItem = useCallback(({ item, index }: { item: VideoPost; index: number }) => {
-    const { currentIndex, likedStates, votingStates, voteCountStates } = itemStateRef.current;
+    const { currentIndex, likedStates, votingStates, voteCountStates, screenFocused } = itemStateRef.current;
     const key = `${item.author}-${item.permlink}`;
+    if (!screenFocused) return <View style={{ height: screenHeight }} />;
     return (
       <VideoItem
         item={item}
@@ -397,11 +406,11 @@ export default function VideosScreen() {
         voteCount={voteCountStates[key] ?? item.votes}
       />
     );
-  }, [username, handleVote, handleComment, handleShare]);
+  }, [username, handleVote, handleComment, handleShare, screenHeight]);
 
   const extraData = useMemo(
-    () => ({ currentIndex, likedStates, votingStates, voteCountStates }),
-    [currentIndex, likedStates, votingStates, voteCountStates]
+    () => ({ currentIndex, likedStates, votingStates, voteCountStates, screenFocused }),
+    [currentIndex, likedStates, votingStates, voteCountStates, screenFocused]
   );
 
   if (isLoading) {
@@ -435,7 +444,7 @@ export default function VideosScreen() {
           data={videos}
           renderItem={renderItem}
           extraData={extraData}
-          keyExtractor={(item) => `${item.author}-${item.permlink}`}
+          keyExtractor={videoKey}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -460,7 +469,9 @@ export default function VideosScreen() {
           // Load the next page while two clips are still left, so the swipe
           // after the last one has somewhere to go.
           onEndReached={() => {
-            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+            // isFetching also covers a pull-to-refresh, which a page load
+            // started now would cancel.
+            if (hasNextPage && !isFetching) fetchNextPage();
           }}
           onEndReachedThreshold={2}
           removeClippedSubviews
@@ -478,8 +489,39 @@ export default function VideosScreen() {
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Ionicons name="videocam-off-outline" size={64} color={theme.colors.gray} />
-          <Text style={styles.emptyText}>{t("feed.videos.empty")}</Text>
+          <Ionicons
+            name={isError ? "cloud-offline-outline" : "videocam-off-outline"}
+            size={64}
+            color={theme.colors.gray}
+          />
+          {/* A load that failed is not an empty feed: say so and offer a retry. */}
+          <Text style={styles.emptyText}>
+            {isError ? t("feed.videos.load_failed") : t("feed.videos.empty")}
+          </Text>
+          {isError && (
+            <Pressable
+              style={styles.retryButton}
+              onPress={() => refetch()}
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryText}>{t("common.try_again")}</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* The next page failed: say so near the end of the list and offer a
+          retry right there; the clips already loaded stay. */}
+      {isFetchNextPageError && videos.length > 0 && currentIndex >= videos.length - 2 && (
+        <View style={styles.moreFailed} pointerEvents="box-none">
+          <Text style={styles.moreFailedText}>{t("feed.videos.more_failed")}</Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => fetchNextPage()}
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryText}>{t("common.try_again")}</Text>
+          </Pressable>
         </View>
       )}
 
@@ -577,5 +619,29 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
-  emptyText: { color: theme.colors.gray, fontSize: 16 },
+  emptyText: { color: theme.colors.gray, fontSize: 16, textAlign: "center", paddingHorizontal: 24 },
+  retryButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { color: theme.colors.primary, fontFamily: theme.fonts.bold },
+  moreFailed: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: theme.colors.secondaryCard,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  moreFailedText: { flex: 1, color: theme.colors.muted, fontSize: 14 },
 });

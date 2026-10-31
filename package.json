@@ -8,6 +8,8 @@
     "dev:web": "expo start -c --web",
     "dev:android": "expo start -c --android",
     "android": "expo run:android",
+    "build:android:aab": "node scripts/build-android-aab.js",
+    "test:signing": "node --test scripts/__tests__/android-signing.test.js",
     "ios": "expo run:ios",
     "web": "expo start -c --web",
     "clean": "rm -rf .expo node_modules",
@@ -15,7 +17,7 @@
     "prebuild:ios": "expo prebuild --clean -p ios && node scripts/sync-widget-version.js",
     "start": "expo start --dev-client",
     "logs:ios": "xcrun simctl spawn booted log stream --level error --predicate 'process == \"SkateHive\"'",
-    "test": "tsx lib/upload/__tests__/upload-job.test.ts && tsx lib/spotmap/__tests__/images.test.ts && tsx lib/upload/__tests__/upload-runner.test.ts && tsx lib/upload/__tests__/post-assembly.test.ts && tsx lib/upload/__tests__/hive-errors.test.ts && tsx lib/notifications/__tests__/merge.test.ts && tsx lib/notifications/__tests__/localize.test.ts && tsx lib/userbase/__tests__/session-expiry.test.ts && tsx lib/i18n/__tests__/i18n.test.ts && tsx lib/i18n/__tests__/catalogs.test.ts && tsx lib/i18n/__tests__/usage.test.ts"
+    "test": "tsx lib/upload/__tests__/upload-job.test.ts && tsx lib/spotmap/__tests__/images.test.ts && tsx lib/upload/__tests__/net.test.ts && tsx lib/__tests__/api-retry.test.ts && tsx lib/__tests__/video-feed.test.ts && tsx lib/upload/__tests__/upload-runner.test.ts && tsx lib/upload/__tests__/post-assembly.test.ts && tsx lib/upload/__tests__/hive-errors.test.ts && tsx lib/notifications/__tests__/merge.test.ts && tsx lib/notifications/__tests__/localize.test.ts && tsx lib/userbase/__tests__/session-expiry.test.ts && tsx lib/i18n/__tests__/i18n.test.ts && tsx lib/i18n/__tests__/catalogs.test.ts && tsx lib/i18n/__tests__/usage.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/fira-code": "^0.4.0",
@@ -86,5 +88,10 @@
     "cosmiconfig": "^9.0.1",
     "tsx": "^4.20.6"
   },
-  "private": true
+  "private": true,
+  "pnpm": {
+    "patchedDependencies": {
+      "react-native-maps@1.20.1": "patches/react-native-maps@1.20.1.patch"
+    }
+  }
 }
