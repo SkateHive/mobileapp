@@ -186,10 +186,8 @@ export default function TabLayout() {
                         iconFamily={tab.iconFamily}
                       />
                     ),
-                  // Unmount videos tab when switching away to free native video player memory
-                  ...(tab.name === "videos" && {
-                    unmountOnBlur: true,
-                  }),
+                  // The Videos tab frees its players on blur itself (videos.tsx):
+                  // React Navigation 7 dropped the unmountOnBlur option.
                   ...(tab.name === "profile" && {
                     href: {
                       pathname: "/(tabs)/profile",

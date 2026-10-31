@@ -8,6 +8,8 @@
     "dev:web": "expo start -c --web",
     "dev:android": "expo start -c --android",
     "android": "expo run:android",
+    "build:android:aab": "node scripts/build-android-aab.js",
+    "test:signing": "node --test scripts/__tests__/android-signing.test.js",
     "ios": "expo run:ios",
     "web": "expo start -c --web",
     "clean": "rm -rf .expo node_modules",

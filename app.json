@@ -94,7 +94,18 @@
         }
       ],
       "@bacons/apple-targets",
-      "./plugins/withScriptSandboxDisabled"
+      "./plugins/withScriptSandboxDisabled",
+      [
+        "expo-splash-screen",
+        {
+          "android": {
+            "backgroundColor": "#000000",
+            "image": "./assets/images/splash/blank.png",
+            "imageWidth": 1
+          }
+        }
+      ],
+      "./plugins/withAndroidReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true

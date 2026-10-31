@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, FiraCode_400Regular, FiraCode_700Bold } from '@expo-google-fonts/fira-code';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from '~/lib/auth-provider';
 import { ToastProvider } from '~/lib/toast-provider';
 import { ActivityWrapper } from '~/lib/ActivityWrapper';
@@ -14,6 +14,7 @@ import { SoftPostProvider } from '~/lib/userbase/soft-post-context';
 import { UploadProvider } from '~/lib/upload/upload-provider';
 import { useSpotWidgetSync } from '~/lib/hooks/useSpotWidgetSync';
 import { theme } from '~/lib/theme';
+import { AnimatedSplash } from '~/components/AnimatedSplash';
 
 const styles = StyleSheet.create({
   container: {
@@ -94,18 +95,36 @@ export default function RootLayout() {
     'FiraCode-Bold': FiraCode_700Bold,
   });
 
+  // Android opens on a plain black native splash, then AnimatedSplash builds
+  // the logo. The app mounts only once the logo is built (mounting it earlier
+  // stalled the animation), and the overlay dives away once the app has had
+  // a moment to render. iOS keeps its native logo splash for now.
+  const isAndroid = Platform.OS === 'android';
+  const [showIntro, setShowIntro] = useState(isAndroid);
+  const [appMountAllowed, setAppMountAllowed] = useState(!isAndroid);
+  const [appReady, setAppReady] = useState(false);
+  const appMounted = fontsLoaded && appMountAllowed;
+
   useEffect(() => {
-    if (fontsLoaded) {
+    // On Android the intro hides the native splash on its first frame.
+    if (fontsLoaded && !isAndroid) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, isAndroid]);
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    if (!appMounted) return;
+    const t = setTimeout(() => setAppReady(true), 250);
+    return () => clearTimeout(t);
+  }, [appMounted]);
+
+  if (!fontsLoaded && !showIntro) {
     return null;
   }
 
   return (
     <GestureHandlerRootView style={styles.container}>
+    {appMounted && (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NavigationGuard>
@@ -223,6 +242,15 @@ export default function RootLayout() {
         </NavigationGuard>
       </AuthProvider>
     </QueryClientProvider>
+    )}
+    {showIntro && (
+      <AnimatedSplash
+        onReady={() => SplashScreen.hideAsync()}
+        onAppMount={() => setAppMountAllowed(true)}
+        appReady={appReady}
+        onDone={() => setShowIntro(false)}
+      />
+    )}
     </GestureHandlerRootView>
   );
 }
