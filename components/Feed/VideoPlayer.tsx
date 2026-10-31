@@ -65,6 +65,9 @@ export const VideoPlayer = React.memo(
     }, [playing, player]);
 
     useEffect(() => {
+      // A paused player stays mounted (e.g. a grid tile scrolled away), so it
+      // keeps only a small buffer on Android while it waits.
+      setAndroidBuffer(player, playing ? "active" : "neighbor");
       try {
         if (playing) {
           player.play();

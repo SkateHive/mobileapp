@@ -13,9 +13,13 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import MapView, { PROVIDER_DEFAULT, Marker, type Region } from "react-native-maps";
-import { NATIVE_MAP_AVAILABLE } from "~/lib/spotmap/map-availability";
-import { MapUnavailable } from "~/components/spotmap/MapUnavailable";
+import { getCurrentPosition } from "~/lib/spotmap/current-position";
+import type { Region } from "react-native-maps";
+import {
+  SpotMapView as MapView,
+  SpotMapMarker as Marker,
+  PROVIDER_DEFAULT,
+} from "~/components/spotmap/SpotMapView";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { Text } from "~/components/ui/text";
@@ -113,13 +117,14 @@ export default function SpotCreateScreen() {
         // "Finding your location…". On timeout, fall back to the last known fix,
         // and failing that, let the user place the pin manually on the map.
         const fresh = await Promise.race([
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-          new Promise<Location.LocationObject | null>((resolve) =>
+          getCurrentPosition().catch(() => null),
+          new Promise<null>((resolve) =>
             setTimeout(() => resolve(null), 10000)
           ),
         ]);
         if (cancelled) return;
-        const pos = fresh ?? (await Location.getLastKnownPositionAsync());
+        const pos =
+          fresh ?? (await Location.getLastKnownPositionAsync().catch(() => null));
         if (cancelled) return;
         if (pos) {
           const lat = pos.coords.latitude;
@@ -415,9 +420,6 @@ export default function SpotCreateScreen() {
               <ActivityIndicator color={theme.colors.primary} />
               <Text style={styles.hint}>{t("map.create.location.finding")}</Text>
             </View>
-          ) : !NATIVE_MAP_AVAILABLE ? (
-            // No map to pick on; the GPS fix above still fills the coordinates.
-            <MapUnavailable />
           ) : (
             <MapView
               ref={mapRef}

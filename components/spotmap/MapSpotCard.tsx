@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet, Platform } from "react-native";
+import { spotImageUri } from "~/lib/spotmap/images";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -30,7 +31,10 @@ function MapSpotCardImpl({
 }: MapSpotCardProps) {
   const [imgErrored, setImgErrored] = React.useState(false);
   const hive = isHiveSpot(spot);
-  const showImage = !!spot.thumbnail && !imgErrored;
+  // Bounded or small image only on Android: the original upload is often a
+  // multi-MB PNG, and a list of those ran it out of memory.
+  const thumbUri = spotImageUri(spot, Platform.OS !== "android");
+  const showImage = !!thumbUri && !imgErrored;
 
   return (
     <Pressable
@@ -47,7 +51,7 @@ function MapSpotCardImpl({
       <View style={styles.thumbWrap}>
         {showImage ? (
           <Image
-            source={{ uri: spot.thumbnail! }}
+            source={{ uri: thumbUri! }}
             style={styles.thumb}
             contentFit="cover"
             transition={150}

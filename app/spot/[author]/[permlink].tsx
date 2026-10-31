@@ -8,12 +8,16 @@ import {
   Linking,
   ActivityIndicator,
   useWindowDimensions,
+  Platform,
 } from "react-native";
+import { galleryUris, spotImageUri } from "~/lib/spotmap/images";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
-import { NATIVE_MAP_AVAILABLE } from "~/lib/spotmap/map-availability";
-import { MapUnavailable } from "~/components/spotmap/MapUnavailable";
+import {
+  SpotMapView as MapView,
+  SpotMapMarker as Marker,
+  PROVIDER_DEFAULT,
+} from "~/components/spotmap/SpotMapView";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
@@ -133,8 +137,13 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
     if (isKml && spot.kml_description) {
       parseKmlDescription(spot.kml_description).images.forEach((u) => urls.push(u));
     }
-    if (!urls.length && spot.thumbnail) urls.push(spot.thumbnail);
-    return Array.from(new Set(urls));
+    const allowOriginal = Platform.OS !== "android";
+    if (!urls.length) {
+      const fallback = spotImageUri(spot, allowOriginal);
+      if (fallback) urls.push(fallback);
+    }
+    // Android: never a raw original (Google My Maps PNGs run to 5.7 MB).
+    return galleryUris(Array.from(new Set(urls)), spot, allowOriginal);
   }, [spot, isKml]);
 
   const aboutText = React.useMemo(() => {
@@ -236,9 +245,6 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t("map.detail.location")}</Text>
         <View style={styles.miniMapWrap}>
-          {!NATIVE_MAP_AVAILABLE ? (
-            <MapUnavailable />
-          ) : (
           <MapView
             provider={PROVIDER_DEFAULT}
             style={styles.miniMap}
@@ -257,7 +263,6 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
               </View>
             </Marker>
           </MapView>
-          )}
         </View>
         <Text style={styles.coords}>
           {spot.lat.toFixed(5)}, {spot.lng.toFixed(5)}
