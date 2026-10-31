@@ -262,6 +262,7 @@ const VideoItem = React.memo(function VideoItem({
 
 export default function VideosScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const screenHeight = SCREEN_HEIGHT;
   const router = useRouter();
   const { session, username } = useAuth();
   const { showToast } = useToast();
@@ -288,8 +289,13 @@ export default function VideosScreen() {
   // Latest per-item state, readable from callbacks that must not change
   // identity: handleVote and renderItem read these instead of closing over
   // the maps, so a vote doesn't hand every mounted item a new render function.
-  const itemStateRef = useRef({ currentIndex, likedStates, votingStates, voteCountStates });
-  itemStateRef.current = { currentIndex, likedStates, votingStates, voteCountStates };
+  // Leaving the tab releases every clip's player: the tab stays mounted (the
+  // `unmountOnBlur` option is gone in React Navigation 7), and on Android the
+  // idle players' buffers filled the 256 MB Java heap later in the feed and
+  // profile. Same-height placeholders keep the list's scroll position.
+  const screenFocused = useIsFocused();
+  const itemStateRef = useRef({ currentIndex, likedStates, votingStates, voteCountStates, screenFocused });
+  itemStateRef.current = { currentIndex, likedStates, votingStates, voteCountStates, screenFocused };
 
   // Init liked/vote states when data arrives. This feed is prefetched at login
   // and cached for a minute, so on its own it happily shows an empty heart for
@@ -383,8 +389,9 @@ export default function VideosScreen() {
   // VideoItem is memoized on the scalars it gets, so only the items whose
   // active/neighbour status or vote state actually changed re-render.
   const renderItem = useCallback(({ item, index }: { item: VideoPost; index: number }) => {
-    const { currentIndex, likedStates, votingStates, voteCountStates } = itemStateRef.current;
+    const { currentIndex, likedStates, votingStates, voteCountStates, screenFocused } = itemStateRef.current;
     const key = `${item.author}-${item.permlink}`;
+    if (!screenFocused) return <View style={{ height: screenHeight }} />;
     return (
       <VideoItem
         item={item}
@@ -399,11 +406,11 @@ export default function VideosScreen() {
         voteCount={voteCountStates[key] ?? item.votes}
       />
     );
-  }, [username, handleVote, handleComment, handleShare]);
+  }, [username, handleVote, handleComment, handleShare, screenHeight]);
 
   const extraData = useMemo(
-    () => ({ currentIndex, likedStates, votingStates, voteCountStates }),
-    [currentIndex, likedStates, votingStates, voteCountStates]
+    () => ({ currentIndex, likedStates, votingStates, voteCountStates, screenFocused }),
+    [currentIndex, likedStates, votingStates, voteCountStates, screenFocused]
   );
 
   if (isLoading) {

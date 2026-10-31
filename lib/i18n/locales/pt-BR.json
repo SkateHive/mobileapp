@@ -446,7 +446,7 @@
   "map.near_me.permission_denied": "Ative a localização em Ajustes → Privacidade e Segurança → Serviços de Localização → Skatehive",
   "map.near_me.permission_denied_android": "Ative a localização em Configurações → Apps → Skatehive → Permissões",
   "map.unavailable.title": "Mapa indisponível",
-  "map.unavailable.body": "O mapa ainda não carrega neste aparelho. Os picos vão aparecer aqui numa próxima atualização.",
+  "map.unavailable.body": "Não deu para carregar o mapa. Confira sua conexão e abra esta tela de novo.",
   "map.relative.days": "há {{n}} d",
   "map.relative.hours": "há {{n}} h",
   "map.relative.minutes": "há {{n}} min",

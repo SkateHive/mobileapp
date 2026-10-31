@@ -446,7 +446,7 @@
   "map.near_me.permission_denied": "Enable location in Settings → Privacy → Location Services → Skatehive",
   "map.near_me.permission_denied_android": "Enable location in Settings → Apps → Skatehive → Permissions",
   "map.unavailable.title": "Map unavailable",
-  "map.unavailable.body": "The map can't load on this device yet. Spots will show up here in a future update.",
+  "map.unavailable.body": "The map couldn't load. Check your connection and open this screen again.",
   "map.relative.days": "{{n}}d ago",
   "map.relative.hours": "{{n}}h ago",
   "map.relative.minutes": "{{n}}m ago",

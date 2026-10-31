@@ -4,7 +4,7 @@ import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { t } from "~/lib/i18n";
 
-/** Shown in place of a map when the device can't draw one (see map-availability). */
+/** Shown in place of a map that failed to load (see SpotMapView.android). */
 export function MapUnavailable() {
   return (
     <View style={styles.container}>

@@ -6,9 +6,11 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
-import MapView, { PROVIDER_DEFAULT, type Region as RNRegion } from "react-native-maps";
-import { NATIVE_MAP_AVAILABLE } from "~/lib/spotmap/map-availability";
-import { MapUnavailable } from "~/components/spotmap/MapUnavailable";
+import type { Region as RNRegion } from "react-native-maps";
+import {
+  SpotMapView as MapView,
+  PROVIDER_DEFAULT,
+} from "~/components/spotmap/SpotMapView";
 import BottomSheet, {
   BottomSheetFlatList,
   type BottomSheetFlatListMethods,
@@ -37,6 +39,7 @@ import {
   type Region,
 } from "~/lib/spotmap/geo";
 import { spotHref, type SpotmapRow } from "~/lib/spotmap/types";
+import { getCurrentPosition } from "~/lib/spotmap/current-position";
 import { syncSpotWidget } from "~/lib/widgets/spotWidget";
 import { persistUserLoc, loadPersistedUserLoc } from "~/lib/hooks/useSpotWidgetSync";
 
@@ -233,9 +236,7 @@ export default function MapScreen() {
         );
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const pos = await getCurrentPosition();
       const { latitude, longitude } = pos.coords;
       const loc = { lat: latitude, lng: longitude };
       setUserLoc(loc);
@@ -274,9 +275,7 @@ export default function MapScreen() {
           status = (await Location.requestForegroundPermissionsAsync()).status;
         }
         if (status !== Location.PermissionStatus.GRANTED) return;
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const pos = await getCurrentPosition();
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLoc(loc);
         persistUserLoc(loc);
@@ -295,9 +294,6 @@ export default function MapScreen() {
   );
 
   const total = spots?.length ?? 0;
-
-  // A module constant, so this never changes the hook order between renders.
-  if (!NATIVE_MAP_AVAILABLE) return <MapUnavailable />;
 
   return (
     <View style={styles.container}>

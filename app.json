@@ -50,14 +50,19 @@
     "android": {
       "icon": "./assets/images/icon-android.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon-android.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/adaptive-icon-round.png",
+        "backgroundColor": "#090409"
       },
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.READ_MEDIA_AUDIO"
       ],
       "package": "com.skatehive.app",
       "versionCode": 2
@@ -94,7 +99,18 @@
         }
       ],
       "@bacons/apple-targets",
-      "./plugins/withScriptSandboxDisabled"
+      "./plugins/withScriptSandboxDisabled",
+      [
+        "expo-splash-screen",
+        {
+          "android": {
+            "backgroundColor": "#000000",
+            "image": "./assets/images/splash/blank.png",
+            "imageWidth": 1
+          }
+        }
+      ],
+      "./plugins/withAndroidReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true

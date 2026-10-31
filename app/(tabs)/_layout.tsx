@@ -170,6 +170,9 @@ export default function TabLayout() {
                 }
                 options={{
                   title: tab.title,
+                  // The tab bar hides its labels; without this a screen
+                  // reader announced every tab as just "button".
+                  tabBarAccessibilityLabel: tab.title,
                   tabBarIcon: ({ color, focused }) =>
                     tab.isCenter ? (
                       <View style={styles.centerButtonContainer}>
@@ -186,10 +189,8 @@ export default function TabLayout() {
                         iconFamily={tab.iconFamily}
                       />
                     ),
-                  // Unmount videos tab when switching away to free native video player memory
-                  ...(tab.name === "videos" && {
-                    unmountOnBlur: true,
-                  }),
+                  // The Videos tab frees its players on blur itself (videos.tsx):
+                  // React Navigation 7 dropped the unmountOnBlur option.
                   ...(tab.name === "profile" && {
                     href: {
                       pathname: "/(tabs)/profile",
