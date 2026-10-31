@@ -39,6 +39,7 @@ import {
   type Region,
 } from "~/lib/spotmap/geo";
 import { spotHref, type SpotmapRow } from "~/lib/spotmap/types";
+import { getCurrentPosition } from "~/lib/spotmap/current-position";
 import { syncSpotWidget } from "~/lib/widgets/spotWidget";
 import { persistUserLoc, loadPersistedUserLoc } from "~/lib/hooks/useSpotWidgetSync";
 
@@ -235,9 +236,7 @@ export default function MapScreen() {
         );
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const pos = await getCurrentPosition();
       const { latitude, longitude } = pos.coords;
       const loc = { lat: latitude, lng: longitude };
       setUserLoc(loc);
@@ -276,9 +275,7 @@ export default function MapScreen() {
           status = (await Location.requestForegroundPermissionsAsync()).status;
         }
         if (status !== Location.PermissionStatus.GRANTED) return;
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const pos = await getCurrentPosition();
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLoc(loc);
         persistUserLoc(loc);

@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.skatehive'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.playservices"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // Already in the app through react-native-maps; Gradle picks one version.
+  implementation "com.google.android.gms:play-services-base:18.2.0"
+}

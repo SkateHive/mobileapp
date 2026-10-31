@@ -35,7 +35,7 @@ DerivedData/
 ios/.xcode.env.local
 
 # Android
-android/
+/android/
 *.apk
 *.aab
 *.ap_
