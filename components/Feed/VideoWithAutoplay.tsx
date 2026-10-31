@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Pressable, StyleSheet, ViewStyle, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Pressable, StyleSheet, ViewStyle, ActivityIndicator, Dimensions } from 'react-native';
+import { SizedImage } from '../ui/SizedImage';
+
+// Posters are drawn about as wide as the screen.
+const SCREEN_WIDTH = Dimensions.get('window').width;
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
@@ -94,8 +97,9 @@ export function VideoWithAutoplay({
         {/* Thumbnail overlay until video plays */}
         {!isPlaying && thumbnailUrl && (
           <View style={styles.posterOverlay}>
-            <Image
-              source={{ uri: thumbnailUrl }}
+            <SizedImage
+              uri={thumbnailUrl}
+              width={SCREEN_WIDTH}
               style={styles.posterImage}
               contentFit="cover"
               transition={0}

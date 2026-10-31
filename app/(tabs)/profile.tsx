@@ -43,6 +43,7 @@ import { canPost } from "~/lib/posting";
 import * as Haptics from "expo-haptics";
 import { extractMediaFromBody, filterDeletedPosts, formatPayout, metadataImageUrl } from "~/lib/utils";
 import { Image } from "expo-image";
+import { SizedImage } from "~/components/ui/SizedImage";
 import { GridVideoTile, createTileVisibility } from "~/components/Profile/GridVideoTile";
 import { ProfileHeader } from "~/components/Profile/ProfileHeader";
 import { setViewerPayload, updateViewerPosts } from "~/lib/viewer-store";
@@ -394,8 +395,9 @@ export default function ProfileScreen() {
         onPress={() => openViewerAt(index)}
       >
         {thumb ? (
-          <Image
-            source={{ uri: thumb }}
+          <SizedImage
+            uri={thumb}
+            width={tileSize}
             style={styles.gridImage}
             contentFit="cover"
             recyclingKey={item.permlink}

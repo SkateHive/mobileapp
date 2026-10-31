@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, View, FlatList, Dimensions, StyleSheet, Platform } from 'react-native';
 import { Image } from 'expo-image';
+import { SizedImage } from '../ui/SizedImage';
 import { Text } from '../ui/text';
 import { VideoPlayer } from './VideoPlayer';
 import { VideoWithAutoplay } from './VideoWithAutoplay';
@@ -55,8 +56,9 @@ function ImageCarousel({
         }
         renderItem={({ item, index: i }) => (
           <Pressable onPress={() => onPress(item)} style={{ width, height }}>
-            <Image
-              source={{ uri: item.url }}
+            <SizedImage
+              uri={item.url}
+              width={width}
               style={styles.fullSize}
               contentFit="cover"
               onLoad={
@@ -160,7 +162,7 @@ export function MediaPreview({
               // a player; many idle players filled the 256 MB Java heap.
               <View style={[styles.fullSize, styles.videoPoster]}>
                 {thumbnailUrl ? (
-                  <Image source={{ uri: thumbnailUrl }} style={styles.fullSize} contentFit="cover" />
+                  <SizedImage uri={thumbnailUrl} width={getContainerWidth()} style={styles.fullSize} contentFit="cover" />
                 ) : null}
               </View>
             ) : item.type === 'video' ? (
@@ -182,8 +184,9 @@ export function MediaPreview({
             style={[styles.mediaContainer, styles.singleMedia, { height: getImageHeight(0) }]}
           >
             <Pressable onPress={() => onMediaPress(images[0])} style={styles.fullSize}>
-              <Image
-                source={{ uri: images[0].url }}
+              <SizedImage
+                uri={images[0].url}
+                width={getContainerWidth()}
                 style={styles.fullSize}
                 contentFit="cover"
                 onLoad={(e) => {
