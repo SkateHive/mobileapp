@@ -16,6 +16,7 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { Image } from "expo-image";
+import { SizedImage } from "~/components/ui/SizedImage";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -189,8 +190,9 @@ const VideoItem = React.memo(function VideoItem({
 
       {/* Thumbnail poster — covers video until it plays */}
       {!isPlaying && item.thumbnailUrl && (
-        <Image
-          source={{ uri: item.thumbnailUrl }}
+        <SizedImage
+          uri={item.thumbnailUrl}
+          width={SCREEN_WIDTH}
           style={styles.thumbnail}
           contentFit="cover"
           transition={0}

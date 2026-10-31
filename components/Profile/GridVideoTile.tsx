@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
+import { SizedImage } from '../ui/SizedImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { VideoPlayer } from '~/components/Feed/VideoPlayer';
@@ -132,8 +132,9 @@ export const GridVideoTile = React.memo(
               onPlaybackStarted={onPlaybackStarted}
             />
             {!hasFrames && poster ? (
-              <Image
-                source={{ uri: poster }}
+              <SizedImage
+                uri={poster}
+                width={size}
                 style={styles.posterOverlay}
                 contentFit="cover"
                 recyclingKey={permlink}
@@ -142,8 +143,9 @@ export const GridVideoTile = React.memo(
             ) : null}
           </>
         ) : poster ? (
-          <Image
-            source={{ uri: poster }}
+          <SizedImage
+            uri={poster}
+            width={size}
             style={styles.poster}
             contentFit="cover"
             recyclingKey={permlink}

@@ -15,6 +15,7 @@ import {
   type ViewToken,
 } from "react-native";
 import { Image } from "expo-image";
+import { SizedImage } from "~/components/ui/SizedImage";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -257,7 +258,7 @@ function ImmersivePostItem({
           {/* Matches the video's fit, so there's no jump from a letterboxed
               poster to full-bleed video. */}
           {poster && (!isActive || !hasFrames) && (
-            <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} />
+            <SizedImage uri={poster} width={width} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} />
           )}
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -283,8 +284,9 @@ function ImmersivePostItem({
           }
           renderItem={({ item: uri }) => (
             <Pressable onPress={handleTap} style={[styles.center, { width, height }]}>
-              <Image
-                source={{ uri }}
+              <SizedImage
+                uri={uri}
+                width={width}
                 style={{ width, height }}
                 contentFit="contain"
                 transition={0}
