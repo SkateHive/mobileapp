@@ -50,8 +50,8 @@
     "android": {
       "icon": "./assets/images/icon-android.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon-android.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/adaptive-icon-round.png",
+        "backgroundColor": "#090409"
       },
       "permissions": [
         "android.permission.CAMERA",

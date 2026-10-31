@@ -30,7 +30,10 @@ function MapSpotCardImpl({
 }: MapSpotCardProps) {
   const [imgErrored, setImgErrored] = React.useState(false);
   const hive = isHiveSpot(spot);
-  const showImage = !!spot.thumbnail && !imgErrored;
+  // The small variant is ~20 KB; `thumbnail` is the original upload, often a
+  // multi-MB PNG, and a list of those ran Android out of memory.
+  const thumbUri = spot.thumbnail_small ?? spot.thumbnail;
+  const showImage = !!thumbUri && !imgErrored;
 
   return (
     <Pressable
@@ -47,7 +50,7 @@ function MapSpotCardImpl({
       <View style={styles.thumbWrap}>
         {showImage ? (
           <Image
-            source={{ uri: spot.thumbnail! }}
+            source={{ uri: thumbUri! }}
             style={styles.thumb}
             contentFit="cover"
             transition={150}

@@ -11,9 +11,11 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
-import { NATIVE_MAP_AVAILABLE } from "~/lib/spotmap/map-availability";
-import { MapUnavailable } from "~/components/spotmap/MapUnavailable";
+import {
+  SpotMapView as MapView,
+  SpotMapMarker as Marker,
+  PROVIDER_DEFAULT,
+} from "~/components/spotmap/SpotMapView";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
@@ -236,9 +238,6 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t("map.detail.location")}</Text>
         <View style={styles.miniMapWrap}>
-          {!NATIVE_MAP_AVAILABLE ? (
-            <MapUnavailable />
-          ) : (
           <MapView
             provider={PROVIDER_DEFAULT}
             style={styles.miniMap}
@@ -257,7 +256,6 @@ function SpotPage({ spot: row, width }: { spot: SpotmapRow; width: number }) {
               </View>
             </Marker>
           </MapView>
-          )}
         </View>
         <Text style={styles.coords}>
           {spot.lat.toFixed(5)}, {spot.lng.toFixed(5)}
