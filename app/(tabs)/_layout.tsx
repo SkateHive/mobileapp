@@ -170,6 +170,9 @@ export default function TabLayout() {
                 }
                 options={{
                   title: tab.title,
+                  // The tab bar hides its labels; without this a screen
+                  // reader announced every tab as just "button".
+                  tabBarAccessibilityLabel: tab.title,
                   tabBarIcon: ({ color, focused }) =>
                     tab.isCenter ? (
                       <View style={styles.centerButtonContainer}>

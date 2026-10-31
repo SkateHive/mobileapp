@@ -31,6 +31,7 @@ import {
   type LastEmailAccount,
 } from "~/lib/userbase/session-store";
 import { theme } from "~/lib/theme";
+import { useTabBarBottomInset } from "~/lib/use-tab-bar-inset";
 import type { StoredUser } from "~/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,6 +55,8 @@ export default function Index() {
   } = useAuth();
   const queryClient = useQueryClient();
   const isFocused = useIsFocused();
+  // Keeps the bottom links clear of Android's navigation bar (0 on iOS).
+  const bottomInset = useTabBarBottomInset();
 
   // Spectators are technically "authenticated" but can't post and must still be
   // able to reach this screen (e.g. tapping "Log in to add a spot" on the map).
@@ -213,7 +216,10 @@ export default function Index() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: styles.scrollContent.paddingBottom + bottomInset },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
