@@ -269,11 +269,13 @@ export default function VideosScreen() {
   const {
     data: videos,
     isLoading,
+    isError,
     refetch,
     isRefetching,
     fetchNextPage,
     hasNextPage,
     isFetching,
+    isFetchNextPageError,
   } = useVideoFeed();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votingStates, setVotingStates] = useState<Record<string, boolean>>({});
@@ -487,8 +489,39 @@ export default function VideosScreen() {
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Ionicons name="videocam-off-outline" size={64} color={theme.colors.gray} />
-          <Text style={styles.emptyText}>{t("feed.videos.empty")}</Text>
+          <Ionicons
+            name={isError ? "cloud-offline-outline" : "videocam-off-outline"}
+            size={64}
+            color={theme.colors.gray}
+          />
+          {/* A load that failed is not an empty feed: say so and offer a retry. */}
+          <Text style={styles.emptyText}>
+            {isError ? t("feed.videos.load_failed") : t("feed.videos.empty")}
+          </Text>
+          {isError && (
+            <Pressable
+              style={styles.retryButton}
+              onPress={() => refetch()}
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryText}>{t("common.try_again")}</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* The next page failed: say so near the end of the list and offer a
+          retry right there; the clips already loaded stay. */}
+      {isFetchNextPageError && videos.length > 0 && currentIndex >= videos.length - 2 && (
+        <View style={styles.moreFailed} pointerEvents="box-none">
+          <Text style={styles.moreFailedText}>{t("feed.videos.more_failed")}</Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => fetchNextPage()}
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryText}>{t("common.try_again")}</Text>
+          </Pressable>
         </View>
       )}
 
@@ -586,5 +619,29 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
-  emptyText: { color: theme.colors.gray, fontSize: 16 },
+  emptyText: { color: theme.colors.gray, fontSize: 16, textAlign: "center", paddingHorizontal: 24 },
+  retryButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { color: theme.colors.primary, fontFamily: theme.fonts.bold },
+  moreFailed: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: theme.colors.secondaryCard,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  moreFailedText: { flex: 1, color: theme.colors.muted, fontSize: 14 },
 });

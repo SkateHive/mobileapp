@@ -1,6 +1,24 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { t } from '~/lib/i18n';
 import { describeError, failWith } from './upload-runner';
+import {
+  canFailOver,
+  createProgressTracker,
+  createStallWatchdog,
+  fetchWithTimeout,
+  nextReachable,
+} from './net';
+import { followEventStream } from './sse';
+
+// The status lookup only picks a server; past this, use the built-in list.
+const STATUS_TIMEOUT_MS = 5_000;
+// Each candidate's /healthz must answer within this before it gets the video.
+const PROBE_TIMEOUT_MS = 4_000;
+// Transcoding a clip can take minutes. Once the progress stream has shown real
+// movement, an upload whose progress then stops for this long is cut; before
+// that, only the hard cap applies (see createStallWatchdog).
+const UPLOAD_STALL_MS = 120_000;
+const UPLOAD_MAX_MS = 20 * 60_000;
 
 interface VideoUploadResult {
   cid: string;
@@ -82,7 +100,7 @@ async function getTranscodeServices(): Promise<TranscodeService[]> {
   const STATUS_API_URL = 'https://api.skatehive.app/api/transcode/status';
 
   try {
-    const response = await fetch(STATUS_API_URL);
+    const response = await fetchWithTimeout(STATUS_API_URL, {}, STATUS_TIMEOUT_MS);
 
     if (!response.ok) {
       throw new Error(`Status API request failed: ${response.status}`);
@@ -124,8 +142,26 @@ export async function uploadVideoToWorker(
 
     const services = await getTranscodeServices();
     const errors: string[] = [];
+    // Ask a server's health endpoint (GET, no body) before sending it the
+    // video: an unreachable server is skipped without any risk of a duplicate
+    // job, and a server that is down no longer stops the whole upload.
+    const isReachable = async (service: TranscodeService) => {
+      try {
+        const response = await fetchWithTimeout(service.healthUrl, {}, PROBE_TIMEOUT_MS);
+        if (response.ok) return true;
+      } catch {
+        // unreachable
+      }
+      errors.push(t('upload.error.service_fallback', { service: service.name }));
+      return false;
+    };
 
-    for (const service of services) {
+    for (
+      let index = await nextReachable(services, 0, isReachable);
+      index >= 0;
+      index = await nextReachable(services, index + 1, isReachable)
+    ) {
+      const service = services[index];
       const workerApiUrl = service.transcodeUrl;
       const baseUrl = workerApiUrl.replace(/\/transcode$/, '');
       const correlationId = `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
@@ -153,43 +189,40 @@ export async function uploadVideoToWorker(
         formData.append('thumbnail', options.thumbnailUrl);
       }
 
-      let pollInterval: ReturnType<typeof setInterval> | null = null;
-      // clearInterval stops future ticks but can't cancel a poll already in
-      // flight. Without this guard a late response lands after the caller has
-      // reset its UI and re-writes a stale stage — leaving "Done!" on screen.
+      const watchdog = createStallWatchdog(UPLOAD_STALL_MS, UPLOAD_MAX_MS);
+      const progress = createProgressTracker();
+      let failedStatus: number | undefined;
+      // A progress event can still arrive after the upload settled (the stream
+      // is closed asynchronously); without this guard it would re-write a stale
+      // stage over the caller's reset UI.
       let settled = false;
+      let closeProgress: (() => void) | null = null;
       if (options.onProgress) {
         options.onProgress(5, 'receiving');
-        pollInterval = setInterval(async () => {
+        closeProgress = followEventStream(`${baseUrl}/progress/${correlationId}`, (raw) => {
+          if (settled) return;
+          let data: { progress?: unknown; stage?: unknown };
           try {
-            const resp = await fetch(`${baseUrl}/progress/${correlationId}`, {
-              headers: { 'Accept': 'text/event-stream' },
-            });
-            if (!resp.ok || settled) return;
-            const text = await resp.text();
-            const lines = text.split('\n').filter(l => l.startsWith('data:'));
-            if (lines.length > 0) {
-              const lastLine = lines[lines.length - 1];
-              const data = JSON.parse(lastLine.replace('data: ', ''));
-              // Re-checked here and not only above: reading the body is a second
-              // await, and the upload can settle while it's pending.
-              if (!settled && data.progress !== undefined) {
-                options.onProgress?.(data.progress, data.stage || 'processing');
-              }
-            }
+            data = JSON.parse(raw);
           } catch {
-            // Polling errors are non-fatal
+            return;
           }
-        }, 1500);
+          if (data.progress === undefined) return;
+          const next = { progress: Number(data.progress), stage: String(data.stage || 'processing') };
+          if (progress.advance(next)) watchdog.kick();
+          options.onProgress?.(next.progress, next.stage);
+        });
       }
 
       try {
         const uploadResponse = await fetch(workerApiUrl, {
           method: 'POST',
           body: formData,
+          signal: watchdog.signal,
         });
 
         if (!uploadResponse.ok) {
+          failedStatus = uploadResponse.status;
           const errorText = await uploadResponse.text();
           throw failWith('service_failed', { service: service.name, status: uploadResponse.status, detail: errorText });
         }
@@ -215,10 +248,17 @@ export async function uploadVideoToWorker(
               : undefined,
         };
       } catch (error) {
+        // Unless this server refused the video outright, it may still be
+        // transcoding it (see canFailOver): stop rather than send it to the
+        // next server and transcode it twice.
+        if (!canFailOver({ status: failedStatus, watchdogFired: watchdog.reason !== null })) {
+          throw failWith('video_unconfirmed', { service: service.name });
+        }
         errors.push(error instanceof Error ? describeError(error, t) : t('upload.error.service_fallback', { service: service.name }));
       } finally {
         settled = true;
-        if (pollInterval) clearInterval(pollInterval);
+        watchdog.dispose();
+        closeProgress?.();
       }
     }
 

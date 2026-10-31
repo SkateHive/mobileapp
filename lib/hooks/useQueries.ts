@@ -4,7 +4,9 @@ import {
   getFeed,
   getBalance,
   getRewards,
-  getVideoFeed } from '../api';
+  getVideoFeed,
+  fetchFeedPage,
+  FEED_TIMEOUT_MS } from '../api';
 import { API_BASE_URL, LEADERBOARD_API_URL, HIVE_AVATAR_URL } from '../constants';
 import { extractMediaFromBody, filterDeletedPosts } from '../utils';
 import { filterModeratedPosts } from '../moderation';
@@ -81,9 +83,25 @@ interface VideoFeedPage {
   nextPage?: number;
 }
 
-async function fetchVideoFeedPage(page: number): Promise<VideoFeedPage> {
+// One page of the Videos tab gets this much time in total, /videos plus the
+// general-feed fallback, and the query adds no retries of its own (retry: 0):
+// before, React Query's default 2 retries multiplied 20 s + 20 s into ~2 min
+// before the error showed. The user retries with the Try Again buttons.
+export const VIDEO_PAGE_DEADLINE_MS = 35_000;
+// Not worth starting the fallback with less time than this left.
+const MIN_FALLBACK_MS = 5_000;
+
+export interface VideoFeedDeps {
+  getVideoFeed: typeof getVideoFeed;
+  fetchFeedPage: typeof fetchFeedPage;
+  now: () => number;
+}
+const realDeps: VideoFeedDeps = { getVideoFeed, fetchFeedPage, now: () => Date.now() };
+
+export async function fetchVideoFeedPage(page: number, deps: VideoFeedDeps = realDeps): Promise<VideoFeedPage> {
+  const startedAt = deps.now();
   // Try the dedicated /videos endpoint first
-  const result = await getVideoFeed(page, VIDEO_PAGE_SIZE);
+  const result = await deps.getVideoFeed(page, VIDEO_PAGE_SIZE);
   if (result) {
     const mapped = result.data.map((entry: any) => ({
       ...entry,
@@ -97,12 +115,15 @@ async function fetchVideoFeedPage(page: number): Promise<VideoFeedPage> {
   }
 
   // A later page failing (getVideoFeed gives up with null) must not look like
-  // the end of the feed: throw, so the query retries and onEndReached can ask
-  // again once the network is back.
+  // the end of the feed: throw, so the list shows a retry for the next page.
   if (page > 1) throw new Error(`Video feed page ${page} failed to load`);
 
-  // Fallback: use general feed + client-side extraction
-  const posts = await getFeed(1, 50);
+  // Fallback: the general feed + client-side extraction, within what is left
+  // of the page's deadline. fetchFeedPage throws when it fails too, so a double
+  // failure shows as an error with a retry, never as an empty "no videos" feed.
+  const left = VIDEO_PAGE_DEADLINE_MS - (deps.now() - startedAt);
+  if (left < MIN_FALLBACK_MS) throw new Error("Video feed failed to load");
+  const posts = await deps.fetchFeedPage(1, 50, Math.min(FEED_TIMEOUT_MS, left));
   return {
     videos: filterModeratedPosts(
       filterDeletedPosts(extractVideosFromFeed(filterDeletedPosts(posts)))
@@ -110,12 +131,17 @@ async function fetchVideoFeedPage(page: number): Promise<VideoFeedPage> {
   };
 }
 
-const videoFeedOptions = infiniteQueryOptions({
+export const videoFeedOptions = infiniteQueryOptions({
   queryKey: VIDEO_FEED_QUERY_KEY,
   queryFn: ({ pageParam }) => fetchVideoFeedPage(pageParam),
   initialPageParam: 1,
   getNextPageParam: (last: VideoFeedPage) => last.nextPage,
   staleTime: VIDEO_FEED_STALE_TIME,
+  // See VIDEO_PAGE_DEADLINE_MS: one bounded attempt per request. The login
+  // prefetch uses these options too, and a prefetch that failed is not
+  // silently retried when the tab mounts: the tab shows Try Again instead.
+  retry: 0,
+  retryOnMount: false,
 });
 
 // New posts arriving between two page loads shift the API's pages, so the
@@ -161,8 +187,14 @@ export function prefetchVideoFeed(queryClient: QueryClient) {
 export async function warmUpVideoAssets(queryClient: QueryClient) {
   const { Image } = require('react-native');
 
-  const feed = await queryClient.ensureInfiniteQueryData(videoFeedOptions);
-  const data = feed?.pages[0]?.videos;
+  let data: VideoPost[] | undefined;
+  try {
+    const feed = await queryClient.ensureInfiniteQueryData(videoFeedOptions);
+    data = feed?.pages[0]?.videos;
+  } catch {
+    // The feed didn't load: the Videos tab shows the error and a retry.
+    return;
+  }
 
   if (!data || data.length === 0) return;
 
