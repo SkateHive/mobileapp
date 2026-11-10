@@ -134,16 +134,20 @@ function verifyBundle(aab, expected) {
   return want;
 }
 
-/** apksigner from the newest installed build-tools (ANDROID_HOME / ANDROID_SDK_ROOT, or the macOS default). */
+/**
+ * apksigner from the newest installed build-tools (ANDROID_HOME / ANDROID_SDK_ROOT, or the macOS default).
+ * macOS and Linux only: on Windows the SDK ships apksigner.bat, which Node won't spawn without a shell.
+ */
 function apksignerBin() {
   const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(os.homedir(), "Library/Android/sdk");
   const bt = path.join(sdk, "build-tools");
-  const tool = process.platform === "win32" ? "apksigner.bat" : "apksigner";
+  const tool = "apksigner";
   const versions = fs.existsSync(bt)
     ? fs.readdirSync(bt)
       .filter((v) => /^\d+(\.\d+)*(-rc\d+)?$/.test(v) && fs.existsSync(path.join(bt, v, tool)))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     : [];
+  if (process.platform === "win32") throw new SigningError("The APK build runs on macOS or Linux only.");
   if (!versions.length) throw new SigningError(`No ${tool} under ${bt}: install an Android build-tools package.`);
   return path.join(bt, versions[versions.length - 1], tool);
 }
