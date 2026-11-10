@@ -63,6 +63,26 @@ version truth** (the old "bump 4 places" checklist no longer applies).
    **Product → Archive** (not Build) → Organizer → **Distribute App → App Store
    Connect → Upload**.
 
+### Releasing the Android APK (sideload, skatehive.app/download)
+Until the app is on Google Play, Android users install an APK from GitHub Releases.
+`skatehive.app/download` and `start.skatehive.app/android` point at
+`https://github.com/SkateHive/mobileapp/releases/latest/download/skatehive.apk`, so
+the asset must keep that exact name.
+
+1. Bump `expo.android.versionCode` in `app.json` (Android refuses to install a lower one
+   over a higher one) and `expo.version` if it changed.
+2. `pnpm build:android:apk` (JDK 17 + Android SDK + upload key in
+   `~/.skatehive/android-upload.properties`). It builds ARM only, verifies with
+   `apksigner` that the only signer is the upload key, and writes `dist/skatehive.apk`,
+   `dist/skatehive-<version>-<versionCode>.apk` and `dist/skatehive.apk.sha256`.
+3. `gh release create android-v<version>-<versionCode> dist/skatehive.apk dist/skatehive-*.apk dist/skatehive.apk.sha256 --latest`
+   (the newest release must be marked latest, or the download link serves the old one).
+
+**Signing key:** the APK is signed with the Play *upload* key on purpose. When setting
+up the app on Play Console, choose Play App Signing with **your own key** and upload
+this keystore, so APK installs update from Play without reinstalling. If Play generates
+its own key instead, APK users must uninstall (and log in again) to switch to Play.
+
 ### Identifiers
 - iOS App Store ID: `6751173076`
 - iOS bundle: `com.bgrana.skatehive` · widget `com.bgrana.skatehive.widget`
