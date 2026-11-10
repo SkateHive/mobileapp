@@ -10,7 +10,7 @@
     "android": "expo run:android",
     "build:android:aab": "node scripts/build-android-aab.js",
     "build:android:apk": "node scripts/build-android-apk.js",
-    "test:signing": "node --test scripts/__tests__/android-signing.test.js",
+    "test:signing": "node --test scripts/__tests__/android-signing.test.js scripts/__tests__/android-apk-signing.test.js",
     "ios": "expo run:ios",
     "web": "expo start -c --web",
     "clean": "rm -rf .expo node_modules",

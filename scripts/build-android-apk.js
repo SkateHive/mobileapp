@@ -10,7 +10,8 @@
 //
 // ARM only (arm64-v8a, armeabi-v7a): phones are ARM, and the x86 libraries would add tens of MB for emulators.
 // Before building it runs the same key checks as the bundle build; after, apksigner must verify the APK and its
-// only signer must be the upload certificate. Output: dist/skatehive-<version>.apk and dist/skatehive.apk.
+// only signer must be the upload certificate. Output: dist/skatehive-<version>-<versionCode>.apk, dist/skatehive.apk
+// and dist/skatehive.apk.sha256.
 const { execSync } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");

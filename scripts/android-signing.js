@@ -138,24 +138,26 @@ function verifyBundle(aab, expected) {
 function apksignerBin() {
   const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(os.homedir(), "Library/Android/sdk");
   const bt = path.join(sdk, "build-tools");
+  const tool = process.platform === "win32" ? "apksigner.bat" : "apksigner";
   const versions = fs.existsSync(bt)
-    ? fs.readdirSync(bt).filter((v) => fs.existsSync(path.join(bt, v, "apksigner")))
+    ? fs.readdirSync(bt)
+      .filter((v) => /^\d+(\.\d+)*(-rc\d+)?$/.test(v) && fs.existsSync(path.join(bt, v, tool)))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     : [];
-  if (!versions.length) throw new SigningError(`No apksigner under ${bt}: install an Android build-tools package.`);
-  return path.join(bt, versions[versions.length - 1], "apksigner");
+  if (!versions.length) throw new SigningError(`No ${tool} under ${bt}: install an Android build-tools package.`);
+  return path.join(bt, versions[versions.length - 1], tool);
 }
 
 /**
  * Throws unless the APK verifies (apksigner checks the v1/v2/v3 schemes Android itself checks at install)
  * AND every signer is the expected upload certificate. An APK is not a plain jar: jarsigner would only see
- * the v1 scheme, so the bundle check above does not apply here.
+ * the v1 scheme, so the bundle check above does not apply here. `apksigner` is overridable for tests.
  */
-function verifyApk(apk, expected) {
+function verifyApk(apk, expected, apksigner = apksignerBin()) {
   const want = normalizeSha256(expected);
   if (!want) throw new SigningError("No valid expected upload certificate SHA-256 to check the APK against.");
   if (!fs.existsSync(apk)) throw new SigningError(`${apk} does not exist.`);
-  const r = spawnSync(apksignerBin(), ["verify", "--verbose", "--print-certs", apk], { encoding: "utf8" });
+  const r = spawnSync(apksigner, ["verify", "--verbose", "--print-certs", apk], { encoding: "utf8" });
   const out = `${r.stdout}\n${r.stderr}`;
   if (r.status !== 0 || !/^Verifies$/m.test(out)) {
     throw new SigningError(`${apk} failed signature verification (unsigned, tampered or corrupt).`);
