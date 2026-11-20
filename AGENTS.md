@@ -111,7 +111,11 @@ QueryClientProvider
 
 ## Common Gotchas
 
-1. **Version drift:** app.json, Info.plist, project.pbxproj, and package.json all have independent version numbers that must be synced manually before builds.
+1. **Versions live in `app.json`:** `ios/` and `android/` are gitignored and regenerated
+   by prebuild, so bump `expo.version`, `expo.ios.buildNumber` and
+   `expo.android.versionCode` there. The iOS widget target is the exception:
+   `pnpm prebuild:ios` runs `scripts/sync-widget-version.js` to copy the build
+   number onto it (see CLAUDE.md, "Releasing to TestFlight").
 
 2. **Android versionCode:** Must be incremented in `app.json` before each Play Store
    release (`eas.json` uses `appVersionSource: "local"`, so it is never auto-bumped).
@@ -139,7 +143,12 @@ QueryClientProvider
    When changing card padding, check all four call sites instead of assuming
    the value is global.
 
-8. **No test suite:** There are no automated tests in the project currently. The `scripts/` directory is empty.
+8. **Tests are plain `node:test` files run by `tsx`:** `pnpm test` runs the suites
+   listed one by one in `package.json`'s `test` script. There is no runner config
+   and no glob, so a new `__tests__/*.test.ts` file runs only once it is added to
+   that list. Keep tested logic in modules that do not import React Native, or the
+   suite cannot load it. `scripts/` holds the Android build/signing and
+   native-string/widget-version sync scripts.
 
 ## Environment Setup
 
@@ -152,16 +161,17 @@ pnpm
 pnpm install
 cp .env.example .env   # Configure API_BASE_URL
 pnpm dev               # Start Expo dev server
-
-# Build for production
-eas build --platform ios --profile production
-eas build --platform android --profile production
+pnpm test              # Unit tests (see gotcha 8)
 ```
+
+Production builds do not use EAS: iOS is archived locally in Xcode and Android is
+built with `pnpm build:android:apk` / `build:android:aab`. CLAUDE.md has both
+release flows.
 
 ## Android Quickstart (local emulator)
 
 For running the app on an Android emulator during development. Production Android
-builds are a separate flow (`eas.json`); this section is only about dev.
+builds are a separate flow (see CLAUDE.md); this section is only about dev.
 
 > Verified end to end on 2026-09-19 (Apple Silicon Mac, Pixel 9 / API 36 arm64
 > AVD): clean `pnpm android` built on the first try (~10 min), the app opened and
