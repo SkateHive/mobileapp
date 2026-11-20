@@ -13,35 +13,10 @@ truth and update it there, not here.
 
 These build/release specifics are not in AGENTS.md.
 
-### Pre-PR checklist (Maestri note)
-Before opening any PR, read the connected Maestri note **"Checklist pré-PR —
-SkateHive mobile"** (CLI name: `checklist-pre-pr-skatehive`) and review the diff
-against it:
-
-```bash
-maestri note read "checklist-pre-pr-skatehive"
-```
-
-It is the review checklist, not a copy of AGENTS.md: theme tokens, security,
-build steps, scope of the diff, PR conventions.
-
-If you discover a new convention or a gotcha while working, **write it into the
-note yourself** instead of only mentioning it in chat:
-
-```bash
-maestri note edit "checklist-pre-pr-skatehive" "<existing line>" "<existing line>
-- [ ] <new check>"
-```
-
-Prefer `edit` over `write` so nothing already in the note is lost. This is about
-the *check*; a convention that belongs to the codebase itself still goes in
-AGENTS.md as well.
-
-The note lives on the repo owner's Maestri canvas, so `maestri` will not be on
-PATH for everyone. If the command is missing or the note is not connected, skip
-this section and review the diff against AGENTS.md, which covers the repository
-conventions. Say in the PR that the Maestri-specific checks were unavailable,
-rather than treating the review as complete.
+### Before opening any PR
+Review the diff against AGENTS.md, which holds the repository conventions: theme
+tokens, security rules, styling, and the gotchas list. A new convention or gotcha
+you discover while working goes into AGENTS.md in the same PR.
 
 ### Releasing to TestFlight (local Xcode build — NOT EAS)
 Builds are made locally in Xcode and uploaded to App Store Connect under the
