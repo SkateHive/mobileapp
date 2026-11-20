@@ -1,15 +1,24 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useVideoPlayer, type VideoThumbnail } from "expo-video";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { t } from "~/lib/i18n";
+import { coverTimeAt, stripTimeAt } from "~/lib/video-cover";
 
-const FRAME_COUNT = 10;
+// Frames behind the cursor. They are a ruler, not the choice — the cover is
+// whatever instant the cursor lands on, extracted when the finger lifts.
+const STRIP_FRAMES = 10;
 // Big enough to stay sharp as a profile-grid tile, small enough to upload fast.
 const MAX_FRAME_WIDTH = 720;
+const STRIP_HEIGHT = 56;
+const CURSOR_WIDTH = 40;
+// One screen-reader arrow press, as a share of the scrubbable range.
+const STEP = 0.05;
 
 interface VideoCoverPickerProps {
   videoUri: string;
@@ -23,13 +32,34 @@ interface VideoCoverPickerProps {
  *
  * The chosen frame becomes `json_metadata.images[0]` — what the profile grid shows —
  * and the Instagram Reel cover. Frames are pulled from the local file before upload,
- * so this costs no network. Without a choice the first frame is used, which keeps
+ * so this costs no network. Without a choice the 10% mark is used, which keeps
  * posting a two-tap flow.
+ *
+ * Dragging moves a cursor over a filmstrip and the exact frame is extracted on
+ * release, not during the drag: `generateThumbnailsAsync` is one native decode per
+ * call and a long clip cannot keep up with a moving finger.
  */
 export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPickerProps) {
-  const [frames, setFrames] = useState<VideoThumbnail[]>([]);
-  const [selected, setSelected] = useState(0);
+  const [strip, setStrip] = useState<VideoThumbnail[]>([]);
+  const [cover, setCover] = useState<VideoThumbnail | null>(null);
   const [isWorking, setIsWorking] = useState(true);
+  const [isPicking, setIsPicking] = useState(false);
+  const [stripWidth, setStripWidth] = useState(0);
+
+  // Only the newest pick may write the cover: a slow extraction from an earlier
+  // position must not overwrite a newer one.
+  const pickId = useRef(0);
+  const unmounted = useRef(false);
+  useEffect(
+    () => () => {
+      unmounted.current = true;
+    },
+    []
+  );
+
+  const cursorX = useSharedValue(0);
+  const dragStart = useSharedValue(0);
+  const travel = Math.max(0, stripWidth - CURSOR_WIDTH);
 
   const player = useVideoPlayer(videoUri, (p) => {
     p.muted = true;
@@ -63,21 +93,20 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
       const duration = player.duration;
       if (!duration || duration <= 0) return;
       try {
-        // Evenly spread across 10%–90%, skipping the very first and last moments:
-        // those tend to be black frames or the rider still setting up. Starting at
-        // 10% also keeps the default frame where the transcoder used to take it,
-        // so not choosing gives the same result as before.
-        const times = Array.from(
-          { length: FRAME_COUNT },
-          (_, i) => duration * (0.1 + (0.8 * i) / (FRAME_COUNT - 1))
+        // One frame per tile, sampled at the tile's centre so the strip lines up
+        // with what sits under the cursor. The extra time is the cursor's
+        // resting position, which is the cover until the author drags.
+        const times = Array.from({ length: STRIP_FRAMES }, (_, i) =>
+          stripTimeAt(i, STRIP_FRAMES, duration)
         );
+        times.push(coverTimeAt(0, 1, duration));
         const thumbs = await player.generateThumbnailsAsync(times, {
           maxWidth: MAX_FRAME_WIDTH,
         });
         if (cancelled) return;
-        setFrames(thumbs);
-        setSelected(0);
-        await emit(thumbs[0]);
+        setStrip(thumbs.slice(0, STRIP_FRAMES));
+        setCover(thumbs[STRIP_FRAMES] ?? null);
+        await emit(thumbs[STRIP_FRAMES]);
       } catch {
         if (!cancelled) onSelect(null);
       } finally {
@@ -114,13 +143,75 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     };
   }, [player, emit, onSelect]);
 
-  const pick = useCallback(
-    (index: number) => {
-      setSelected(index);
-      emit(frames[index]);
+  const pickAt = useCallback(
+    async (x: number) => {
+      const duration = player.duration;
+      if (!duration || duration <= 0) return;
+      const id = ++pickId.current;
+      setIsPicking(true);
+      try {
+        const [thumb] = await player.generateThumbnailsAsync(
+          [coverTimeAt(x, travel, duration)],
+          { maxWidth: MAX_FRAME_WIDTH }
+        );
+        if (id !== pickId.current || unmounted.current) return;
+        setCover(thumb ?? null);
+        await emit(thumb);
+      } catch {
+        // Keep the frame already chosen rather than dropping the cover.
+      } finally {
+        if (id === pickId.current && !unmounted.current) setIsPicking(false);
+      }
     },
-    [frames, emit]
+    [player, travel, emit]
   );
+
+  const step = useCallback(
+    (delta: number) => {
+      const next = Math.min(travel, Math.max(0, cursorX.value + delta * travel));
+      cursorX.value = next;
+      pickAt(next);
+    },
+    [travel, cursorX, pickAt]
+  );
+
+  // Extracting only on release keeps the cursor at gesture speed: the drag runs
+  // on the UI thread and never waits on a decode.
+  const pan = Gesture.Pan()
+    .enabled(!disabled && travel > 0)
+    // The picker sits inside the composer's ScrollView. Claiming the gesture
+    // only past a horizontal threshold leaves vertical scrolling to the list,
+    // and moving the cursor on activation rather than on touch means a scroll
+    // that started here never drags the cover along with it.
+    .activeOffsetX([-5, 5])
+    .failOffsetY([-10, 10])
+    .onStart((e) => {
+      const next = Math.min(travel, Math.max(0, e.x - CURSOR_WIDTH / 2));
+      cursorX.value = next;
+      dragStart.value = next;
+    })
+    .onUpdate((e) => {
+      cursorX.value = Math.min(travel, Math.max(0, dragStart.value + e.translationX));
+    })
+    .onEnd(() => {
+      runOnJS(pickAt)(cursorX.value);
+    });
+
+  // A tap never travels far enough to activate the pan, so it needs its own
+  // gesture: tapping the strip jumps the cursor there.
+  const tap = Gesture.Tap()
+    .enabled(!disabled && travel > 0)
+    .onEnd((e) => {
+      const next = Math.min(travel, Math.max(0, e.x - CURSOR_WIDTH / 2));
+      cursorX.value = next;
+      runOnJS(pickAt)(next);
+    });
+
+  const scrub = Gesture.Race(pan, tap);
+
+  const cursorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: cursorX.value }],
+  }));
 
   if (isWorking) {
     return (
@@ -133,27 +224,41 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     );
   }
 
-  if (frames.length === 0) return null;
+  if (strip.length === 0) return null;
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{t("create.cover.label")}</Text>
       <Text style={styles.hint}>{t("create.cover.hint")}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-        {frames.map((frame, i) => (
-          <Pressable
-            key={i}
-            onPress={() => pick(i)}
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={t("create.cover.option_a11y", { n: i + 1, total: frames.length })}
-            accessibilityState={{ selected: i === selected }}
-            style={[styles.frame, i === selected && styles.frameSelected]}
-          >
-            <Image source={frame} style={styles.frameImage} contentFit="cover" />
-          </Pressable>
-        ))}
-      </ScrollView>
+
+      <View style={styles.preview}>
+        {cover ? <Image source={cover} style={styles.previewImage} contentFit="cover" /> : null}
+        {isPicking ? (
+          <View style={styles.previewSpinner}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          </View>
+        ) : null}
+      </View>
+
+      <GestureDetector gesture={scrub}>
+        <View
+          style={styles.strip}
+          onLayout={(e) => setStripWidth(e.nativeEvent.layout.width)}
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={t("create.cover.frame_a11y")}
+          accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === "increment") step(STEP);
+            else if (e.nativeEvent.actionName === "decrement") step(-STEP);
+          }}
+        >
+          {strip.map((frame, i) => (
+            <Image key={i} source={frame} style={styles.stripFrame} contentFit="cover" />
+          ))}
+          <Animated.View style={[styles.cursor, cursorStyle]} pointerEvents="none" />
+        </View>
+      </GestureDetector>
     </View>
   );
 }
@@ -177,22 +282,43 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: "center",
   },
-  strip: {
-    gap: theme.spacing.sm,
-  },
-  frame: {
-    width: 64,
-    height: 64,
+  preview: {
+    height: 140,
     borderRadius: theme.borderRadius.sm,
     overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "transparent",
+    backgroundColor: theme.colors.secondaryCard,
+    marginBottom: theme.spacing.sm,
   },
-  frameSelected: {
-    borderColor: theme.colors.primary,
-  },
-  frameImage: {
+  previewImage: {
     width: "100%",
     height: "100%",
+  },
+  previewSpinner: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.scrim,
+  },
+  strip: {
+    flexDirection: "row",
+    height: STRIP_HEIGHT,
+    borderRadius: theme.borderRadius.sm,
+    overflow: "hidden",
+    backgroundColor: theme.colors.secondaryCard,
+  },
+  stripFrame: {
+    flex: 1,
+    height: "100%",
+  },
+  cursor: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: CURSOR_WIDTH,
+    height: STRIP_HEIGHT,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    backgroundColor: "rgba(50,205,50,0.15)",
   },
 });
