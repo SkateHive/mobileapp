@@ -7,6 +7,7 @@ import { useVideoPlayer, type VideoThumbnail } from "expo-video";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
+import { t } from "~/lib/i18n";
 import { coverTimeAt, stripTimeAt } from "~/lib/video-cover";
 
 // Frames behind the cursor. They are a ruler, not the choice — the cover is
@@ -215,7 +216,7 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
   if (isWorking) {
     return (
       <View style={styles.container}>
-        <Text style={styles.label}>COVER</Text>
+        <Text style={styles.label}>{t("create.cover.label")}</Text>
         <View style={styles.loading}>
           <ActivityIndicator size="small" color={theme.colors.primary} />
         </View>
@@ -227,10 +228,8 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>COVER</Text>
-      <Text style={styles.hint}>
-        Drag to pick any frame. Shown on your profile grid, and it can't be changed later.
-      </Text>
+      <Text style={styles.label}>{t("create.cover.label")}</Text>
+      <Text style={styles.hint}>{t("create.cover.hint")}</Text>
 
       <View style={styles.preview}>
         {cover ? <Image source={cover} style={styles.previewImage} contentFit="cover" /> : null}
@@ -247,7 +246,7 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
           onLayout={(e) => setStripWidth(e.nativeEvent.layout.width)}
           accessible
           accessibilityRole="adjustable"
-          accessibilityLabel="Video cover frame"
+          accessibilityLabel={t("create.cover.frame_a11y")}
           accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
           onAccessibilityAction={(e) => {
             if (e.nativeEvent.actionName === "increment") step(STEP);
