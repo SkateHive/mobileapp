@@ -204,7 +204,7 @@ export function RecentMediaGallery({
         <Text style={styles.countText}>{t("feed.gallery.count", { count: mediaAssets.length })}</Text>
       </View>
       <View style={styles.gridContainer}>
-        {mediaAssets.slice(0, 9).map((item, index) => (
+        {mediaAssets.map((item) => (
           <Pressable
             key={item.id}
             style={styles.mediaItem}
