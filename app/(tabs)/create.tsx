@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
-import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { Button } from "~/components/ui/button";
 import { Text } from "~/components/ui/text";
 import { RecentMediaGallery } from "~/components/ui/RecentMediaGallery";
@@ -42,6 +41,7 @@ import { InstagramHandleModal } from "~/components/Instagram/InstagramHandleModa
 import { VideoCoverPicker } from "~/components/create/VideoCoverPicker";
 import { isJobActive } from "~/lib/upload/upload-job";
 import { enqueue, UploadBusyError, useUploadJob } from "~/lib/upload/upload-store";
+import { useTabBarBottomInset } from "~/lib/use-tab-bar-inset";
 
 export default function CreatePost() {
   const { username, session } = useAuth();
@@ -49,6 +49,7 @@ export default function CreatePost() {
   // The job lives in the upload store; the screen only needs to know whether
   // Share is allowed. A failed job blocks too: there is no second slot.
   const uploadJob = useUploadJob();
+  const bottomInset = useTabBarBottomInset();
   const jobBlocksShare = isJobActive(uploadJob) || uploadJob?.status === "failed";
   const shareHint = isJobActive(uploadJob)
     ? t("create.upload.busy")
@@ -381,16 +382,22 @@ export default function CreatePost() {
           frame over the one the author chose. Keyed by the file so a new video
           starts fresh. */}
       {media && mediaType === "video" && (
-        <ScrollView
+        // Not scrollable: the video shrinks to fit so the cover strip stays
+        // above the tab bar and the upload pill, which both float over screens.
+        <View
           key={media}
-          style={[styles.container, step !== "edit" && styles.hidden]}
+          style={[
+            styles.container,
+            {
+              paddingBottom:
+                theme.layout.tabBarHeight + bottomInset + (uploadJob ? UPLOAD_PILL_SPACE : 0),
+            },
+            step !== "edit" && styles.hidden,
+          ]}
         >
           {topBar(() => setStep("details"))}
-          <View style={styles.editVideo}>
-            <VideoPlayer url={media} playing={step === "edit" && isFocused} />
-          </View>
           <VideoCoverPicker videoUri={media} onSelect={setCoverUri} disabled={isSubmitting} />
-        </ScrollView>
+        </View>
       )}
 
       {step === "details" && (
@@ -513,6 +520,9 @@ export default function CreatePost() {
 type Step = "pick" | "edit" | "details";
 
 const THUMB_SIZE = 112;
+// ponytail: approximate height of UploadPill collapsed plus its gap; export it
+// from UploadPill if its layout changes.
+const UPLOAD_PILL_SPACE = 72;
 
 const IMAGE_MIME: Record<string, string> = {
   jpg: "image/jpeg",
@@ -551,13 +561,10 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     paddingTop: theme.spacing.md,
   },
-  // Same top offset as the header on the pick step, so the screens line up.
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: theme.spacing.xxl,
-    paddingTop: theme.spacing.md,
     marginBottom: theme.spacing.md,
   },
   nextText: {
@@ -588,13 +595,6 @@ const styles = StyleSheet.create({
   },
   hidden: {
     display: "none",
-  },
-  editVideo: {
-    width: "100%",
-    aspectRatio: 3 / 4,
-    borderRadius: theme.borderRadius.lg,
-    overflow: "hidden",
-    backgroundColor: theme.colors.black,
   },
   detailsRow: {
     flexDirection: "row",
