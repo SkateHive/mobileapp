@@ -136,21 +136,32 @@ export function createProgressTracker() {
   };
 }
 
+/** What a transcoder health probe said, before anything is uploaded. */
+export type Availability = "free" | "busy" | "down";
+
 /**
- * Picks the next transcoder to send the video to, by asking each candidate's
- * health endpoint in order (GET, no body, bounded). Nothing is uploaded until
- * a server answers, so skipping an unreachable one can't duplicate a job.
- * Returns the index of the first reachable service at or after `from`, or -1.
+ * Order in which to try the transcoders: those with a free slot first, then
+ * busy ones in case every server is busy, each group in priority order. Down
+ * servers are dropped. The probe is a GET with no body, so skipping a server
+ * can never duplicate a job.
  */
-export async function nextReachable<T>(
-  services: T[],
-  from: number,
-  isReachable: (service: T) => Promise<boolean>,
-): Promise<number> {
-  for (let i = from; i < services.length; i++) {
-    if (await isReachable(services[i])) return i;
+export function rankByAvailability<T>(services: T[], availability: Availability[]): T[] {
+  const pick = (want: Availability) => services.filter((_, i) => availability[i] === want);
+  return [...pick("free"), ...pick("busy")];
+}
+
+/**
+ * The transcoder answers a job it has no slot for with a 503 carrying its
+ * capacity, after deleting the upload. That reply is an explicit refusal,
+ * unlike a bare 503 from a proxy, which may hide a job still running.
+ */
+export function isBusyRefusal(status: number, body: string): boolean {
+  if (status !== 503) return false;
+  try {
+    return JSON.parse(body)?.capacity !== undefined;
+  } catch {
+    return false;
   }
-  return -1;
 }
 
 export interface UploadFailure {
@@ -158,6 +169,8 @@ export interface UploadFailure {
   status?: number;
   /** The watchdog cut the request. */
   watchdogFired: boolean;
+  /** The transcoder said it had no free slot (see isBusyRefusal). */
+  busy?: boolean;
 }
 
 // Statuses that say the request itself was refused, before any work: bad or
@@ -174,9 +187,11 @@ const REFUSED = new Set([400, 401, 403, 404, 405, 413, 415, 422]);
  * result, a cut by the watchdog) may hide a video the server is still
  * transcoding, so we stop rather than risk a second transcode. Servers that
  * are down are avoided up front by the status lookup, which skips unhealthy
- * services.
+ * services. The transcoder's own "busy" 503 is the one 5xx that counts as a
+ * refusal: it says it took nothing.
  */
 export function canFailOver(failure: UploadFailure): boolean {
   if (failure.watchdogFired) return false;
+  if (failure.busy) return true;
   return failure.status !== undefined && REFUSED.has(failure.status);
 }
