@@ -17,6 +17,7 @@ const STRIP_FRAMES = 10;
 const MAX_FRAME_WIDTH = 720;
 const STRIP_HEIGHT = 56;
 const CURSOR_WIDTH = 40;
+const PREVIEW_SIZE = 160;
 // One screen-reader arrow press, as a share of the scrubbable range.
 const STEP = 0.05;
 
@@ -282,8 +283,12 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: "center",
   },
+  // Square like the profile-grid tile (GridVideoTile), so the author sees the
+  // exact crop the grid will show.
   preview: {
-    height: 140,
+    width: PREVIEW_SIZE,
+    height: PREVIEW_SIZE,
+    alignSelf: "center",
     borderRadius: theme.borderRadius.sm,
     overflow: "hidden",
     backgroundColor: theme.colors.secondaryCard,
