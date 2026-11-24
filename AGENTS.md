@@ -150,6 +150,16 @@ QueryClientProvider
    suite cannot load it. `scripts/` holds the Android build/signing and
    native-string/widget-version sync scripts.
 
+9. **Build iOS with Xcode 26, not Xcode 27:** an app built against the iOS 27 SDK
+   crashes at launch on iOS 27 (`UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`),
+   because iOS 27 requires the UIScene lifecycle and Expo SDK 54 / RN 0.81 does not
+   adopt it. This applies to dev builds and to the TestFlight archive alike. Install
+   Xcode 26 beside 27 (e.g. `xcodes install 26.6`, then
+   `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer
+   xcodebuild -downloadPlatform iOS`) and archive with it until the Expo SDK
+   upgrade lands. Xcode 27 also rejects pods whose deployment target is below
+   iOS 15 (SDWebImage, react-native-svg, react-native-maps).
+
 ## Environment Setup
 
 ```bash
