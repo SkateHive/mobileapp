@@ -122,7 +122,9 @@ export default function CreatePost() {
     setMedia(uri);
     setMediaType(kind);
     setMediaMimeType(mime || guessMime(uri, kind));
-    setCoverUri(null);
+    // The same file keeps its cover: the picker is keyed by the file, so it is
+    // not remounted and would never emit the cover again.
+    if (uri !== media) setCoverUri(null);
     setStep(kind === "video" ? "edit" : "details");
   };
 
@@ -308,11 +310,15 @@ export default function CreatePost() {
   useEffect(() => {
     if (!isFocused || step === "pick") return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      goBack();
+      // Swallowed while sharing, like the disabled back arrow: an error must
+      // land on the details step the author is still looking at.
+      if (!isSubmitting) goBack();
       return true;
     });
     return () => sub.remove();
-  });
+    // goBack only reads step and mediaType.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, step, mediaType, isSubmitting]);
 
   const topBar = (onNext?: () => void) => (
     <View style={styles.topBar}>
@@ -343,32 +349,32 @@ export default function CreatePost() {
 
   return (
     <>
-      {step === "pick" && (
-        <ScrollView style={styles.container}>
-          <Text style={styles.headerText}>{t("create.header.title")}</Text>
-          <View style={styles.pickActions}>
-            <Pressable
-              onPress={pickMedia}
-              style={styles.pickButton}
-              disabled={isSelectingMedia}
-            >
-              {isSelectingMedia ? (
-                <ActivityIndicator size="small" color={theme.colors.text} />
-              ) : (
-                <Ionicons name="images-outline" size={22} color={theme.colors.text} />
-              )}
-              <Text style={styles.pickButtonText}>
-                {isSelectingMedia ? t("create.media.selecting") : t("create.media.add")}
-              </Text>
-            </Pressable>
-            <Pressable onPress={startTextOnly} style={styles.pickButton}>
-              <Ionicons name="create-outline" size={22} color={theme.colors.text} />
-              <Text style={styles.pickButtonText}>{t("create.step.text_only")}</Text>
-            </Pressable>
-          </View>
-          <RecentMediaGallery onMediaSelect={handleGalleryMediaSelect} maxItems={30} />
-        </ScrollView>
-      )}
+      {/* Hidden rather than unmounted, so coming back does not reload the
+          gallery or lose its scroll position. */}
+      <ScrollView style={[styles.container, step !== "pick" && styles.hidden]}>
+        <Text style={styles.headerText}>{t("create.header.title")}</Text>
+        <View style={styles.pickActions}>
+          <Pressable
+            onPress={pickMedia}
+            style={styles.pickButton}
+            disabled={isSelectingMedia}
+          >
+            {isSelectingMedia ? (
+              <ActivityIndicator size="small" color={theme.colors.text} />
+            ) : (
+              <Ionicons name="images-outline" size={22} color={theme.colors.text} />
+            )}
+            <Text style={styles.pickButtonText}>
+              {isSelectingMedia ? t("create.media.selecting") : t("create.media.add")}
+            </Text>
+          </Pressable>
+          <Pressable onPress={startTextOnly} style={styles.pickButton}>
+            <Ionicons name="create-outline" size={22} color={theme.colors.text} />
+            <Text style={styles.pickButtonText}>{t("create.step.text_only")}</Text>
+          </Pressable>
+        </View>
+        <RecentMediaGallery onMediaSelect={handleGalleryMediaSelect} maxItems={30} />
+      </ScrollView>
 
       {/* Hidden rather than unmounted outside its step: the cover picker holds
           the cursor position, and remounting it would re-extract the default
