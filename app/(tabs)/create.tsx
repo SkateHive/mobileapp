@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
-import { VideoPlayer } from "~/components/Feed/VideoPlayer";
 import { Button } from "~/components/ui/button";
 import { Text } from "~/components/ui/text";
 import { RecentMediaGallery } from "~/components/ui/RecentMediaGallery";
@@ -71,6 +70,8 @@ export default function CreatePost() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Local file of the frame the author picked as the video's cover.
   const [coverUri, setCoverUri] = useState<string | null>(null);
+  // A cover file still being written: Next waits, or the post would carry the old one.
+  const [coverPending, setCoverPending] = useState(false);
   // Instagram caption, editable and separate from the Hive body. Only offered to
   // accounts that will actually cross-post, so the field never lies about where
   // the text ends up.
@@ -320,7 +321,7 @@ export default function CreatePost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused, step, mediaType, isSubmitting]);
 
-  const topBar = (onNext?: () => void) => (
+  const topBar = (onNext?: () => void, nextDisabled = false) => (
     <View style={styles.topBar}>
       <Pressable
         onPress={goBack}
@@ -332,8 +333,16 @@ export default function CreatePost() {
         <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
       </Pressable>
       {onNext ? (
-        <Pressable onPress={onNext} hitSlop={12} accessibilityRole="button">
-          <Text style={styles.nextText}>{t("create.step.next")}</Text>
+        <Pressable
+          onPress={onNext}
+          hitSlop={12}
+          accessibilityRole="button"
+          disabled={nextDisabled}
+          accessibilityState={{ disabled: nextDisabled }}
+        >
+          <Text style={[styles.nextText, nextDisabled && styles.nextDisabled]}>
+            {t("create.step.next")}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -381,16 +390,25 @@ export default function CreatePost() {
           frame over the one the author chose. Keyed by the file so a new video
           starts fresh. */}
       {media && mediaType === "video" && (
-        <ScrollView
+        // Not scrollable: the video shrinks to fit so the cover strip stays
+        // above the upload pill, which floats over the screen.
+        <View
           key={media}
-          style={[styles.container, step !== "edit" && styles.hidden]}
+          style={[
+            styles.container,
+            styles.editStep,
+            uploadJob && styles.pillClearance,
+            step !== "edit" && styles.hidden,
+          ]}
         >
-          {topBar(() => setStep("details"))}
-          <View style={styles.editVideo}>
-            <VideoPlayer url={media} playing={step === "edit" && isFocused} />
-          </View>
-          <VideoCoverPicker videoUri={media} onSelect={setCoverUri} disabled={isSubmitting} />
-        </ScrollView>
+          {topBar(() => setStep("details"), coverPending)}
+          <VideoCoverPicker
+            videoUri={media}
+            onSelect={setCoverUri}
+            onPendingChange={setCoverPending}
+            disabled={isSubmitting}
+          />
+        </View>
       )}
 
       {step === "details" && (
@@ -513,6 +531,9 @@ export default function CreatePost() {
 type Step = "pick" | "edit" | "details";
 
 const THUMB_SIZE = 112;
+// ponytail: approximate height of UploadPill collapsed plus its gap; export it
+// from UploadPill if its layout changes.
+const UPLOAD_PILL_SPACE = 72;
 
 const IMAGE_MIME: Record<string, string> = {
   jpg: "image/jpeg",
@@ -551,19 +572,28 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     paddingTop: theme.spacing.md,
   },
-  // Same top offset as the header on the pick step, so the screens line up.
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: theme.spacing.xxl,
-    paddingTop: theme.spacing.md,
     marginBottom: theme.spacing.md,
   },
   nextText: {
     fontSize: theme.fontSizes.lg,
     fontFamily: theme.fonts.bold,
     color: theme.colors.primary,
+  },
+  // While the cover file is still being written.
+  nextDisabled: {
+    opacity: 0.4,
+  },
+  // The tab bar's raised + button sticks up into the screen; this keeps the
+  // cover strip clear of it.
+  editStep: {
+    paddingBottom: theme.spacing.xl,
+  },
+  pillClearance: {
+    paddingBottom: UPLOAD_PILL_SPACE,
   },
   pickActions: {
     flexDirection: "row",
@@ -589,13 +619,6 @@ const styles = StyleSheet.create({
   hidden: {
     display: "none",
   },
-  editVideo: {
-    width: "100%",
-    aspectRatio: 3 / 4,
-    borderRadius: theme.borderRadius.lg,
-    overflow: "hidden",
-    backgroundColor: theme.colors.black,
-  },
   detailsRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -609,7 +632,7 @@ const styles = StyleSheet.create({
     minHeight: THUMB_SIZE,
     textAlignVertical: "top",
   },
-  // Square like the profile-grid tile, the same crop the cover picker previews.
+  // Square like the profile-grid tile, so the author sees the grid's crop.
   thumb: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,

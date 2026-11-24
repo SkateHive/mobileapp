@@ -3,28 +3,33 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
-import { useVideoPlayer, type VideoThumbnail } from "expo-video";
+import { useVideoPlayer, VideoView, type VideoThumbnail } from "expo-video";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { Text } from "~/components/ui/text";
 import { theme } from "~/lib/theme";
 import { t } from "~/lib/i18n";
 import { coverTimeAt, stripTimeAt } from "~/lib/video-cover";
 
-// Frames behind the cursor. They are a ruler, not the choice — the cover is
-// whatever instant the cursor lands on, extracted when the finger lifts.
+// Frames behind the cursor. They are a ruler, not the choice: the cover is
+// whatever instant the cursor lands on, shown live in the video above it.
 const STRIP_FRAMES = 10;
 // Big enough to stay sharp as a profile-grid tile, small enough to upload fast.
 const MAX_FRAME_WIDTH = 720;
 const STRIP_HEIGHT = 56;
 const CURSOR_WIDTH = 40;
-const PREVIEW_SIZE = 160;
 // One screen-reader arrow press, as a share of the scrubbable range.
 const STEP = 0.05;
+// Shortest gap between two seeks while dragging. Each exact seek decodes from
+// the previous keyframe, which Android in particular can't do every frame; the
+// release always seeks to the final position anyway.
+const SEEK_INTERVAL_MS = 50;
 
 interface VideoCoverPickerProps {
   videoUri: string;
   /** Local file URI of the chosen frame, ready to upload. Null while none is picked. */
   onSelect: (uri: string | null) => void;
+  /** True while a cover file is still being written, so the caller can hold off. */
+  onPendingChange?: (pending: boolean) => void;
   disabled?: boolean;
 }
 
@@ -36,20 +41,25 @@ interface VideoCoverPickerProps {
  * so this costs no network. Without a choice the 10% mark is used, which keeps
  * posting a two-tap flow.
  *
- * Dragging moves a cursor over a filmstrip and the exact frame is extracted on
- * release, not during the drag: `generateThumbnailsAsync` is one native decode per
- * call and a long clip cannot keep up with a moving finger.
+ * Dragging moves a cursor over a filmstrip while the video above it seeks along,
+ * so the author sees the exact frame under the finger. The cover file itself is
+ * extracted on release, not during the drag: `generateThumbnailsAsync` is one
+ * native decode per call and a long clip cannot keep up with a moving finger.
  */
-export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPickerProps) {
+export function VideoCoverPicker({
+  videoUri,
+  onSelect,
+  onPendingChange,
+  disabled,
+}: VideoCoverPickerProps) {
   const [strip, setStrip] = useState<VideoThumbnail[]>([]);
-  const [cover, setCover] = useState<VideoThumbnail | null>(null);
   const [isWorking, setIsWorking] = useState(true);
-  const [isPicking, setIsPicking] = useState(false);
   const [stripWidth, setStripWidth] = useState(0);
 
   // Only the newest pick may write the cover: a slow extraction from an earlier
   // position must not overwrite a newer one.
   const pickId = useRef(0);
+  const lastSeek = useRef(0);
   const unmounted = useRef(false);
   useEffect(
     () => () => {
@@ -93,6 +103,7 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     const extract = async () => {
       const duration = player.duration;
       if (!duration || duration <= 0) return;
+      onPendingChange?.(true);
       try {
         // One frame per tile, sampled at the tile's centre so the strip lines up
         // with what sits under the cursor. The extra time is the cursor's
@@ -106,12 +117,15 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
         });
         if (cancelled) return;
         setStrip(thumbs.slice(0, STRIP_FRAMES));
-        setCover(thumbs[STRIP_FRAMES] ?? null);
+        player.currentTime = coverTimeAt(0, 1, duration);
         await emit(thumbs[STRIP_FRAMES]);
       } catch {
         if (!cancelled) onSelect(null);
       } finally {
-        if (!cancelled) setIsWorking(false);
+        if (!cancelled) {
+          setIsWorking(false);
+          onPendingChange?.(false);
+        }
       }
     };
 
@@ -142,29 +156,42 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     return () => {
       cancelled = true;
     };
-  }, [player, emit, onSelect]);
+  }, [player, emit, onSelect, onPendingChange]);
+
+  // Frame-accurate: currentTime seeks exactly, unlike seekBy. Drag updates are
+  // throttled (force skips that, for the final position).
+  const seekTo = useCallback(
+    (x: number, force = false) => {
+      const now = Date.now();
+      if (!force && now - lastSeek.current < SEEK_INTERVAL_MS) return;
+      lastSeek.current = now;
+      const duration = player.duration;
+      if (duration > 0) player.currentTime = coverTimeAt(x, travel, duration);
+    },
+    [player, travel]
+  );
 
   const pickAt = useCallback(
     async (x: number) => {
       const duration = player.duration;
       if (!duration || duration <= 0) return;
       const id = ++pickId.current;
-      setIsPicking(true);
+      seekTo(x, true);
+      onPendingChange?.(true);
       try {
         const [thumb] = await player.generateThumbnailsAsync(
           [coverTimeAt(x, travel, duration)],
           { maxWidth: MAX_FRAME_WIDTH }
         );
         if (id !== pickId.current || unmounted.current) return;
-        setCover(thumb ?? null);
         await emit(thumb);
       } catch {
         // Keep the frame already chosen rather than dropping the cover.
       } finally {
-        if (id === pickId.current && !unmounted.current) setIsPicking(false);
+        if (id === pickId.current && !unmounted.current) onPendingChange?.(false);
       }
     },
-    [player, travel, emit]
+    [player, travel, emit, seekTo, onPendingChange]
   );
 
   const step = useCallback(
@@ -176,8 +203,8 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     [travel, cursorX, pickAt]
   );
 
-  // Extracting only on release keeps the cursor at gesture speed: the drag runs
-  // on the UI thread and never waits on a decode.
+  // The cursor moves on the UI thread; each move asks the video to seek, which
+  // never blocks the drag, and the cover file is extracted only on release.
   const pan = Gesture.Pan()
     .enabled(!disabled && travel > 0)
     // The picker sits inside the composer's ScrollView. Claiming the gesture
@@ -190,9 +217,11 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
       const next = Math.min(travel, Math.max(0, e.x - CURSOR_WIDTH / 2));
       cursorX.value = next;
       dragStart.value = next;
+      runOnJS(seekTo)(next);
     })
     .onUpdate((e) => {
       cursorX.value = Math.min(travel, Math.max(0, dragStart.value + e.translationX));
+      runOnJS(seekTo)(cursorX.value);
     })
     .onEnd(() => {
       runOnJS(pickAt)(cursorX.value);
@@ -214,52 +243,45 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     transform: [{ translateX: cursorX.value }],
   }));
 
-  if (isWorking) {
-    return (
+  return (
+    <View style={styles.root}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        contentFit="contain"
+        nativeControls={false}
+      />
       <View style={styles.container}>
         <Text style={styles.label}>{t("create.cover.label")}</Text>
-        <View style={styles.loading}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        </View>
-      </View>
-    );
-  }
-
-  if (strip.length === 0) return null;
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.label}>{t("create.cover.label")}</Text>
-      <Text style={styles.hint}>{t("create.cover.hint")}</Text>
-
-      <View style={styles.preview}>
-        {cover ? <Image source={cover} style={styles.previewImage} contentFit="cover" /> : null}
-        {isPicking ? (
-          <View style={styles.previewSpinner}>
+        {isWorking ? (
+          <View style={styles.loading}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
           </View>
+        ) : strip.length > 0 ? (
+          <>
+            <Text style={styles.hint}>{t("create.cover.hint")}</Text>
+            <GestureDetector gesture={scrub}>
+              <View
+                style={styles.strip}
+                onLayout={(e) => setStripWidth(e.nativeEvent.layout.width)}
+                accessible
+                accessibilityRole="adjustable"
+                accessibilityLabel={t("create.cover.frame_a11y")}
+                accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+                onAccessibilityAction={(e) => {
+                  if (e.nativeEvent.actionName === "increment") step(STEP);
+                  else if (e.nativeEvent.actionName === "decrement") step(-STEP);
+                }}
+              >
+                {strip.map((frame, i) => (
+                  <Image key={i} source={frame} style={styles.stripFrame} contentFit="cover" />
+                ))}
+                <Animated.View style={[styles.cursor, cursorStyle]} pointerEvents="none" />
+              </View>
+            </GestureDetector>
+          </>
         ) : null}
       </View>
-
-      <GestureDetector gesture={scrub}>
-        <View
-          style={styles.strip}
-          onLayout={(e) => setStripWidth(e.nativeEvent.layout.width)}
-          accessible
-          accessibilityRole="adjustable"
-          accessibilityLabel={t("create.cover.frame_a11y")}
-          accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
-          onAccessibilityAction={(e) => {
-            if (e.nativeEvent.actionName === "increment") step(STEP);
-            else if (e.nativeEvent.actionName === "decrement") step(-STEP);
-          }}
-        >
-          {strip.map((frame, i) => (
-            <Image key={i} source={frame} style={styles.stripFrame} contentFit="cover" />
-          ))}
-          <Animated.View style={[styles.cursor, cursorStyle]} pointerEvents="none" />
-        </View>
-      </GestureDetector>
     </View>
   );
 }
@@ -283,27 +305,16 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: "center",
   },
-  // Square with cover fit like the profile-grid tile (GridVideoTile), so the
-  // author sees the same square crop. Only the shape matches: the tile's size
-  // follows the screen width, this one is fixed.
-  preview: {
-    width: PREVIEW_SIZE,
-    height: PREVIEW_SIZE,
-    alignSelf: "center",
-    borderRadius: theme.borderRadius.sm,
-    overflow: "hidden",
-    backgroundColor: theme.colors.secondaryCard,
-    marginBottom: theme.spacing.sm,
+  root: {
+    flex: 1,
   },
-  previewImage: {
+  // Takes whatever height the strip leaves, so it fits any screen.
+  video: {
+    flex: 1,
     width: "100%",
-    height: "100%",
-  },
-  previewSpinner: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.scrim,
+    borderRadius: theme.borderRadius.lg,
+    overflow: "hidden",
+    backgroundColor: theme.colors.black,
   },
   strip: {
     flexDirection: "row",
