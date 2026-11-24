@@ -291,10 +291,13 @@ export default function VideosScreen() {
   // Latest per-item state, readable from callbacks that must not change
   // identity: handleVote and renderItem read these instead of closing over
   // the maps, so a vote doesn't hand every mounted item a new render function.
-  // Leaving the tab releases every clip's player: the tab stays mounted (the
-  // `unmountOnBlur` option is gone in React Navigation 7), and on Android the
-  // idle players' buffers filled the 256 MB Java heap later in the feed and
-  // profile. Same-height placeholders keep the list's scroll position.
+  // Leaving the tab releases every clip's player except the one on screen: the
+  // tab stays mounted (the `unmountOnBlur` option is gone in React Navigation
+  // 7), and on Android the idle players' buffers filled the 256 MB Java heap
+  // later in the feed and profile. The current clip stays, paused, so coming
+  // back resumes it instead of loading it from scratch; one player is capped
+  // well under the heap (lib/video-buffer.ts). Same-height placeholders keep
+  // the list's scroll position.
   const screenFocused = useIsFocused();
   const itemStateRef = useRef({ currentIndex, likedStates, votingStates, voteCountStates, screenFocused });
   itemStateRef.current = { currentIndex, likedStates, votingStates, voteCountStates, screenFocused };
@@ -393,7 +396,7 @@ export default function VideosScreen() {
   const renderItem = useCallback(({ item, index }: { item: VideoPost; index: number }) => {
     const { currentIndex, likedStates, votingStates, voteCountStates, screenFocused } = itemStateRef.current;
     const key = `${item.author}-${item.permlink}`;
-    if (!screenFocused) return <View style={{ height: screenHeight }} />;
+    if (!screenFocused && index !== currentIndex) return <View style={{ height: screenHeight }} />;
     return (
       <VideoItem
         item={item}
