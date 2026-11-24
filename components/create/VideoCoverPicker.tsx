@@ -283,8 +283,9 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: "center",
   },
-  // Square like the profile-grid tile (GridVideoTile), so the author sees the
-  // exact crop the grid will show.
+  // Square with cover fit like the profile-grid tile (GridVideoTile), so the
+  // author sees the same square crop. Only the shape matches: the tile's size
+  // follows the screen width, this one is fixed.
   preview: {
     width: PREVIEW_SIZE,
     height: PREVIEW_SIZE,
