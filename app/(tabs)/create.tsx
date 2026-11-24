@@ -1,4 +1,4 @@
-import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  BackHandler,
   StyleSheet,
   Switch,
 } from "react-native";
@@ -63,8 +64,10 @@ export default function CreatePost() {
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [mediaMimeType, setMediaMimeType] = useState<string | null>(null);
   const [isSelectingMedia, setIsSelectingMedia] = useState(false);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [hasVideoInteraction, setHasVideoInteraction] = useState(false);
+  // One screen, three steps: pick the media, edit it (videos only), then write
+  // the caption and share. Steps instead of routes keep the whole draft in this
+  // component, so going back never loses what was already chosen.
+  const [step, setStep] = useState<Step>("pick");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Local file of the frame the author picked as the video's cover.
   const [coverUri, setCoverUri] = useState<string | null>(null);
@@ -114,6 +117,17 @@ export default function CreatePost() {
     }
   };
 
+  // A video goes on to the edit step (cover); a photo has nothing to edit yet.
+  const selectMedia = (uri: string, kind: "image" | "video", mime?: string | null) => {
+    setMedia(uri);
+    setMediaType(kind);
+    setMediaMimeType(mime || guessMime(uri, kind));
+    // The same file keeps its cover: the picker is keyed by the file, so it is
+    // not remounted and would never emit the cover again.
+    if (uri !== media) setCoverUri(null);
+    setStep(kind === "video" ? "edit" : "details");
+  };
+
   const pickMedia = async () => {
     try {
       setIsSelectingMedia(true);
@@ -123,47 +137,9 @@ export default function CreatePost() {
         quality: 0.75,
         exif: false,
       });
-
-      if (!result.canceled && result.assets?.[0]) {
-        const asset = result.assets[0];
-        setMedia(asset.uri);
-        setMediaType(asset.type === "video" ? "video" : "image");
-        setCoverUri(null);
-
-        // Get the actual MIME type from the asset
-        if (asset.mimeType) {
-          setMediaMimeType(asset.mimeType);
-        } else {
-          // Fallback to detection based on file extension
-          const fileExtension = asset.uri.split(".").pop()?.toLowerCase();
-          if (asset.type === "image") {
-            const imageMimeTypes: Record<string, string> = {
-              jpg: "image/jpeg",
-              jpeg: "image/jpeg",
-              png: "image/png",
-              gif: "image/gif",
-              webp: "image/webp",
-              heic: "image/heic",
-            };
-            setMediaMimeType(
-              imageMimeTypes[fileExtension || ""] || "image/jpeg"
-            );
-          } else {
-            const videoMimeTypes: Record<string, string> = {
-              mp4: "video/mp4",
-              mov: "video/quicktime",
-              avi: "video/x-msvideo",
-              wmv: "video/x-ms-wmv",
-              webm: "video/webm",
-            };
-            setMediaMimeType(
-              videoMimeTypes[fileExtension || ""] || "video/mp4"
-            );
-          }
-        }
-
-        setIsVideoPlaying(false);
-        setHasVideoInteraction(false);
+      const asset = result.canceled ? undefined : result.assets?.[0];
+      if (asset) {
+        selectMedia(asset.uri, asset.type === "video" ? "video" : "image", asset.mimeType);
       }
     } catch (error) {
       console.error("Error selecting media:", error);
@@ -173,53 +149,22 @@ export default function CreatePost() {
     }
   };
 
-  const handleGalleryMediaSelect = async (mediaAsset: any) => {
-    try {
-      setMedia(mediaAsset.uri);
-      setMediaType(mediaAsset.mediaType === "video" ? "video" : "image");
-      setCoverUri(null);
-
-      // Get the actual MIME type based on the asset type
-      const fileExtension = mediaAsset.uri.split(".").pop()?.toLowerCase();
-      if (mediaAsset.mediaType === "photo") {
-        const imageMimeTypes: Record<string, string> = {
-          jpg: "image/jpeg",
-          jpeg: "image/jpeg",
-          png: "image/png",
-          gif: "image/gif",
-          webp: "image/webp",
-          heic: "image/heic",
-        };
-        setMediaMimeType(imageMimeTypes[fileExtension || ""] || "image/jpeg");
-      } else if (mediaAsset.mediaType === "video") {
-        const videoMimeTypes: Record<string, string> = {
-          mp4: "video/mp4",
-          mov: "video/quicktime",
-          avi: "video/x-msvideo",
-          wmv: "video/x-ms-wmv",
-          webm: "video/webm",
-        };
-        setMediaMimeType(videoMimeTypes[fileExtension || ""] || "video/mp4");
-      }
-
-      setIsVideoPlaying(false);
-      setHasVideoInteraction(false);
-    } catch (error) {
-      console.error("Error selecting media from gallery:", error);
-      Alert.alert(
-        t("create.alert.error_title"),
-        t("create.alert.select_gallery_failed")
-      );
-    }
+  const handleGalleryMediaSelect = (asset: { uri: string; mediaType: "photo" | "video" }) => {
+    selectMedia(asset.uri, asset.mediaType === "video" ? "video" : "image");
   };
 
-  const removeMedia = () => {
+  // A post without media skips straight to the caption.
+  const startTextOnly = () => {
     setMedia(null);
     setMediaType(null);
     setMediaMimeType(null);
-    setIsVideoPlaying(false);
-    setHasVideoInteraction(false);
     setCoverUri(null);
+    setStep("details");
+  };
+
+  const goBack = () => {
+    if (step === "details" && mediaType === "video") setStep("edit");
+    else setStep("pick");
   };
 
   // Resolve cross-post eligibility as soon as there's media, so the caption field
@@ -267,13 +212,6 @@ export default function CreatePost() {
       cancelled = true;
     };
   }, [isFocused]);
-
-  const handleVideoPress = () => {
-    if (!hasVideoInteraction) {
-      setIsVideoPlaying(true);
-      setHasVideoInteraction(true);
-    }
-  };
 
   const handlePost = async () => {
     if (submitLock.current) return;
@@ -349,6 +287,7 @@ export default function CreatePost() {
       setIgCaption("");
       setMediaType(null);
       setMediaMimeType(null);
+      setStep("pick");
 
       // The pill takes it from here.
       router.push("/(tabs)/feed");
@@ -367,20 +306,98 @@ export default function CreatePost() {
     }
   };
 
+  // Android's back button walks the steps before it leaves the tab.
+  useEffect(() => {
+    if (!isFocused || step === "pick") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      // Swallowed while sharing, like the disabled back arrow: an error must
+      // land on the details step the author is still looking at.
+      if (!isSubmitting) goBack();
+      return true;
+    });
+    return () => sub.remove();
+    // goBack only reads step and mediaType.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, step, mediaType, isSubmitting]);
+
+  const topBar = (onNext?: () => void) => (
+    <View style={styles.topBar}>
+      <Pressable
+        onPress={goBack}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={t("create.step.back_a11y")}
+        disabled={isSubmitting}
+      >
+        <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
+      </Pressable>
+      {onNext ? (
+        <Pressable onPress={onNext} hitSlop={12} accessibilityRole="button">
+          <Text style={styles.nextText}>{t("create.step.next")}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  if (username === "SPECTATOR") {
+    return (
+      <ScrollView style={styles.container}>
+        <CreateSpectatorInfo />
+      </ScrollView>
+    );
+  }
+
   return (
     <>
-      {username === "SPECTATOR" ? (
-        <ScrollView style={styles.container}>
-          <CreateSpectatorInfo />
-        </ScrollView>
-      ) : (
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView style={styles.container}>
-            {/* Header */}
-            <Text style={styles.headerText}>{t("create.header.title")}</Text>
+      {/* Hidden rather than unmounted, so coming back does not reload the
+          gallery or lose its scroll position. */}
+      <ScrollView style={[styles.container, step !== "pick" && styles.hidden]}>
+        <Text style={styles.headerText}>{t("create.header.title")}</Text>
+        <View style={styles.pickActions}>
+          <Pressable
+            onPress={pickMedia}
+            style={styles.pickButton}
+            disabled={isSelectingMedia}
+          >
+            {isSelectingMedia ? (
+              <ActivityIndicator size="small" color={theme.colors.text} />
+            ) : (
+              <Ionicons name="images-outline" size={22} color={theme.colors.text} />
+            )}
+            <Text style={styles.pickButtonText}>
+              {isSelectingMedia ? t("create.media.selecting") : t("create.media.add")}
+            </Text>
+          </Pressable>
+          <Pressable onPress={startTextOnly} style={styles.pickButton}>
+            <Ionicons name="create-outline" size={22} color={theme.colors.text} />
+            <Text style={styles.pickButtonText}>{t("create.step.text_only")}</Text>
+          </Pressable>
+        </View>
+        <RecentMediaGallery onMediaSelect={handleGalleryMediaSelect} maxItems={30} />
+      </ScrollView>
 
-            <View style={styles.card}>
-              {/* Content Input */}
+      {/* Hidden rather than unmounted outside its step: the cover picker holds
+          the cursor position, and remounting it would re-extract the default
+          frame over the one the author chose. Keyed by the file so a new video
+          starts fresh. */}
+      {media && mediaType === "video" && (
+        <ScrollView
+          key={media}
+          style={[styles.container, step !== "edit" && styles.hidden]}
+        >
+          {topBar(() => setStep("details"))}
+          <View style={styles.editVideo}>
+            <VideoPlayer url={media} playing={step === "edit" && isFocused} />
+          </View>
+          <VideoCoverPicker videoUri={media} onSelect={setCoverUri} disabled={isSubmitting} />
+        </ScrollView>
+      )}
+
+      {step === "details" && (
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+            {topBar()}
+            <View style={styles.detailsRow}>
               <TextInput
                 multiline
                 placeholder={t("create.input.placeholder")}
@@ -388,156 +405,97 @@ export default function CreatePost() {
                 onChangeText={setContent}
                 style={styles.textInput}
                 placeholderTextColor={theme.colors.gray}
-                numberOfLines={5}
+                editable={!isSubmitting}
               />
-            </View>
-
-            {/* Action Bar */}
-            <View style={styles.actionBar}>
-              <Pressable
-                onPress={pickMedia}
-                style={styles.mediaButton}
-                disabled={isSubmitting || isSelectingMedia}
-              >
-                {isSelectingMedia ? (
-                  <>
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator
-                        size="small"
-                        color={theme.colors.text}
-                      />
-                    </View>
-                    <Text style={styles.buttonTextSecondary}>{t("create.media.selecting")}</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons
-                      name="image-outline"
-                      size={24}
-                      color={theme.colors.gray}
-                    />
-                    <Text style={styles.buttonTextSecondary}>
-                      {media ? t("create.media.replace") : t("create.media.add")}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-
-            </View>
-
-            {/* Media Preview */}
-            {media && (
-              <View style={styles.mediaPreviewContainer}>
-                <View style={styles.mediaCard}>
+              {media ? (
+                <Pressable
+                  style={styles.thumb}
+                  onPress={mediaType === "video" ? () => setStep("edit") : undefined}
+                  disabled={mediaType !== "video" || isSubmitting}
+                  accessibilityRole={mediaType === "video" ? "button" : undefined}
+                >
                   {mediaType === "image" ? (
-                    <Image source={{ uri: media }} style={styles.mediaImage} />
-                  ) : mediaType === "video" ? (
-                    hasVideoInteraction ? (
-                      <VideoPlayer url={media} playing={isVideoPlaying} />
-                    ) : (
-                      <Pressable
-                        style={styles.videoContainer}
-                        onPress={handleVideoPress}
-                      >
-                        <VideoPlayer url={media} playing={false} />
-                        <View style={styles.playButtonOverlay}>
-                          <FontAwesome
-                            name="play-circle"
-                            size={50}
-                            color="white"
-                          />
-                        </View>
-                      </Pressable>
-                    )
-                  ) : null}
-                  <Pressable
-                    onPress={removeMedia}
-                    style={styles.removeButton}
-                    disabled={isSubmitting}
-                  >
-                    <Ionicons name="close" size={20} color="white" />
-                  </Pressable>
-                </View>
-
-                {mediaType === "video" && (
-                  <VideoCoverPicker
-                    videoUri={media}
-                    onSelect={setCoverUri}
-                    disabled={isSubmitting}
-                  />
-                )}
-
-                {igCanCrossPost && igGlobalOn && (
-                  <View style={styles.captionBlock}>
-                    <View style={styles.captionHeader}>
-                      {/* The switch controls the cross-post, not the caption.
-                          Labelling this row "INSTAGRAM CAPTION" made it read as
-                          a switch for the text field sitting under it. */}
-                      <View style={styles.captionLabelGroup}>
-                        <Ionicons
-                          name="logo-instagram"
-                          size={14}
-                          color={theme.colors.primary}
-                        />
-                        <Text style={styles.captionLabel}>
-                          {t("create.ig.toggle_label")}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={igCrossPost}
-                        onValueChange={setIgCrossPost}
-                        disabled={isSubmitting}
-                        trackColor={{
-                          false: theme.colors.border,
-                          true: theme.colors.primary,
-                        }}
-                        thumbColor={theme.colors.white}
-                      />
+                    <Image source={{ uri: media }} style={styles.thumbImage} />
+                  ) : coverUri ? (
+                    <Image source={{ uri: coverUri }} style={styles.thumbImage} />
+                  ) : (
+                    <Ionicons name="videocam-outline" size={28} color={theme.colors.gray} />
+                  )}
+                  {mediaType === "video" ? (
+                    <View style={styles.thumbLabel}>
+                      <Text style={styles.thumbLabelText}>{t("create.cover.edit")}</Text>
                     </View>
-                    <Text style={styles.captionSubLabel}>
-                      {t("create.ig.toggle_hint")}
+                  ) : null}
+                </Pressable>
+              ) : null}
+            </View>
+
+            {media && igCanCrossPost && igGlobalOn && (
+              <View style={styles.captionBlock}>
+                <View style={styles.captionHeader}>
+                  {/* The switch controls the cross-post, not the caption.
+                      Labelling this row "INSTAGRAM CAPTION" made it read as
+                      a switch for the text field sitting under it. */}
+                  <View style={styles.captionLabelGroup}>
+                    <Ionicons
+                      name="logo-instagram"
+                      size={14}
+                      color={theme.colors.primary}
+                    />
+                    <Text style={styles.captionLabel}>
+                      {t("create.ig.toggle_label")}
                     </Text>
-                    {igCrossPost && (
-                      <>
-                        <Text style={styles.captionSubLabel}>{t("create.ig.caption_label")}</Text>
-                        <TextInput
-                          style={styles.captionInput}
-                          value={igCaption}
-                          onChangeText={setIgCaption}
-                          placeholder={content.trim() || t("create.ig.caption_placeholder")}
-                          placeholderTextColor={theme.colors.muted}
-                          multiline
-                          maxLength={2200}
-                          editable={!isSubmitting}
-                        />
-                      </>
-                    )}
                   </View>
+                  <Switch
+                    value={igCrossPost}
+                    onValueChange={setIgCrossPost}
+                    disabled={isSubmitting}
+                    trackColor={{
+                      false: theme.colors.border,
+                      true: theme.colors.primary,
+                    }}
+                    thumbColor={theme.colors.white}
+                  />
+                </View>
+                <Text style={styles.captionSubLabel}>
+                  {t("create.ig.toggle_hint")}
+                </Text>
+                {igCrossPost && (
+                  <>
+                    <Text style={styles.captionSubLabel}>{t("create.ig.caption_label")}</Text>
+                    <TextInput
+                      style={styles.captionInput}
+                      value={igCaption}
+                      onChangeText={setIgCaption}
+                      placeholder={content.trim() || t("create.ig.caption_placeholder")}
+                      placeholderTextColor={theme.colors.muted}
+                      multiline
+                      maxLength={2200}
+                      editable={!isSubmitting}
+                    />
+                  </>
                 )}
               </View>
             )}
 
-            {/* Publishing last, after the cover and caption the author may still
-                be adjusting. Disabled while another job holds the single slot. */}
-            <Button
-              onPress={handlePost}
-              disabled={(!content.trim() && !media) || isSubmitting || jobBlocksShare}
-            >
-              <Text style={styles.shareButtonText}>
-                {isSubmitting ? t("create.share.button_busy") : t("create.share.button")}
-              </Text>
-            </Button>
-            {shareHint ? <Text style={styles.shareHint}>{shareHint}</Text> : null}
+            {/* Disabled while another job holds the single upload slot. */}
+            <View style={styles.shareBlock}>
+              <Button
+                onPress={handlePost}
+                disabled={(!content.trim() && !media) || isSubmitting || jobBlocksShare}
+              >
+                <Text style={styles.shareButtonText}>
+                  {isSubmitting ? t("create.share.button_busy") : t("create.share.button")}
+                </Text>
+              </Button>
+              {shareHint ? <Text style={styles.shareHint}>{shareHint}</Text> : null}
+            </View>
 
-            {/* Error Message */}
             {errorMessage && (
               <View style={styles.errorCard}>
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
-
-            {/* Recent Media Gallery */}
-            <RecentMediaGallery onMediaSelect={handleGalleryMediaSelect} />
           </ScrollView>
         </TouchableWithoutFeedback>
       )}
@@ -550,6 +508,32 @@ export default function CreatePost() {
       />
     </>
   );
+}
+
+type Step = "pick" | "edit" | "details";
+
+const THUMB_SIZE = 112;
+
+const IMAGE_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  heic: "image/heic",
+};
+const VIDEO_MIME: Record<string, string> = {
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  avi: "video/x-msvideo",
+  wmv: "video/x-ms-wmv",
+  webm: "video/webm",
+};
+
+// Fallback by file extension, for pickers that report no MIME type.
+function guessMime(uri: string, kind: "image" | "video"): string {
+  const ext = uri.split(".").pop()?.toLowerCase() ?? "";
+  return kind === "image" ? IMAGE_MIME[ext] ?? "image/jpeg" : VIDEO_MIME[ext] ?? "video/mp4";
 }
 
 const styles = StyleSheet.create({
@@ -567,23 +551,94 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     paddingTop: theme.spacing.md,
   },
-  card: {
-    backgroundColor: theme.colors.card,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
+  // Same top offset as the header on the pick step, so the screens line up.
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: theme.spacing.xxl,
+    paddingTop: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  nextText: {
+    fontSize: theme.fontSizes.lg,
+    fontFamily: theme.fonts.bold,
+    color: theme.colors.primary,
+  },
+  pickActions: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    marginHorizontal: theme.spacing.md,
+  },
+  pickButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    margin: theme.spacing.md,
-    marginTop: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
+  },
+  pickButtonText: {
+    color: theme.colors.text,
+    fontFamily: theme.fonts.default,
+  },
+  hidden: {
+    display: "none",
+  },
+  editVideo: {
+    width: "100%",
+    aspectRatio: 3 / 4,
+    borderRadius: theme.borderRadius.lg,
+    overflow: "hidden",
+    backgroundColor: theme.colors.black,
+  },
+  detailsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.spacing.md,
   },
   textInput: {
+    flex: 1,
     color: theme.colors.text,
     fontSize: theme.fontSizes.lg,
     fontFamily: theme.fonts.default,
-    // Snaps are short, and the cover strip plus caption now share the screen —
-    // the box grows with the text anyway.
-    minHeight: 96,
+    minHeight: THUMB_SIZE,
     textAlignVertical: "top",
+  },
+  // Square like the profile-grid tile, the same crop the cover picker previews.
+  thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: theme.borderRadius.md,
+    overflow: "hidden",
+    backgroundColor: theme.colors.secondaryCard,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbImage: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbLabel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingVertical: theme.spacing.xxs,
+    backgroundColor: theme.colors.scrim,
+    alignItems: "center",
+  },
+  thumbLabelText: {
+    color: theme.colors.text,
+    fontSize: theme.fontSizes.xs,
+    fontFamily: theme.fonts.bold,
+  },
+  shareBlock: {
+    marginTop: theme.spacing.lg,
   },
   shareHint: {
     color: theme.colors.muted,
@@ -592,29 +647,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: theme.spacing.xs,
     marginHorizontal: theme.spacing.md,
-  },
-  actionBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  mediaButton: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  loadingContainer: {
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonTextSecondary: {
-    marginLeft: theme.spacing.xs,
-    color: theme.colors.gray,
-    fontFamily: theme.fonts.default,
   },
   shareButtonText: {
     fontFamily: theme.fonts.bold,
@@ -655,46 +687,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.sm,
     textAlignVertical: 'top',
-  },
-  mediaPreviewContainer: {
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
-  mediaCard: {
-    position: "relative",
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.lg,
-    overflow: "hidden",
-    width: "100%",
-    aspectRatio: 1,
-  },
-  mediaImage: {
-    resizeMode: "cover",
-    width: "100%",
-    height: "100%",
-  },
-  videoContainer: {
-    width: "100%",
-    height: "100%",
-  },
-  playButtonOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-  },
-  removeButton: {
-    position: "absolute",
-    top: theme.spacing.xs,
-    right: theme.spacing.xs,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: theme.spacing.xxs,
   },
   errorCard: {
     backgroundColor: "#330000",
