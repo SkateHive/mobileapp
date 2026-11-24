@@ -19,11 +19,17 @@ const STRIP_HEIGHT = 56;
 const CURSOR_WIDTH = 40;
 // One screen-reader arrow press, as a share of the scrubbable range.
 const STEP = 0.05;
+// Shortest gap between two seeks while dragging. Each exact seek decodes from
+// the previous keyframe, which Android in particular can't do every frame; the
+// release always seeks to the final position anyway.
+const SEEK_INTERVAL_MS = 50;
 
 interface VideoCoverPickerProps {
   videoUri: string;
   /** Local file URI of the chosen frame, ready to upload. Null while none is picked. */
   onSelect: (uri: string | null) => void;
+  /** True while a cover file is still being written, so the caller can hold off. */
+  onPendingChange?: (pending: boolean) => void;
   disabled?: boolean;
 }
 
@@ -40,7 +46,12 @@ interface VideoCoverPickerProps {
  * extracted on release, not during the drag: `generateThumbnailsAsync` is one
  * native decode per call and a long clip cannot keep up with a moving finger.
  */
-export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPickerProps) {
+export function VideoCoverPicker({
+  videoUri,
+  onSelect,
+  onPendingChange,
+  disabled,
+}: VideoCoverPickerProps) {
   const [strip, setStrip] = useState<VideoThumbnail[]>([]);
   const [isWorking, setIsWorking] = useState(true);
   const [stripWidth, setStripWidth] = useState(0);
@@ -48,6 +59,7 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
   // Only the newest pick may write the cover: a slow extraction from an earlier
   // position must not overwrite a newer one.
   const pickId = useRef(0);
+  const lastSeek = useRef(0);
   const unmounted = useRef(false);
   useEffect(
     () => () => {
@@ -91,6 +103,7 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     const extract = async () => {
       const duration = player.duration;
       if (!duration || duration <= 0) return;
+      onPendingChange?.(true);
       try {
         // One frame per tile, sampled at the tile's centre so the strip lines up
         // with what sits under the cursor. The extra time is the cursor's
@@ -109,7 +122,10 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
       } catch {
         if (!cancelled) onSelect(null);
       } finally {
-        if (!cancelled) setIsWorking(false);
+        if (!cancelled) {
+          setIsWorking(false);
+          onPendingChange?.(false);
+        }
       }
     };
 
@@ -140,11 +156,15 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
     return () => {
       cancelled = true;
     };
-  }, [player, emit, onSelect]);
+  }, [player, emit, onSelect, onPendingChange]);
 
-  // Frame-accurate: currentTime seeks exactly, unlike seekBy.
+  // Frame-accurate: currentTime seeks exactly, unlike seekBy. Drag updates are
+  // throttled (force skips that, for the final position).
   const seekTo = useCallback(
-    (x: number) => {
+    (x: number, force = false) => {
+      const now = Date.now();
+      if (!force && now - lastSeek.current < SEEK_INTERVAL_MS) return;
+      lastSeek.current = now;
       const duration = player.duration;
       if (duration > 0) player.currentTime = coverTimeAt(x, travel, duration);
     },
@@ -156,7 +176,8 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
       const duration = player.duration;
       if (!duration || duration <= 0) return;
       const id = ++pickId.current;
-      seekTo(x);
+      seekTo(x, true);
+      onPendingChange?.(true);
       try {
         const [thumb] = await player.generateThumbnailsAsync(
           [coverTimeAt(x, travel, duration)],
@@ -166,9 +187,11 @@ export function VideoCoverPicker({ videoUri, onSelect, disabled }: VideoCoverPic
         await emit(thumb);
       } catch {
         // Keep the frame already chosen rather than dropping the cover.
+      } finally {
+        if (id === pickId.current && !unmounted.current) onPendingChange?.(false);
       }
     },
-    [player, travel, emit, seekTo]
+    [player, travel, emit, seekTo, onPendingChange]
   );
 
   const step = useCallback(
