@@ -150,6 +150,22 @@ QueryClientProvider
    suite cannot load it. `scripts/` holds the Android build/signing and
    native-string/widget-version sync scripts.
 
+9. **Build iOS with Xcode 26, not Xcode 27:** An app built against the iOS 27 SDK
+   crashes at launch on iOS 27 (`UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`),
+   because iOS 27 requires the UIScene lifecycle and Expo SDK 54 / RN 0.81 does not
+   adopt it. This applies to dev builds and to the TestFlight archive alike, until
+   the Expo SDK upgrade lands ([#110](https://github.com/SkateHive/mobileapp/issues/110));
+   delete this gotcha then. Install Xcode 26 beside 27 and point the toolchain at it:
+   ```bash
+   xcodes install 26.6
+   sudo xcodes select 26.6    # pnpm ios, prebuild and xcodebuild now use Xcode 26
+   xcodebuild -downloadPlatform iOS
+   ```
+   For the archive, open `ios/SkateHive.xcworkspace` with `Xcode-26.6.0.app`, not
+   the default Xcode. When upgrading: Xcode 27 also refuses pods whose deployment
+   target is below iOS 15 (SDWebImage, react-native-svg, react-native-maps), so
+   check that the new versions declare 15 or later.
+
 ## Environment Setup
 
 ```bash

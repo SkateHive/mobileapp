@@ -34,7 +34,8 @@ version truth** (the old "bump 4 places" checklist no longer applies).
    copies the build number onto the widget target. apple-targets resets the
    widget's `CURRENT_PROJECT_VERSION` to 1, and App Store Connect rejects an
    extension whose build number ≠ the app's.
-4. Open `ios/SkateHive.xcworkspace`, set destination to **Any iOS Device**, then
+4. Open `ios/SkateHive.xcworkspace` **in Xcode 26** (an Xcode 27 archive crashes at
+   launch on iOS 27; AGENTS.md gotcha 9), set destination to **Any iOS Device**, then
    **Product → Archive** (not Build) → Organizer → **Distribute App → App Store
    Connect → Upload**.
 
