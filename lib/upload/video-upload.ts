@@ -6,7 +6,9 @@ import {
   createProgressTracker,
   createStallWatchdog,
   fetchWithTimeout,
-  nextReachable,
+  isBusyRefusal,
+  rankByAvailability,
+  type Availability,
 } from './net';
 import { followEventStream } from './sse';
 
@@ -142,26 +144,26 @@ export async function uploadVideoToWorker(
 
     const services = await getTranscodeServices();
     const errors: string[] = [];
-    // Ask a server's health endpoint (GET, no body) before sending it the
-    // video: an unreachable server is skipped without any risk of a duplicate
-    // job, and a server that is down no longer stops the whole upload.
-    const isReachable = async (service: TranscodeService) => {
+    // Ask every server's health endpoint (GET, no body) before sending the
+    // video: unreachable servers are skipped without any risk of a duplicate
+    // job, and one with a free slot goes first, so a busy server no longer
+    // costs a whole upload before it answers 503.
+    const probe = async (service: TranscodeService): Promise<Availability> => {
       try {
         const response = await fetchWithTimeout(service.healthUrl, {}, PROBE_TIMEOUT_MS);
-        if (response.ok) return true;
+        if (response.ok) {
+          const health = await response.json().catch(() => null);
+          return health?.capacity?.available === 0 ? 'busy' : 'free';
+        }
       } catch {
         // unreachable
       }
       errors.push(t('upload.error.service_fallback', { service: service.name }));
-      return false;
+      return 'down';
     };
+    const ranked = rankByAvailability(services, await Promise.all(services.map(probe)));
 
-    for (
-      let index = await nextReachable(services, 0, isReachable);
-      index >= 0;
-      index = await nextReachable(services, index + 1, isReachable)
-    ) {
-      const service = services[index];
+    for (const service of ranked) {
       const workerApiUrl = service.transcodeUrl;
       const baseUrl = workerApiUrl.replace(/\/transcode$/, '');
       const correlationId = `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
@@ -192,6 +194,7 @@ export async function uploadVideoToWorker(
       const watchdog = createStallWatchdog(UPLOAD_STALL_MS, UPLOAD_MAX_MS);
       const progress = createProgressTracker();
       let failedStatus: number | undefined;
+      let busy = false;
       // A progress event can still arrive after the upload settled (the stream
       // is closed asynchronously); without this guard it would re-write a stale
       // stage over the caller's reset UI.
@@ -224,6 +227,7 @@ export async function uploadVideoToWorker(
         if (!uploadResponse.ok) {
           failedStatus = uploadResponse.status;
           const errorText = await uploadResponse.text();
+          busy = isBusyRefusal(uploadResponse.status, errorText);
           throw failWith('service_failed', { service: service.name, status: uploadResponse.status, detail: errorText });
         }
 
@@ -251,7 +255,7 @@ export async function uploadVideoToWorker(
         // Unless this server refused the video outright, it may still be
         // transcoding it (see canFailOver): stop rather than send it to the
         // next server and transcode it twice.
-        if (!canFailOver({ status: failedStatus, watchdogFired: watchdog.reason !== null })) {
+        if (!canFailOver({ status: failedStatus, busy, watchdogFired: watchdog.reason !== null })) {
           throw failWith('video_unconfirmed', { service: service.name });
         }
         errors.push(error instanceof Error ? describeError(error, t) : t('upload.error.service_fallback', { service: service.name }));

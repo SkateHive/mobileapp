@@ -5,7 +5,8 @@ import {
   createStallWatchdog,
   fetchWithTimeout,
   isAbortError,
-  nextReachable,
+  isBusyRefusal,
+  rankByAvailability,
   createProgressTracker,
   type Timers,
 } from "../net";
@@ -156,6 +157,17 @@ test("fail over only on an explicit refusal", () => {
     assert.equal(canFailOver({ status, watchdogFired: false }), false, `status ${status}`);
   }
   assert.equal(canFailOver({ status: 400, watchdogFired: true }), false);
+  // The transcoder's own busy 503 took nothing, so the next server may try.
+  assert.equal(canFailOver({ status: 503, busy: true, watchdogFired: false }), true);
+  assert.equal(canFailOver({ status: 503, busy: true, watchdogFired: true }), false);
+});
+
+test("only the transcoder's own busy 503 is a refusal", () => {
+  const busy = JSON.stringify({ error: "Worker busy: 1/1", capacity: { active: 1, max: 1, available: 0 } });
+  assert.equal(isBusyRefusal(503, busy), true);
+  assert.equal(isBusyRefusal(503, "<html>Service Unavailable</html>"), false); // a proxy's 503
+  assert.equal(isBusyRefusal(503, JSON.stringify({ error: "down" })), false);
+  assert.equal(isBusyRefusal(500, busy), false);
 });
 
 test("an unconfirmed upload is not a network error, so it is never auto-retried", () => {
@@ -177,15 +189,10 @@ test("SSE parser: events split across chunks, CRLF, multi-line data", () => {
   assert.deepEqual(got, ['{"progress":5,"stage":"receiving"}', '{"progress":40}', "line one\nline two"]);
 });
 
-test("an unreachable server is skipped before anything is sent", async () => {
-  const probed: string[] = [];
-  const up = new Set(["oracle"]);
-  const probe = async (name: string) => {
-    probed.push(name);
-    return up.has(name);
-  };
-  const services = ["mac", "oracle", "spare"];
-  assert.equal(await nextReachable(services, 0, probe), 1);
-  assert.deepEqual(probed, ["mac", "oracle"]); // stops at the first that answers
-  assert.equal(await nextReachable(services, 2, probe), -1);
+test("servers with a free slot go first; down ones are dropped", () => {
+  const services = ["mac", "oracle", "spare", "old"];
+  assert.deepEqual(rankByAvailability(services, ["busy", "free", "down", "free"]), ["oracle", "old", "mac"]);
+  // Every server busy: still try them, in priority order.
+  assert.deepEqual(rankByAvailability(services.slice(0, 2), ["busy", "busy"]), ["mac", "oracle"]);
+  assert.deepEqual(rankByAvailability(services.slice(0, 2), ["down", "down"]), []);
 });
