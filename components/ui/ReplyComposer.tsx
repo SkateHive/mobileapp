@@ -175,10 +175,9 @@ export function ReplyComposer({
       setUploadProgress(t("feed.composer.posting"));
 
       // Post reply — server-signed for email accounts, local key otherwise.
-      if (isUserbaseSession(session)) {
-        await postComment(session!, { parentAuthor, parentPermlink, body: replyBody });
-      } else {
-        await createHiveComment(
+      const { permlink } = isUserbaseSession(session)
+        ? await postComment(session!, { parentAuthor, parentPermlink, body: replyBody })
+        : await createHiveComment(
           replyBody,
           parentAuthor,
           parentPermlink,
@@ -187,12 +186,11 @@ export function ReplyComposer({
             privateKey: session!.decryptedKey,
           }
         );
-      }
 
       // Create optimistic reply object - simplified to avoid type conflicts
       const newReply = {
         author: username,
-        permlink: `reply-${Date.now()}`,
+        permlink,
         body: replyBody,
         created: new Date().toISOString(),
         parent_author: parentAuthor,
@@ -228,7 +226,7 @@ export function ReplyComposer({
         allow_votes: true,
         allow_curation_rewards: true,
         beneficiaries: [],
-        url: `/@${username}/reply-${Date.now()}`,
+        url: `/@${username}/${permlink}`,
         root_title: '',
         replies: [],
         author_reputation: 0,

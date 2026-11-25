@@ -114,7 +114,7 @@ export async function createHiveComment(
   parentAuthor: string,
   parentPermlink: string,
   options: CreatePostOptions
-): Promise<any> {
+): Promise<{ author: string; permlink: string }> {
   try {
     const { username, privateKey, communityTag = 'hive-173115' } = options;
     
@@ -137,7 +137,7 @@ export async function createHiveComment(
     };
     
     // Create the comment using the comment function
-    const result = await comment(
+    await comment(
       privateKey,
       parentAuthor, // parent_author
       parentPermlink, // parent_permlink
@@ -148,7 +148,8 @@ export async function createHiveComment(
       jsonMetadata // json_metadata
     );
     
-    return result;
+    // The caller shows the reply right away, so it needs the real permlink.
+    return { author: username, permlink };
   } catch (error) {
     console.error('Failed to create Hive comment:', error);
     throw new Error(t('upload.error.comment_failed', { message: error instanceof Error ? error.message : t('common.unknown_error') }));
