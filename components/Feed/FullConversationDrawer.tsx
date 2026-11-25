@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Modal,
@@ -50,6 +50,13 @@ export function FullConversationDrawer({
     permlink,
     visible, // Only fetch when visible
   );
+  // Replies posted from this drawer, shown until the next fetch includes them
+  // (the drawer refetches each time it opens). Same approach as app/conversation.tsx.
+  const [posted, setPosted] = useState<NestedDiscussion[]>([]);
+  useEffect(() => {
+    if (!visible) setPosted([]);
+  }, [visible, author, permlink]);
+  const replies = [...comments, ...posted];
 
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -191,13 +198,13 @@ export function FullConversationDrawer({
                     {t("feed.drawer.error")}
                   </Text>
                 </View>
-              ) : comments.length === 0 ? (
+              ) : replies.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>{t("feed.drawer.empty")}</Text>
                 </View>
               ) : (
                 <View style={styles.repliesContainer}>
-                  {renderNestedReplies(comments)}
+                  {renderNestedReplies(replies)}
                 </View>
               )}
             </ScrollView>
@@ -213,7 +220,9 @@ export function FullConversationDrawer({
                 <ReplyComposer
                   parentAuthor={author}
                   parentPermlink={permlink}
-                  onReplySuccess={() => {}}
+                  onReplySuccess={(reply) =>
+                    setPosted((prev) => [...prev, { ...reply, replies: [] }])
+                  }
                   placeholder={t("feed.drawer.reply_placeholder")}
                   buttonLabel={t("feed.drawer.reply_button")}
                 />
