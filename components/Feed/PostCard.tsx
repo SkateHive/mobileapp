@@ -120,10 +120,9 @@ export const PostCard = React.memo(
     const isVisible = isItemVisible(post.permlink);
 
     // Only computed once on mount (useState ignores the initializer on subsequent renders)
-    const [voteCount, setVoteCount] = useState(() =>
-      Array.isArray(post.active_votes)
-        ? post.active_votes.filter((vote: any) => vote.weight > 0).length
-        : 0,
+    // Same rule as the sync below: bridge votes carry rshares but no weight.
+    const [voteCount, setVoteCount] = useState(
+      () => resolveVoteState({}, post, currentUsername).voteCount,
     );
 
     const voteOverrides = useVoteOverrides();
