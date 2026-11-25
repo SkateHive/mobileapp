@@ -560,12 +560,12 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontSize: theme.fontSizes.xxxl,
+    // Text defaults to lineHeight 20, which clips a 32pt title on iOS.
+    lineHeight: 44,
     fontFamily: theme.fonts.bold,
     color: theme.colors.text,
     marginLeft: theme.spacing.md,
-    marginTop: theme.spacing.xxl,
     marginBottom: theme.spacing.sm,
-    paddingTop: theme.spacing.md,
   },
   card: {
     backgroundColor: theme.colors.card,

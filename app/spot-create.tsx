@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -337,7 +338,14 @@ export default function SpotCreateScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + theme.spacing.sm }]}>
+      {/* iOS presents this modal as a sheet below the status bar, so the
+          top inset would only add an empty band; Android shows it full screen. */}
+      <View
+        style={[
+          styles.header,
+          { paddingTop: (Platform.OS === "ios" ? 0 : insets.top) + theme.spacing.sm },
+        ]}
+      >
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
