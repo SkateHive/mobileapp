@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Modal,
@@ -24,6 +24,7 @@ import type { Discussion } from "@hiveio/dhive";
 import type { NestedDiscussion } from "~/lib/types";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const PARTIAL_HEIGHT = SCREEN_HEIGHT * 0.8;
 
 interface FullConversationDrawerProps {
   visible: boolean;
@@ -49,6 +50,13 @@ export function FullConversationDrawer({
     permlink,
     visible, // Only fetch when visible
   );
+  // Replies posted from this drawer, shown until the next fetch includes them
+  // (the drawer refetches each time it opens). Same approach as app/conversation.tsx.
+  const [posted, setPosted] = useState<NestedDiscussion[]>([]);
+  useEffect(() => {
+    if (!visible) setPosted([]);
+  }, [visible, author, permlink]);
+  const replies = [...comments, ...posted];
 
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -138,7 +146,13 @@ export function FullConversationDrawer({
           <KeyboardAvoidingView
             style={styles.keyboardAvoidingView}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={partial ? 0 : insets.top}
+            // KeyboardAvoidingView measures itself relative to the drawer, not
+            // the screen, so the partial drawer's distance from the top has to be
+            // passed in, or the composer stays under the keyboard. iOS only: Android
+            // was not reported and resizes the window itself.
+            keyboardVerticalOffset={
+              partial ? (Platform.OS === "ios" ? SCREEN_HEIGHT - PARTIAL_HEIGHT : 0) : insets.top
+            }
           >
             {/* Header with safe area padding */}
             <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
@@ -184,13 +198,13 @@ export function FullConversationDrawer({
                     {t("feed.drawer.error")}
                   </Text>
                 </View>
-              ) : comments.length === 0 ? (
+              ) : replies.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>{t("feed.drawer.empty")}</Text>
                 </View>
               ) : (
                 <View style={styles.repliesContainer}>
-                  {renderNestedReplies(comments)}
+                  {renderNestedReplies(replies)}
                 </View>
               )}
             </ScrollView>
@@ -206,7 +220,9 @@ export function FullConversationDrawer({
                 <ReplyComposer
                   parentAuthor={author}
                   parentPermlink={permlink}
-                  onReplySuccess={() => {}}
+                  onReplySuccess={(reply) =>
+                    setPosted((prev) => [...prev, { ...reply, replies: [] }])
+                  }
                   placeholder={t("feed.drawer.reply_placeholder")}
                   buttonLabel={t("feed.drawer.reply_button")}
                 />
@@ -241,7 +257,7 @@ const styles = StyleSheet.create({
   },
   drawerPartial: {
     top: undefined,
-    height: SCREEN_HEIGHT * 0.8,
+    height: PARTIAL_HEIGHT,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     overflow: "hidden",
