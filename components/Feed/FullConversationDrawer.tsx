@@ -141,8 +141,11 @@ export function FullConversationDrawer({
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             // KeyboardAvoidingView measures itself relative to the drawer, not
             // the screen, so the partial drawer's distance from the top has to be
-            // passed in, or the composer stays under the keyboard.
-            keyboardVerticalOffset={partial ? SCREEN_HEIGHT - PARTIAL_HEIGHT : insets.top}
+            // passed in, or the composer stays under the keyboard. iOS only: Android
+            // was not reported and resizes the window itself.
+            keyboardVerticalOffset={
+              partial ? (Platform.OS === "ios" ? SCREEN_HEIGHT - PARTIAL_HEIGHT : 0) : insets.top
+            }
           >
             {/* Header with safe area padding */}
             <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
