@@ -24,6 +24,7 @@ import type { Discussion } from "@hiveio/dhive";
 import type { NestedDiscussion } from "~/lib/types";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const PARTIAL_HEIGHT = SCREEN_HEIGHT * 0.8;
 
 interface FullConversationDrawerProps {
   visible: boolean;
@@ -138,7 +139,10 @@ export function FullConversationDrawer({
           <KeyboardAvoidingView
             style={styles.keyboardAvoidingView}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={partial ? 0 : insets.top}
+            // KeyboardAvoidingView measures itself relative to the drawer, not
+            // the screen, so the partial drawer's distance from the top has to be
+            // passed in, or the composer stays under the keyboard.
+            keyboardVerticalOffset={partial ? SCREEN_HEIGHT - PARTIAL_HEIGHT : insets.top}
           >
             {/* Header with safe area padding */}
             <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
@@ -241,7 +245,7 @@ const styles = StyleSheet.create({
   },
   drawerPartial: {
     top: undefined,
-    height: SCREEN_HEIGHT * 0.8,
+    height: PARTIAL_HEIGHT,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     overflow: "hidden",
