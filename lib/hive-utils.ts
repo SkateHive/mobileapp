@@ -532,28 +532,10 @@ export async function getUserComments(
 
     const posts = await HiveClient.call('bridge', 'get_account_posts', params);
     
-    // Fetch full content for each post to get active_votes data
-    const postsWithVotes = await Promise.all(
-      (posts || []).map(async (post: any) => {
-        try {
-          const fullContent = await getContent(post.author, post.permlink);
-          if (fullContent) {
-            // Merge the bridge data with full content data (including active_votes)
-            return {
-              ...post,
-              active_votes: fullContent.active_votes || [],
-              net_votes: fullContent.net_votes || 0,
-            };
-          }
-          return post;
-        } catch (error) {
-          console.error(`Error fetching full content for ${post.author}/${post.permlink}:`, error);
-          return post;
-        }
-      })
-    );
-    
-    return postsWithVotes;
+    // Bridge posts already carry active_votes with signed rshares, which is
+    // what the vote state and moderation read; fetching each post again with
+    // get_content cost one extra RPC call per post (~125 calls per profile).
+    return posts || [];
   } catch (error) {
     // Callers decide what a missing account means; it is not worth a log line.
     if (!isMissingAccountError(error)) {
