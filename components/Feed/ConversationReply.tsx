@@ -86,6 +86,8 @@ export function ConversationReply({
   };
 
   const handleVote = async () => {
+    // Like PostCard: a vote already cast isn't undone by a tap.
+    if (isLiked) return;
     try {
       setIsVoting(true);
 
@@ -226,7 +228,7 @@ export function ConversationReply({
             <Pressable
               onPress={handleVote}
               style={[styles.actionItem, isVoting && styles.disabledButton]}
-              disabled={isVoting}
+              disabled={isVoting || isLiked}
             >
               {isVoting ? (
                 <ActivityIndicator size="small" color={theme.colors.green} />
