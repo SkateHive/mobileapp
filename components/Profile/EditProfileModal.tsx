@@ -23,8 +23,6 @@ import { useToast } from '~/lib/toast-provider';
 import { HiveClient } from '~/lib/hive-utils';
 import { uploadImageToHive, uploadImageViaUserbase } from '~/lib/upload/image-upload';
 import { isUserbaseSession, updateProfile } from '~/lib/posting';
-import { getIgHandle, setIgHandle as setIgHandleApi, deleteIgHandle, hasEligibleHiveAccount } from '~/lib/instagram';
-import { InstagramHandleModal } from '~/components/Instagram/InstagramHandleModal';
 
 const COUNTRIES = [
   { code: 'AR', name: 'Argentina', flag: '🇦🇷' },
@@ -130,57 +128,6 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
   const [location, setLocation] = useState('');
   const [website, setWebsite] = useState('');
   const [profileImage, setProfileImage] = useState('');
-
-  // Instagram handle — shown only for accounts with an eligible (>=100 HP) Hive
-  // account: key accounts, or email accounts with an eligible attached Hive.
-  const [igEligible, setIgEligible] = useState(false);
-  const [instagramHandle, setInstagramHandle] = useState('');
-  const [igModalVisible, setIgModalVisible] = useState(false);
-  const [igSaving, setIgSaving] = useState(false);
-
-  useEffect(() => {
-    if (!visible || !session) return;
-    let cancelled = false;
-    (async () => {
-      const ok = await hasEligibleHiveAccount(session);
-      if (cancelled) return;
-      setIgEligible(ok);
-      if (ok) {
-        const { handle } = await getIgHandle(session);
-        if (!cancelled) setInstagramHandle(handle || '');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [visible]);
-
-  const saveInstagram = async (handle: string) => {
-    if (!session) return setIgModalVisible(false);
-    try {
-      setIgSaving(true);
-      await setIgHandleApi(handle, session);
-      setInstagramHandle(handle);
-      showToast(t('profile.ig.handle_saved'), 'success');
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : t('profile.ig.save_error'), 'error');
-    } finally {
-      setIgSaving(false);
-      setIgModalVisible(false);
-    }
-  };
-
-  const removeInstagram = async () => {
-    if (!session) return setIgModalVisible(false);
-    try {
-      setIgSaving(true);
-      await deleteIgHandle(session);
-      setInstagramHandle('');
-    } finally {
-      setIgSaving(false);
-      setIgModalVisible(false);
-    }
-  };
 
   const selectedCountry = useMemo(() => getCountryByName(location), [location]);
 
@@ -409,34 +356,9 @@ export function EditProfileModal({ visible, onClose, currentProfile, onSaved }: 
                 autoCapitalize="none"
               />
             </View>
-
-            {igEligible && (
-              <View style={styles.field}>
-                <Text style={styles.label}>Instagram</Text>
-                <Pressable style={styles.countryPicker} onPress={() => setIgModalVisible(true)}>
-                  {instagramHandle ? (
-                    <Text style={styles.countryName}>@{instagramHandle}</Text>
-                  ) : (
-                    <Text style={styles.countryPlaceholder}>
-                      {t('profile.edit.ig_placeholder')}
-                    </Text>
-                  )}
-                  <Ionicons name="logo-instagram" size={16} color={theme.colors.muted} />
-                </Pressable>
-              </View>
-            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <InstagramHandleModal
-        visible={igModalVisible}
-        initialHandle={instagramHandle}
-        saving={igSaving}
-        onSave={saveInstagram}
-        onRemove={removeInstagram}
-        onClose={() => setIgModalVisible(false)}
-      />
 
       {/* Country Picker Modal */}
       <Modal visible={countryPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCountryPickerVisible(false)}>
