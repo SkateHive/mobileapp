@@ -71,19 +71,25 @@ export async function loadSnapsPage<C extends Container, R extends Reply>(
       const fresh = containers.filter((c) => !nextSeen.has(c.permlink));
       if (fresh.length === 0) break;
 
-      const replies = await Promise.all(fresh.map((c) => deps.fetchReplies(c)));
+      const replies = await Promise.allSettled(fresh.map((c) => deps.fetchReplies(c)));
 
-      fresh.forEach((container, i) => {
-        nextSeen.add(container.permlink);
-        const tagged = replies[i].filter((r) => hasTag(r, tag));
+      // Keep the containers before the first failure, in order, and stop there:
+      // the cursor stays on the last one kept, so the next page retries the rest.
+      const failed = replies.findIndex((r) => r.status === "rejected");
+      const kept = failed === -1 ? fresh.length : failed;
+      for (let i = 0; i < kept; i++) {
+        nextSeen.add(fresh[i].permlink);
+        const tagged = (replies[i] as PromiseFulfilledResult<R[]>).value.filter((r) => hasTag(r, tag));
         tagged.forEach((r) => nextSeen.add(r.permlink));
         snaps.push(...tagged);
-      });
-      const last = fresh[fresh.length - 1];
-      next = { permlink: last.permlink, date: last.created };
+        next = { permlink: fresh[i].permlink, date: fresh[i].created };
+      }
+      if (failed !== -1) {
+        console.error("Error fetching snaps:", (replies[failed] as PromiseRejectedResult).reason);
+        break;
+      }
     } catch (error) {
-      // Keep what loaded. The cursor stays before the failed batch, so the
-      // next page retries it.
+      // The container list itself failed: keep what loaded.
       console.error("Error fetching snaps:", error);
       break;
     }

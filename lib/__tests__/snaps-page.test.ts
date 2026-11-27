@@ -135,13 +135,22 @@ test("the replies of a batch are fetched at the same time, not one after another
   assert.equal(fake.maxInFlight(), 6);
 });
 
-test("a failed batch keeps what loaded and leaves the cursor before it, so the next page retries it", async () => {
+test("a failed container keeps the ones before it and leaves the cursor there, so the next page retries it", async () => {
+  // Batches of 3: [0,1,2], then [3,4] fresh, where 4 fails and 3 loaded.
   const fake = fakeDeps(3, { failOn: "container-4" });
   const page = await loadSnapsPage(fake.deps, options({ permlink: "", date: "2026-11-27T13:00:00Z" }, new Set()));
-  assert.equal(page.cursor.permlink, "container-2");
-  assert.ok(page.snaps.length > 0);
-  assert.ok(page.snaps.every((s) => /^container-[0-2]-/.test(s.permlink)));
-  assert.ok(!page.seen.has("container-3"), "the failed batch should load again");
+  assert.equal(page.cursor.permlink, "container-3");
+  assert.ok(page.snaps.some((s) => s.permlink.startsWith("container-3-")), "container 3 loaded before the failure");
+  assert.ok(page.snaps.every((s) => /^container-[0-3]-/.test(s.permlink)));
+  assert.ok(!page.seen.has("container-4"), "the failed container should load again");
+});
+
+test("a failure in the first container of a page doesn't drop the others' cursor", async () => {
+  const fake = fakeDeps(6, { failOn: "container-0" });
+  const cursor = { permlink: "", date: "2026-11-27T13:00:00Z" };
+  const page = await loadSnapsPage(fake.deps, options(cursor, new Set()));
+  assert.deepEqual(page.snaps, []);
+  assert.deepEqual(page.cursor, cursor, "nothing loaded, so the next page starts from the same place");
 });
 
 test("stops when there are no more containers", async () => {
