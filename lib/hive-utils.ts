@@ -314,6 +314,14 @@ export async function getContentReplies({
 }
 
 /**
+ * A whole thread in one call: "author/permlink" -> post, root included, each
+ * post listing its replies' keys.
+ */
+export async function getDiscussion(author: string, permlink: string): Promise<Record<string, any>> {
+  return HiveClient.call('bridge', 'get_discussion', { author, permlink });
+}
+
+/**
  * Get a single post/comment content by author and permlink
  */
 export async function getContent(author: string, permlink: string): Promise<Discussion | null> {

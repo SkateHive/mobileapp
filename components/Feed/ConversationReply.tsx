@@ -21,7 +21,7 @@ import { castVote, canPost } from '~/lib/posting';
 import { theme } from '~/lib/theme';
 import { t } from '~/lib/i18n';
 import { extractMediaFromBody } from '~/lib/utils';
-import { recordVote } from '~/lib/vote-store';
+import { recordVote, resolveVoteState } from '~/lib/vote-store';
 import type { Discussion } from '@hiveio/dhive';
 import type { Media, NestedDiscussion } from '../../lib/types';
 
@@ -73,10 +73,9 @@ export function ConversationReply({
   const [isVoting, setIsVoting] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [showReplyComposer, setShowReplyComposer] = useState(false);
+  // rshares, not weight: bridge votes carry no weight, and weight is 0 on many real upvotes.
   const [voteCount, setVoteCount] = useState(
-    Array.isArray(post.active_votes)
-      ? post.active_votes.filter((vote: any) => vote.weight > 0).length
-      : 0
+    () => resolveVoteState({}, post, currentUsername).voteCount
   );
   const { showToast } = useToast();
 
