@@ -48,16 +48,17 @@ function extractVideosFromFeed(posts: Post[]): VideoPost[] {
     const rawPost = post as any;
 
     if (videoMedia.length > 0) {
+      // The feed API sends the metadata as `post_json_metadata` (an object),
+      // and its cover list as `images` rather than Hive's `image`.
+      const rawMetadata = rawPost.json_metadata ?? rawPost.post_json_metadata;
       let metadata: any = {};
       try {
-        metadata = typeof rawPost.json_metadata === 'string'
-          ? JSON.parse(rawPost.json_metadata)
-          : rawPost.json_metadata;
+        metadata = typeof rawMetadata === 'string' ? JSON.parse(rawMetadata) : rawMetadata;
       } catch { metadata = {}; }
 
       const imageMedia = media.filter((m) => m.type === 'image');
       videoMedia.forEach((video) => {
-        const thumbnail = metadata?.image?.[0] || imageMedia[0]?.url;
+        const thumbnail = metadata?.image?.[0] || metadata?.images?.[0] || imageMedia[0]?.url;
         videoList.push({
           videoUrl: video.url,
           username: post.author,

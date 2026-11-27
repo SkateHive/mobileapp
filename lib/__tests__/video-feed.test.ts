@@ -88,3 +88,22 @@ test("the feed fallback keeps the votes, which the feed API sends as `votes`", a
   assert.equal(videos.length, 1, "the post should be read as a video");
   assert.deepEqual(videos[0].active_votes.map((v) => v.voter), ["bielcx"]);
 });
+
+test("the feed fallback keeps the cover, which the feed API sends in `post_json_metadata.images`", async () => {
+  const cover = "https://images.hive.blog/DQmCover/cover.jpg";
+  const deps: VideoFeedDeps = {
+    now: () => 0,
+    getVideoFeed: (async () => null) as VideoFeedDeps["getVideoFeed"],
+    fetchFeedPage: (async () => [
+      {
+        author: "mark0318",
+        permlink: "sh-1",
+        body: `<iframe src="https://ipfs.skatehive.app/ipfs/QmClip"></iframe>`,
+        post_json_metadata: { tags: ["hive-173115"], images: [cover] },
+      },
+    ]) as unknown as VideoFeedDeps["fetchFeedPage"],
+  };
+  const { videos } = await fetchVideoFeedPage(1, deps);
+  assert.equal(videos[0].thumbnailUrl, cover);
+  assert.deepEqual(videos[0].tags, ["hive-173115"]);
+});
