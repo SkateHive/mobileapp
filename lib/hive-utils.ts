@@ -1,6 +1,7 @@
 import { Client, Comment, PrivateKey, Discussion, PublicKey } from '@hiveio/dhive';
 import CryptoJS from 'crypto-js';
 import { t } from '~/lib/i18n';
+import { isReadAt } from '~/lib/notifications/last-read';
 import { 
   SNAPS_CONTAINER_AUTHOR as ENV_SNAPS_CONTAINER_AUTHOR,
   SNAPS_PAGE_MIN_SIZE as ENV_SNAPS_PAGE_MIN_SIZE,
@@ -819,6 +820,21 @@ export async function findLastNotificationsReset(
 }
 
 /**
+ * Date up to which the user has read their notifications. Hivemind keeps it, so
+ * one bridge call replaces the account-history scan (~1 s, up to 5 calls). The
+ * scan stays as the fallback when the bridge call fails.
+ */
+async function getLastReadDate(username: string): Promise<string> {
+  try {
+    const result = await HiveClient.call('bridge', 'unread_notifications', { account: username });
+    if (typeof result?.lastread === 'string') return result.lastread;
+  } catch (error) {
+    console.warn('bridge.unread_notifications failed, scanning account history:', error);
+  }
+  return findLastNotificationsReset(username);
+}
+
+/**
  * Fetch ALL notifications for a user with pagination support
  * @param username - Hive username
  * @param limit - Number of notifications to fetch (default 100)
@@ -848,12 +864,12 @@ export async function fetchAllNotifications(
     }
     
     // Get the last read date to determine which notifications are read
-    const lastDate = await findLastNotificationsReset(username);
+    const lastDate = await getLastReadDate(username);
     
     // Mark notifications as read or unread based on their date
     const notificationsWithReadStatus = notifications.map(notification => ({
       ...notification,
-      isRead: lastDate ? notification.date <= lastDate : false
+      isRead: isReadAt(notification.date, lastDate)
     }));
     
     return notificationsWithReadStatus;
@@ -880,14 +896,11 @@ export async function fetchNewNotifications(username: string): Promise<HiveNotif
       return [];
     }
     
-    const lastDate = await findLastNotificationsReset(username);
+    const lastDate = await getLastReadDate(username);
     
-    if (lastDate) {
-      const filteredNotifications = notifications.filter(notification => notification.date > lastDate);
-      return filteredNotifications.map(n => ({ ...n, isRead: false }));
-    } else {
-      return notifications.map(n => ({ ...n, isRead: false }));
-    }
+    return notifications
+      .filter(notification => !isReadAt(notification.date, lastDate))
+      .map(n => ({ ...n, isRead: false }));
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return [];
