@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useInfiniteQuery, infiniteQueryOptions, QueryClient } from '@tanstack/react-query';
 import {
   getFeed,
@@ -84,58 +84,95 @@ interface VideoFeedPage {
   nextPage?: number;
 }
 
-// One page of the Videos tab gets this much time in total, /videos plus the
-// general-feed fallback, and the query adds no retries of its own (retry: 0):
-// before, React Query's default 2 retries multiplied 20 s + 20 s into ~2 min
-// before the error showed. The user retries with the Try Again buttons.
-export const VIDEO_PAGE_DEADLINE_MS = 35_000;
-// Not worth starting the fallback with less time than this left.
-const MIN_FALLBACK_MS = 5_000;
+// /videos goes cold every few minutes and then answers in 10-20 s (warm: under
+// 0.1 s), while the general feed answers cold in ~5 s. When /videos hasn't
+// answered by this point, the first page also asks the general feed and shows
+// whichever arrives first.
+export const VIDEO_RACE_MS = 4_000;
+// The longest the first page can take: /videos gives up at FEED_TIMEOUT_MS and
+// the fallback, started at VIDEO_RACE_MS at the latest, too. The query adds no
+// retries of its own (retry: 0): before, React Query's default 2 retries
+// multiplied 20 s + 20 s into ~2 min before the error showed. The user retries
+// with the Try Again buttons.
+export const VIDEO_PAGE_DEADLINE_MS = VIDEO_RACE_MS + FEED_TIMEOUT_MS;
 
 export interface VideoFeedDeps {
   getVideoFeed: typeof getVideoFeed;
   fetchFeedPage: typeof fetchFeedPage;
-  now: () => number;
+  /** Runs fn after ms; returns a cancel function. */
+  after: (ms: number, fn: () => void) => () => void;
 }
-const realDeps: VideoFeedDeps = { getVideoFeed, fetchFeedPage, now: () => Date.now() };
+const realDeps: VideoFeedDeps = {
+  getVideoFeed,
+  fetchFeedPage,
+  after: (ms, fn) => {
+    const id = setTimeout(fn, ms);
+    return () => clearTimeout(id);
+  },
+};
+
+async function fetchVideosEndpointPage(page: number, deps: VideoFeedDeps): Promise<VideoFeedPage | null> {
+  const result = await deps.getVideoFeed(page, VIDEO_PAGE_SIZE);
+  if (!result) return null;
+  const mapped = result.data.map((entry: any) => ({
+    ...entry,
+    username: entry.author,
+  }));
+  const pagination = result.pagination;
+  return {
+    videos: filterModeratedPosts(filterDeletedPosts(mapped)),
+    nextPage: pagination?.hasNextPage ? pagination.nextPage ?? page + 1 : undefined,
+  };
+}
+
+// Page param 0 is the first page: /videos page 1, or the general feed when
+// /videos is slow or fails. Params 1, 2, ... are /videos pages only.
+const FIRST_PAGE = 0;
 
 export async function fetchVideoFeedPage(page: number, deps: VideoFeedDeps = realDeps): Promise<VideoFeedPage> {
-  const startedAt = deps.now();
-  // Try the dedicated /videos endpoint first
-  const result = await deps.getVideoFeed(page, VIDEO_PAGE_SIZE);
-  if (result) {
-    const mapped = result.data.map((entry: any) => ({
-      ...entry,
-      username: entry.author,
-    }));
-    const pagination = result.pagination;
-    return {
-      videos: filterModeratedPosts(filterDeletedPosts(mapped)),
-      nextPage: pagination?.hasNextPage ? pagination.nextPage ?? page + 1 : undefined,
-    };
+  if (page !== FIRST_PAGE) {
+    // A later page failing (getVideoFeed gives up with null) must not look like
+    // the end of the feed: throw, so the list shows a retry for the next page.
+    const result = await fetchVideosEndpointPage(page, deps);
+    if (!result) throw new Error(`Video feed page ${page} failed to load`);
+    return result;
   }
 
-  // A later page failing (getVideoFeed gives up with null) must not look like
-  // the end of the feed: throw, so the list shows a retry for the next page.
-  if (page > 1) throw new Error(`Video feed page ${page} failed to load`);
-
-  // Fallback: the general feed + client-side extraction, within what is left
-  // of the page's deadline. fetchFeedPage throws when it fails too, so a double
-  // failure shows as an error with a retry, never as an empty "no videos" feed.
-  const left = VIDEO_PAGE_DEADLINE_MS - (deps.now() - startedAt);
-  if (left < MIN_FALLBACK_MS) throw new Error("Video feed failed to load");
-  const posts = await deps.fetchFeedPage(1, 50, Math.min(FEED_TIMEOUT_MS, left));
-  return {
-    videos: filterModeratedPosts(
-      filterDeletedPosts(extractVideosFromFeed(filterDeletedPosts(posts)))
-    ),
-  };
+  return new Promise((resolve, reject) => {
+    let failures = 0;
+    const fail = () => {
+      // Both failed: an error with a retry, never an empty "no videos" feed.
+      if (++failures === 2) reject(new Error("Video feed failed to load"));
+    };
+    let fallbackStarted = false;
+    const startFallback = () => {
+      if (fallbackStarted) return;
+      fallbackStarted = true;
+      deps.fetchFeedPage(1, 50, FEED_TIMEOUT_MS).then((posts) => {
+        const videos = filterModeratedPosts(
+          filterDeletedPosts(extractVideosFromFeed(filterDeletedPosts(posts)))
+        );
+        // The general feed has no video pages: the next page is /videos page
+        // 1, whose clips already shown here are dropped by flattenVideoPages
+        // (and when that leaves none, see lastPageAddedNothing).
+        if (videos.length > 0) resolve({ videos, nextPage: 1 });
+        else fail();
+      }).catch(fail);
+    };
+    const cancelRace = deps.after(VIDEO_RACE_MS, startFallback);
+    fetchVideosEndpointPage(1, deps).catch(() => null).then((result) => {
+      cancelRace();
+      if (result) return resolve(result);
+      startFallback();
+      fail();
+    });
+  });
 }
 
 export const videoFeedOptions = infiniteQueryOptions({
   queryKey: VIDEO_FEED_QUERY_KEY,
   queryFn: ({ pageParam }) => fetchVideoFeedPage(pageParam),
-  initialPageParam: 1,
+  initialPageParam: FIRST_PAGE,
   getNextPageParam: (last: VideoFeedPage) => last.nextPage,
   staleTime: VIDEO_FEED_STALE_TIME,
   // See VIDEO_PAGE_DEADLINE_MS: one bounded attempt per request. The login
@@ -168,12 +205,28 @@ function flattenVideoPages(pages: VideoFeedPage[] | undefined): VideoPost[] {
 }
 
 /**
+ * True when the newest page only repeated clips already listed: /videos page 1
+ * after a general-feed first page, which measured 34 clips covering all 30 of
+ * it. The list doesn't grow, so FlatList never calls onEndReached again.
+ */
+export function lastPageAddedNothing(pages: VideoFeedPage[] | undefined): boolean {
+  if (!pages || pages.length < 2) return false;
+  return flattenVideoPages(pages).length === flattenVideoPages(pages.slice(0, -1)).length;
+}
+
+/**
  * The Videos tab feed. `data` is the flat list of every page loaded so far;
  * call `fetchNextPage` near the end of the list to keep going.
  */
 export function useVideoFeed() {
   const query = useInfiniteQuery(videoFeedOptions);
   const videos = useMemo(() => flattenVideoPages(query.data?.pages), [query.data]);
+  const stalled = useMemo(() => lastPageAddedNothing(query.data?.pages), [query.data]);
+  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = query;
+  useEffect(() => {
+    // Not after a failure: the list shows its own retry for that.
+    if (stalled && hasNextPage && !isFetching && !isFetchNextPageError) fetchNextPage();
+  }, [stalled, hasNextPage, isFetching, isFetchNextPageError, fetchNextPage]);
   return { ...query, data: videos };
 }
 
