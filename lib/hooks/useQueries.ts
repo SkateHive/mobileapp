@@ -8,7 +8,7 @@ import {
   fetchFeedPage,
   FEED_TIMEOUT_MS } from '../api';
 import { API_BASE_URL, LEADERBOARD_API_URL, HIVE_AVATAR_URL } from '../constants';
-import { extractMediaFromBody, filterDeletedPosts } from '../utils';
+import { extractMediaFromBody, filterDeletedPosts, metadataImageUrl } from '../utils';
 import { filterModeratedPosts } from '../moderation';
 import type { Post } from '../types';
 
@@ -48,8 +48,7 @@ function extractVideosFromFeed(posts: Post[]): VideoPost[] {
     const rawPost = post as any;
 
     if (videoMedia.length > 0) {
-      // The feed API sends the metadata as `post_json_metadata` (an object),
-      // and its cover list as `images` rather than Hive's `image`.
+      // The feed API sends the metadata as `post_json_metadata` (an object).
       const rawMetadata = rawPost.json_metadata ?? rawPost.post_json_metadata;
       let metadata: any = {};
       try {
@@ -58,7 +57,7 @@ function extractVideosFromFeed(posts: Post[]): VideoPost[] {
 
       const imageMedia = media.filter((m) => m.type === 'image');
       videoMedia.forEach((video) => {
-        const thumbnail = metadata?.image?.[0] || metadata?.images?.[0] || imageMedia[0]?.url;
+        const thumbnail = metadataImageUrl(metadata) || imageMedia[0]?.url;
         videoList.push({
           videoUrl: video.url,
           username: post.author,
