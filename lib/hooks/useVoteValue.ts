@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { convertVestToHive, HiveClient } from '../hive-utils';
+import { estimateFromChainData, rewardDataQuery, voterQuery } from '../vote-value';
 
 interface VoteValueHookReturn {
   estimateVoteValue: (votePercentage: number) => Promise<number>;
@@ -10,80 +12,21 @@ interface VoteValueHookReturn {
 }
 
 /**
- * Hook to calculate vote values based on Hive Power and voting power
- * Adapted from the web app's useHivePower hook pattern
+ * Hook to calculate vote values based on Hive Power and voting power.
+ * The chain data is a shared query, so a feed of N PostCards fetches it once.
  */
 export function useVoteValue(username: string | null): VoteValueHookReturn {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hivePower, setHivePower] = useState(0);
-  const [votingPower, setVotingPower] = useState(10000); // Default to 100%
-  const [rewardFund, setRewardFund] = useState<any>(null);
-  const [feedHistory, setFeedHistory] = useState<any>(null);
+  const enabled = !!username && username !== 'SPECTATOR';
+  const voter = useQuery({ ...voterQuery(HiveClient.database, convertVestToHive, username ?? ''), enabled });
+  const rewardData = useQuery({ ...rewardDataQuery(HiveClient.database), enabled });
 
-  // Fetch account data and voting power
-  useEffect(() => {
-    if (!username || username === 'SPECTATOR') {
-      setHivePower(0);
-      setVotingPower(10000);
-      return;
-    }
+  const hivePower = (enabled && voter.data?.hivePower) || 0;
+  const votingPower = (enabled && voter.data?.votingPower) || 10000;
+  const chain = rewardData.data;
 
-    let cancelled = false;
-
-    const fetchAccountData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const [account] = await HiveClient.database.getAccounts([username]);
-        if (cancelled) return;
-        if (!account) throw new Error('Account not found');
-
-        const vestingShares = parseFloat(account.vesting_shares.toString().split(' ')[0]);
-        const hp = await convertVestToHive(vestingShares);
-        if (cancelled) return;
-
-        setHivePower(hp);
-        setVotingPower(account.voting_power || 10000);
-      } catch (err) {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to fetch account data');
-        setHivePower(0);
-        setVotingPower(10000);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    fetchAccountData();
-    return () => { cancelled = true; };
-  }, [username]);
-
-  // Fetch reward fund and feed history for vote calculation
-  useEffect(() => {
-    let cancelled = false;
-    const fetchBlockchainData = async () => {
-      try {
-        const fund = await HiveClient.database.call('get_reward_fund', ['post']);
-        const history = await HiveClient.database.call('get_feed_history', []);
-        if (!cancelled) {
-          setRewardFund(fund);
-          setFeedHistory(history);
-        }
-      } catch (err) {
-        console.warn('[useVoteValue] Failed to fetch blockchain data for vote calc:', err);
-      }
-    };
-
-    fetchBlockchainData();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Calculate vote value based on percentage
   const estimateVoteValue = useCallback(async (votePercentage: number): Promise<number> => {
     try {
-      if (!username || hivePower === 0 || !rewardFund || !feedHistory) {
+      if (!username || hivePower === 0 || !chain) {
         return 0;
       }
 
@@ -93,41 +36,17 @@ export function useVoteValue(username: string | null): VoteValueHookReturn {
         return 0;
       }
 
-      // Use the same calculation as the web app's useHivePower hook
-      const { reward_balance, recent_claims } = rewardFund;
-      const { base, quote } = feedHistory.current_median_history;
-      const baseNumeric = parseFloat(String(base).split(" ")[0]);
-      const quoteNumeric = parseFloat(String(quote).split(" ")[0]);
-      const hbdMedianPrice = baseNumeric / quoteNumeric;
-      const rewardBalanceNumeric = parseFloat(String(reward_balance).split(" ")[0]);
-      const recentClaimsNumeric = parseFloat(String(recent_claims));
-      
-      const vestingSharesNumeric = parseFloat(String(account.vesting_shares).split(" ")[0]);
-      const receivedVestingSharesNumeric = parseFloat(String(account.received_vesting_shares).split(" ")[0]);
-      const delegatedVestingSharesNumeric = parseFloat(String(account.delegated_vesting_shares).split(" ")[0]);
-      const total_vests = vestingSharesNumeric + receivedVestingSharesNumeric - delegatedVestingSharesNumeric;
-      const final_vest = total_vests * 1e6;
-      
-      // Voting power is from 0-100, but blockchain expects 0-10000
-      const voting_power = account.voting_power || 0;
-      // Use the provided votePercentage (slider value)
-      const used_power = Math.floor((voting_power * votePercentage) / 100);
-      const rshares = (used_power * final_vest) / 10000 / 50;
-
-      // Calculate final vote value in HBD
-      const estimate = (rshares / recentClaimsNumeric) * rewardBalanceNumeric * hbdMedianPrice;
-      
-      return Math.max(0, estimate);
+      return estimateFromChainData(account, chain.rewardFund, chain.feedHistory, votePercentage);
     } catch (err) {
       console.warn('[useVoteValue] estimateVoteValue failed:', err);
       return 0;
     }
-  }, [username, hivePower, rewardFund, feedHistory]);
+  }, [username, hivePower, chain]);
 
   return {
     estimateVoteValue,
-    isLoading,
-    error,
+    isLoading: voter.isLoading,
+    error: voter.error ? voter.error.message || 'Failed to fetch account data' : null,
     hivePower,
     votingPower: votingPower / 100, // Convert to percentage for display
   };
