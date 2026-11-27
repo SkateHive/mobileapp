@@ -70,7 +70,8 @@ function extractVideosFromFeed(posts: Post[]): VideoPost[] {
           replies: rawPost.children || 0,
           thumbnailUrl: thumbnail,
           tags: metadata?.tags || [],
-          active_votes: rawPost.active_votes || [],
+          // The feed API names the vote list `votes`, not `active_votes`.
+          active_votes: rawPost.active_votes || rawPost.votes || [],
         });
       });
     }

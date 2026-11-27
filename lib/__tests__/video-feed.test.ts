@@ -69,3 +69,22 @@ test("the query adds no retries on top: 2 requests in total when both endpoints 
     client.clear();
   }
 });
+
+test("the feed fallback keeps the votes, which the feed API sends as `votes`", async () => {
+  const deps: VideoFeedDeps = {
+    now: () => 0,
+    getVideoFeed: (async () => null) as VideoFeedDeps["getVideoFeed"],
+    fetchFeedPage: (async () => [
+      {
+        author: "mark0318",
+        permlink: "sh-1",
+        body: `<iframe src="https://ipfs.skatehive.app/ipfs/QmClip"></iframe>`,
+        json_metadata: "{}",
+        votes: [{ voter: "bielcx", weight: 100, rshares: 100 }],
+      },
+    ]) as unknown as VideoFeedDeps["fetchFeedPage"],
+  };
+  const { videos } = await fetchVideoFeedPage(1, deps);
+  assert.equal(videos.length, 1, "the post should be read as a video");
+  assert.deepEqual(videos[0].active_votes.map((v) => v.voter), ["bielcx"]);
+});
