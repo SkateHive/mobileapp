@@ -21,7 +21,7 @@ import { castVote, canPost } from '~/lib/posting';
 import { theme } from '~/lib/theme';
 import { t } from '~/lib/i18n';
 import { extractMediaFromBody } from '~/lib/utils';
-import { recordVote } from '~/lib/vote-store';
+import { recordVote, resolveVoteState, useVoteOverrides } from '~/lib/vote-store';
 import type { Discussion } from '@hiveio/dhive';
 import type { Media, NestedDiscussion } from '../../lib/types';
 
@@ -71,13 +71,13 @@ export function ConversationReply({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [isVoting, setIsVoting] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
+  // rshares, not weight: bridge votes carry no weight, and weight is 0 on many real upvotes.
+  // The overrides hold votes cast this session, which the fetched thread may predate.
+  const voteOverrides = useVoteOverrides();
+  const [initialVote] = useState(() => resolveVoteState(voteOverrides, post, currentUsername));
+  const [isLiked, setIsLiked] = useState(initialVote.isLiked);
   const [showReplyComposer, setShowReplyComposer] = useState(false);
-  const [voteCount, setVoteCount] = useState(
-    Array.isArray(post.active_votes)
-      ? post.active_votes.filter((vote: any) => vote.weight > 0).length
-      : 0
-  );
+  const [voteCount, setVoteCount] = useState(initialVote.voteCount);
   const { showToast } = useToast();
 
   const handleMediaPress = (media: Media) => {
@@ -86,6 +86,8 @@ export function ConversationReply({
   };
 
   const handleVote = async () => {
+    // Like PostCard: a vote already cast isn't undone by a tap.
+    if (isLiked) return;
     try {
       setIsVoting(true);
 
@@ -226,7 +228,7 @@ export function ConversationReply({
             <Pressable
               onPress={handleVote}
               style={[styles.actionItem, isVoting && styles.disabledButton]}
-              disabled={isVoting}
+              disabled={isVoting || isLiked}
             >
               {isVoting ? (
                 <ActivityIndicator size="small" color={theme.colors.green} />
