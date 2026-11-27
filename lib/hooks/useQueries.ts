@@ -157,7 +157,7 @@ export async function fetchVideoFeedPage(page: number, deps: VideoFeedDeps = rea
         // (and when that leaves none, see lastPageAddedNothing).
         if (videos.length > 0) resolve({ videos, nextPage: 1 });
         else fail();
-      }, fail);
+      }).catch(fail);
     };
     const cancelRace = deps.after(VIDEO_RACE_MS, startFallback);
     fetchVideosEndpointPage(1, deps).catch(() => null).then((result) => {

@@ -116,6 +116,13 @@ test("both failing: an error, within the page's deadline", async () => {
   assert.deepEqual(f.calls, ["videos:1", "feed"]);
 });
 
+test("a fallback that throws while reading the posts is a failure, not a page that never settles", async () => {
+  const f = fakeDeps(100, "fail", 100, "ok");
+  const broken = { author: "a", permlink: "p", get body(): string { throw new Error("bad post"); } };
+  f.deps.fetchFeedPage = (async () => [broken]) as unknown as VideoFeedDeps["fetchFeedPage"];
+  await assert.rejects(f.clock.run(fetchVideoFeedPage(FIRST_PAGE, f.deps)));
+});
+
 test("an empty fallback doesn't beat /videos, and with /videos failing it's an error, not an empty feed", async () => {
   const slow = fakeDeps(8_000, "ok", 1_000, "empty");
   const page = await slow.clock.run(fetchVideoFeedPage(FIRST_PAGE, slow.deps));
