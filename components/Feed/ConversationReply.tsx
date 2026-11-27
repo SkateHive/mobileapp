@@ -21,7 +21,7 @@ import { castVote, canPost } from '~/lib/posting';
 import { theme } from '~/lib/theme';
 import { t } from '~/lib/i18n';
 import { extractMediaFromBody } from '~/lib/utils';
-import { recordVote, resolveVoteState } from '~/lib/vote-store';
+import { recordVote, resolveVoteState, useVoteOverrides } from '~/lib/vote-store';
 import type { Discussion } from '@hiveio/dhive';
 import type { Media, NestedDiscussion } from '../../lib/types';
 
@@ -71,12 +71,13 @@ export function ConversationReply({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [isVoting, setIsVoting] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
-  const [showReplyComposer, setShowReplyComposer] = useState(false);
   // rshares, not weight: bridge votes carry no weight, and weight is 0 on many real upvotes.
-  const [voteCount, setVoteCount] = useState(
-    () => resolveVoteState({}, post, currentUsername).voteCount
-  );
+  // The overrides hold votes cast this session, which the fetched thread may predate.
+  const voteOverrides = useVoteOverrides();
+  const [initialVote] = useState(() => resolveVoteState(voteOverrides, post, currentUsername));
+  const [isLiked, setIsLiked] = useState(initialVote.isLiked);
+  const [showReplyComposer, setShowReplyComposer] = useState(false);
+  const [voteCount, setVoteCount] = useState(initialVote.voteCount);
   const { showToast } = useToast();
 
   const handleMediaPress = (media: Media) => {
